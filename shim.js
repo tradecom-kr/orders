@@ -49,10 +49,14 @@
   gate.addEventListener("submit", e => { if(e.target.id === "gMail") mailLink(e); });
   gate.addEventListener("click", e => { if(e.target.id==="gGoogle") signIn(); if(e.target.id==="gOut") signOut(); });
 
+  // the Google button shows only once Google sign-in is switched on in Supabase
+  let googleOn = true;
+  const settings = fetch(CFG.url + "/auth/v1/settings", { headers: { apikey: CFG.anonKey } }).then(r => r.ok ? r.json() : null)
+    .then(j => { if(j && j.external) googleOn = !!j.external.google; }).catch(() => {});
   let started = false;
   async function check(session){
     if(started) return;
-    if(!session){ say("Войдите, чтобы открыть доску."); $g("gGoogle").hidden=false; $g("gMail").hidden=false; $g("gOut").hidden=true; return; }
+    if(!session){ say("Войдите, чтобы открыть доску."); $g("gGoogle").hidden=!googleOn; $g("gMail").hidden=false; $g("gOut").hidden=true; return; }
     const email = session.user && session.user.email || "";
     say("Проверяю доступ для " + email + "…");
     const { data, error } = await sb.rpc("is_allowed");
@@ -76,7 +80,7 @@
   // the gate and the user badge need the page's markup, so sign-in is checked once the document is parsed
   const domReady = new Promise(r => document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", r) : r());
   domReady.then(() => {
-    sb.auth.getSession().then(({data}) => check(data.session));
+    Promise.race([settings, new Promise(r => setTimeout(r, 2500))]).then(() => sb.auth.getSession()).then(({data}) => check(data.session));
     sb.auth.onAuthStateChange((_ev, session) => { if(session) setTimeout(() => check(session), 0); });
   });
 
