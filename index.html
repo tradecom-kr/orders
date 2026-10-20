@@ -866,7 +866,7 @@ function renderOverview(){
   const key=o=>String(o.date||o.createdAt||"").slice(0,10), nn=o=>parseInt(String(o.num||"").replace(/\D+/g," ").trim().split(" ").pop())||0;
   const vis=visible().sort((x,y)=>key(y).localeCompare(key(x))||nn(y)-nn(x)||String(y.createdAt||"").localeCompare(String(x.createdAt||"")));
   foldBtnText();
-  $("ovl").innerHTML=vis.map(cardHTML).join("")||`<div class="status">${orders.length?"Нет заказов под этот фильтр.":"Заказов пока нет. Нажмите «+ Новый заказ», чтобы добавить первый."}</div>`;
+  $("ovl").innerHTML=vis.map(cardHTML).join("")||(orders.length?`<div class="status">Нет заказов под этот фильтр.</div>`:"");
 }
 
 /* ---------- calendar data ---------- */

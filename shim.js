@@ -54,8 +54,14 @@
   const settings = fetch(CFG.url + "/auth/v1/settings", { headers: { apikey: CFG.anonKey } }).then(r => r.ok ? r.json() : null)
     .then(j => { if(j && j.external) googleOn = !!j.external.google; }).catch(() => {});
   let started = false;
+  // getSession and onAuthStateChange both report the same session; only the first may run the check
+  let checking = false;
   async function check(session){
-    if(started) return;
+    if(started || (session && checking)) return;
+    if(session) checking = true;
+    try { await check1(session); } finally { checking = false; }
+  }
+  async function check1(session){
     if(!session){ say("Войдите, чтобы открыть доску."); $g("gGoogle").hidden=!googleOn; $g("gMail").hidden=false; $g("gOut").hidden=true; return; }
     const email = session.user && session.user.email || "";
     say("Проверяю доступ для " + email + "…");
@@ -71,6 +77,7 @@
   function showUser(email){
     const top = document.querySelector("header.top > div:last-child");
     if(!top) return;
+    if(document.getElementById("tcUser")) return;
     const box = document.createElement("span"); box.id = "tcUser";
     box.innerHTML = `<span></span><button type="button" class="btn ghost">Выйти</button>`;
     box.firstChild.textContent = email;
