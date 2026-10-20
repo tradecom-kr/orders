@@ -6,6 +6,9 @@
   const sb = window.supabase.createClient(CFG.url, CFG.anonKey, {auth:{persistSession:true, autoRefreshToken:true, detectSessionInUrl:true}});
   window.__sb = sb;
   const BUCKET = "files";
+  // "#import" is lost when the sign-in link brings the browser back, so remember it for this tab
+  let wantImport = false;
+  try{ if(location.hash === "#import") sessionStorage.setItem("tcImport", "1"); wantImport = sessionStorage.getItem("tcImport") === "1"; }catch(e){ wantImport = location.hash === "#import"; }
   let readyResolve; const ready = new Promise(r => readyResolve = r);
 
   /* ---------- sign-in gate ---------- */
@@ -72,7 +75,7 @@
     gate.remove();
     showUser(email);
     readyResolve(true);
-    if(location.hash === "#import") importPanel();
+    if(wantImport) importPanel();
   }
   function showUser(email){
     const top = document.querySelector("header.top > div:last-child");
@@ -197,6 +200,7 @@
         for(const coll of ["orders", "buyers", "events"]) (meta[coll] || []).forEach(d => rows.push({ coll, id: d.id, data: d.data, updated_at: new Date().toISOString() }));
         if(rows.length){ const { error } = await sb.from("docs").upsert(rows); if(error) throw error; }
         note(`Готово: ${rows.length} записей и ${n} файлов перенесено. Обновите страницу.`);
+        try{ sessionStorage.removeItem("tcImport"); }catch(e){}
       }catch(x){ note("Ошибка переноса: " + (x && x.message || x)); }
     };
   }
