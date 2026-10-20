@@ -1,6 +1,6 @@
 /* TRADECOM orders board — Supabase adapter.
    The board's own code talks to window.claude.use("db" | "assets" | "user" | "downloads");
-   this file provides the same calls on top of Supabase, plus the Google sign-in gate. */
+   this file provides the same calls on top of Supabase, plus the sign-in gate (email + password, Google when enabled). */
 (function(){
   const CFG = window.TC_CONFIG || {};
   const sb = window.supabase.createClient(CFG.url, CFG.anonKey, {auth:{persistSession:true, autoRefreshToken:true, detectSessionInUrl:true}});
@@ -15,13 +15,26 @@
   const gate = document.createElement("div");
   gate.id = "tcGate";
   gate.innerHTML = `<div class="gbox"><h1>Заказы и отгрузки TRADECOM</h1><p id="gMsg">Проверяю вход…</p>
-    <button type="button" id="gGoogle" class="btn primary" hidden>Войти через Google</button>
-    <form id="gMail" hidden><span class="gor">или по ссылке на почту</span><input type="email" id="gEmail" required placeholder="ваша@почта" autocomplete="email" aria-label="Почта"><button type="submit" class="btn">Прислать ссылку для входа</button></form>
+    <form id="gPw" hidden>
+      <input type="email" id="gEmail" name="username" autocomplete="username" required placeholder="Почта" aria-label="Почта">
+      <input type="password" id="gPass" name="password" autocomplete="current-password" required minlength="6" placeholder="Пароль" aria-label="Пароль">
+      <button type="submit" class="btn primary">Войти</button>
+      <button type="button" class="glnk" id="gSet">Первый вход или забыли пароль? Задать пароль</button>
+    </form>
+    <form id="gNew" hidden>
+      <input type="email" id="gNewUser" name="username" autocomplete="username" readonly aria-label="Почта">
+      <input type="password" id="gNewPass" name="new-password" autocomplete="new-password" required minlength="6" placeholder="Новый пароль, не короче 6 знаков" aria-label="Новый пароль">
+      <button type="submit" class="btn primary">Сохранить пароль и войти</button>
+    </form>
+    <span class="gor" id="gOr" hidden>или</span>
+    <button type="button" id="gGoogle" class="btn" hidden>Войти через Google</button>
     <button type="button" id="gOut" class="btn ghost" hidden>Выйти и войти другим аккаунтом</button></div>`;
   const css = document.createElement("style");
   css.textContent = `#tcGate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:var(--bg,#f3f4f6);padding:16px}
 #tcGate .gbox{max-width:380px;width:100%;background:var(--panel,#fff);border:1px solid var(--line,#dde1e6);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:12px;text-align:center}
-#tcGate form{display:flex;flex-direction:column;gap:8px;margin:0}#tcGate .gor{font-size:12px;color:var(--muted,#5b6573);margin-top:4px}
+#tcGate form{display:flex;flex-direction:column;gap:8px;margin:0}#tcGate .gor{font-size:12px;color:var(--muted,#5b6573)}
+#tcGate .glnk{background:none;border:0;padding:4px;font:inherit;font-size:13px;color:var(--accent,#1d5a7a);text-decoration:underline;cursor:pointer}
+#tcGate input[readonly]{opacity:.75}
 #tcGate h1{font-size:20px;margin:0}#tcGate p{margin:0;color:var(--muted,#5b6573);font-size:14px}
 #tcUser{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted,#5b6573)}
 #tcImp{position:fixed;right:16px;bottom:16px;z-index:50;background:var(--panel,#fff);border:1px solid var(--line,#dde1e6);border-radius:12px;padding:12px;max-width:340px;font-size:13px;display:flex;flex-direction:column;gap:8px;box-shadow:0 4px 18px rgba(0,0,0,.12)}`;
@@ -36,21 +49,56 @@
     const { error } = await sb.auth.signInWithOAuth({ provider:"google", options:{ redirectTo: back, queryParams:{ prompt:"select_account" } } });
     if(error) say("Не получилось открыть вход Google: " + error.message);
   }
-  // a sign-in link by email, for people without a Google account; only addresses on the allowed list get one
-  async function mailLink(e){
-    e.preventDefault();
-    const email = $g("gEmail").value.trim().toLowerCase(); if(!email) return;
-    say("Проверяю почту…");
+  const BACK = () => location.origin + location.pathname;
+  const PWKEY = "tcSetPw";
+  const mem = { get(){ try{ return localStorage.getItem(PWKEY) || ""; }catch(e){ return ""; } }, set(v){ try{ v ? localStorage.setItem(PWKEY, v) : localStorage.removeItem(PWKEY); }catch(e){} } };
+  const mailErr = m => /rate|limit|seconds/i.test(m) ? "Слишком много писем подряд. Подождите минуту и попробуйте снова." : m;
+  async function allowedEmail(email){
     const ok = await sb.rpc("can_sign_in", { e: email });
-    if(ok.error){ say("Нет связи с базой: " + ok.error.message); return; }
-    if(!ok.data){ say("У " + email + " нет доступа к доске. Попросите владельца добавить эту почту."); return; }
-    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname, shouldCreateUser: true } });
-    say(error ? (/rate|limit|seconds/i.test(error.message) ? "Слишком много писем подряд. Подождите немного и попробуйте снова." : "Не получилось отправить письмо: " + error.message)
-              : "Письмо отправлено на " + email + ". Откройте его на этом устройстве и нажмите ссылку для входа.");
+    if(ok.error){ say("Нет связи с базой: " + ok.error.message); return false; }
+    if(!ok.data){ say("У " + email + " нет доступа к доске. Попросите владельца добавить эту почту."); return false; }
+    return true;
+  }
+  // email + password; the browser offers to remember both
+  async function pwSignIn(e){
+    e.preventDefault();
+    const email = $g("gEmail").value.trim().toLowerCase(), password = $g("gPass").value;
+    say("Вхожу…");
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if(error) say(/invalid/i.test(error.message) ? "Неверная почта или пароль. Если входите впервые или забыли пароль — нажмите «Задать пароль»." : /confirm/i.test(error.message) ? "Почта ещё не подтверждена — откройте письмо от Supabase." : "Не получилось войти: " + error.message);
+  }
+  // first time or forgotten: one email with a link, then the new password is typed here
+  async function pwRequest(){
+    const email = $g("gEmail").value.trim().toLowerCase();
+    if(!email || !$g("gEmail").checkValidity()){ say("Сначала впишите свою почту."); $g("gEmail").focus(); return; }
+    say("Проверяю почту…");
+    if(!(await allowedEmail(email))) return;
+    mem.set(email);
+    const tmp = [...crypto.getRandomValues(new Uint8Array(18))].map(b => b.toString(16).padStart(2, "0")).join("") + "Aa1!";
+    let { data, error } = await sb.auth.signUp({ email, password: tmp, options: { emailRedirectTo: BACK() } });
+    const exists = (error && /already|registered|exists/i.test(error.message)) || (data && data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0);
+    if(exists) ({ error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: BACK() }));
+    if(error){ mem.set(""); say("Не получилось отправить письмо: " + mailErr(error.message)); return; }
+    if(data && data.session && !exists){ askNewPassword(email); return; }
+    say("Письмо отправлено на " + email + ". Откройте его в этом браузере и нажмите ссылку — потом здесь же придумаете пароль.");
+  }
+  function askNewPassword(email){
+    say("Придумайте пароль для " + email + ". Браузер предложит его запомнить.");
+    $g("gPw").hidden = true; $g("gOr").hidden = true; $g("gGoogle").hidden = true; $g("gOut").hidden = true;
+    $g("gNew").hidden = false; $g("gNewUser").value = email; $g("gNewPass").focus();
+  }
+  async function pwSave(e){
+    e.preventDefault();
+    say("Сохраняю пароль…");
+    const { data, error } = await sb.auth.updateUser({ password: $g("gNewPass").value });
+    if(error){ say(/same|different/i.test(error.message) ? "Этот пароль уже стоит. Придумайте другой или просто войдите." : "Не получилось сохранить пароль: " + error.message); return; }
+    mem.set(""); recovering = false; $g("gNew").hidden = true;
+    const s2 = (await sb.auth.getSession()).data.session; check(s2);
   }
   async function signOut(){ await sb.auth.signOut(); location.reload(); }
-  gate.addEventListener("submit", e => { if(e.target.id === "gMail") mailLink(e); });
-  gate.addEventListener("click", e => { if(e.target.id==="gGoogle") signIn(); if(e.target.id==="gOut") signOut(); });
+  gate.addEventListener("submit", e => { if(e.target.id === "gPw") pwSignIn(e); if(e.target.id === "gNew") pwSave(e); });
+  gate.addEventListener("click", e => { if(e.target.id==="gGoogle") signIn(); if(e.target.id==="gOut") signOut(); if(e.target.id==="gSet") pwRequest(); });
+  let recovering = false;
 
   // the Google button shows only once Google sign-in is switched on in Supabase
   let googleOn = true;
@@ -65,12 +113,14 @@
     try { await check1(session); } finally { checking = false; }
   }
   async function check1(session){
-    if(!session){ say("Войдите, чтобы открыть доску."); $g("gGoogle").hidden=!googleOn; $g("gMail").hidden=false; $g("gOut").hidden=true; return; }
+    if(!session){ say("Войдите, чтобы открыть доску."); $g("gPw").hidden=false; $g("gGoogle").hidden=!googleOn; $g("gOr").hidden=!googleOn; $g("gOut").hidden=true; return; }
     const email = session.user && session.user.email || "";
+    // back from the password email: set the password before opening the board
+    if(recovering || (mem.get() && mem.get() === email.toLowerCase())){ askNewPassword(email); return; }
     say("Проверяю доступ для " + email + "…");
     const { data, error } = await sb.rpc("is_allowed");
     if(error){ say("Нет связи с базой: " + error.message); $g("gOut").hidden=false; return; }
-    if(!data){ say("У " + email + " нет доступа к доске. Попросите владельца добавить эту почту."); $g("gGoogle").hidden=true; $g("gMail").hidden=true; $g("gOut").hidden=false; return; }
+    if(!data){ say("У " + email + " нет доступа к доске. Попросите владельца добавить эту почту."); $g("gGoogle").hidden=true; $g("gOr").hidden=true; $g("gPw").hidden=true; $g("gOut").hidden=false; return; }
     started = true;
     gate.remove();
     showUser(email);
@@ -91,7 +141,7 @@
   const domReady = new Promise(r => document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", r) : r());
   domReady.then(() => {
     Promise.race([settings, new Promise(r => setTimeout(r, 2500))]).then(() => sb.auth.getSession()).then(({data}) => check(data.session));
-    sb.auth.onAuthStateChange((_ev, session) => { if(session) setTimeout(() => check(session), 0); });
+    sb.auth.onAuthStateChange((ev, session) => { if(ev === "PASSWORD_RECOVERY") recovering = true; if(session) setTimeout(() => check(session), 0); });
   });
 
   /* ---------- db: collections of JSON documents ---------- */
