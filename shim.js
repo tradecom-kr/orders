@@ -229,8 +229,10 @@
   /* ---------- one-time import of the export from the Claude board (open the site with #import) ---------- */
   function importPanel(){
     const p = document.createElement("div"); p.id = "tcImp";
-    p.innerHTML = `<b>Перенос данных из Claude</b><span>Выберите файл экспорта (.zip), который подготовил Claude.</span><input type="file" accept=".zip"><span class="note" id="impNote"></span>`;
+    p.innerHTML = `<button type="button" class="btn ghost" id="impX" aria-label="Закрыть" style="position:absolute;top:6px;right:6px;padding:2px 8px">✕</button><b>Перенос данных из Claude</b><span>Выберите файл экспорта (.zip), который подготовил Claude.</span><input type="file" accept=".zip"><span class="note" id="impNote"></span>`;
     document.body.appendChild(p);
+    p.style.position = "fixed";
+    p.querySelector("#impX").onclick = () => { try{ sessionStorage.removeItem("tcImport"); }catch(e){} if(location.hash === "#import") history.replaceState(null, "", location.pathname); p.remove(); };
     const note = t => { p.querySelector("#impNote").textContent = t; };
     p.querySelector("input").onchange = async e => {
       const f = e.target.files[0]; if(!f) return;
