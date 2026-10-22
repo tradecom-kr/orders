@@ -546,7 +546,7 @@ textarea{min-height:70px;resize:vertical}
         <legend>Документы</legend>
         <div class="upl" id="upl">
           <select id="upKind" aria-label="Тип документа"></select>
-          <select id="upSigner" aria-label="Подпись" hidden><option value="">Подпись — по имени файла</option><option value="ti">Подпись: Ти Валерий (покупатель)</option><option value="den">Подпись: Ден Евгений (банк)</option></select>
+          <select id="upSigner" aria-label="Подпись" hidden><option value="">Подпись — по имени файла</option><option value="ti">Подпись: Ти Валерий (покупатель)</option><option value="both">Подписан обеими сторонами</option><option value="den">Подпись: Ден Евгений (банк)</option></select>
           <input type="file" id="upFile" multiple style="width:auto;flex:1 1 200px" aria-label="Файлы">
           <span class="note" id="upNote">Word, Excel, PDF, фото — можно перетащить сюда</span>
         </div>
@@ -623,7 +623,7 @@ textarea{min-height:70px;resize:vertical}
 const GEN_URL="https://claude.ai/code/artifact/e4664ad1-98f8-49cd-9049-7375eb8665d0";
 const PHASES=[
   {id:"order", t:"Заказ",       steps:["got","check"]},
-  {id:"docs",  t:"Документы",   steps:["kp","cs","ipl"]},
+  {id:"docs",  t:"Документы",   steps:["kp","cs","cs2","ipl"]},
   {id:"sched", t:"График",      steps:["vessel","supconf"]},
   {id:"pay",   t:"Оплата",      steps:["paid","bank"]},
   {id:"suppay",t:"Поставщики",  steps:["suppay"]},
@@ -633,13 +633,14 @@ const PHASES=[
 ];
 const PIDX=Object.fromEntries(PHASES.map((p,i)=>[p.id,i]));
 // short names for the step list under each part of the progress bar
-const SHORT={got:"Заказ получен",check:"Цены и наличие",kp:"КП",cs:"Контракт и спец. (Ти)",ipl:"Инвойс и упаковочный",vessel:"Судно утверждено",supconf:"Сроки поставщиков",paid:"Оплата получена",bank:"Контракт и спец. (Ден Е.)",place:"Место и время загрузки",exp:"Экспортная декларация",photo:"Фотоотчёт",suppay:"Поставщикам оплачено",port:"Контейнер в порту",bl:"Коносамент",freight:"Счёт за отгрузку",broker:"Пакет брокеру",closed:"Сделка завершена 🎉"};
+const SHORT={got:"Заказ получен",check:"Цены и наличие",kp:"КП",cs:"Контракт и спец. (Ти)",cs2:"Подписанный контракт",ipl:"Инвойс и упаковочный",vessel:"Судно утверждено",supconf:"Сроки поставщиков",paid:"Оплата получена",bank:"Контракт и спец. (Ден Е.)",place:"Место и время загрузки",exp:"Экспортная декларация",photo:"Фотоотчёт",suppay:"Поставщикам оплачено",port:"Контейнер в порту",bl:"Коносамент",freight:"Счёт за отгрузку",broker:"Пакет брокеру",closed:"Сделка завершена 🎉"};
 // mode: manual = checkbox; doc = done when the file is attached; auto = done when the fields say so
 const STEP={
   got:    {n:"1",   t:"Заказ получен", mode:"auto"},
   check:  {n:"2",   t:"Цены и наличие у поставщика проверены", mode:"manual", next:"Проверить цены и наличие у поставщика"},
   kp:     {n:"3",   t:"Коммерческое предложение", mode:"doc", doc:"kp", next:"Загрузить коммерческое предложение"},
   cs:     {n:"3",   t:"Контракт и спецификация (подпись Ти В.)", mode:"doc", doc:"cs_ti", next:"Загрузить контракт и спецификацию (Ти В.)"},
+  cs2:    {n:"3-2", t:"Контракт и спецификация, подписанные обеими сторонами", mode:"doc", doc:"cs_both", next:"Получить от покупателя подписанный контракт и спецификацию"},
   ipl:    {n:"3",   t:"Инвойс и упаковочный лист", mode:"doc", doc:"ipl", next:"Загрузить инвойс и упаковочный лист"},
   vessel: {n:"5",   t:"Расписание судна утверждено", mode:"manual", req:o=>!!o.etd, reqMsg:"Сначала заполните ETD (ETA можно позже) в блоке «График и загрузка»", next:"Утвердить расписание судна"},
   supconf:{n:"5",   t:"Сроки поставки от поставщиков подтверждены", mode:"auto", hint:"Отметится само, когда у всех поставщиков срок «Подтверждён»", next:"Подтвердить сроки поставщиков"},
@@ -656,14 +657,15 @@ const STEP={
   closed: {n:"13",  t:"Сделка успешно завершена", mode:"manual", next:"Завершить сделку — финиш близко"}
 };
 // documents each phase must have once the order has reached it
-const REQ={docs:["kp","cs_ti","ipl"],pay:["cs_den"],load:["exp","photo"],port:["bl","freight"]};
-const REQL={kp:"КП",cs_ti:"контракт и спец. (Ти В.)",ipl:"инвойс и упаковочный",cs_den:"контракт и спец. (Ден Е.)",exp:"экспортная декларация",photo:"фотоотчёт",bl:"коносамент",freight:"счёт за отгрузку"};
-const UPK={kp:"kp",cs_ti:"cs",cs_den:"cs",ipl:"ipl",exp:"exp",photo:"photo",bl:"bl",freight:"freight"};
+const REQ={docs:["kp","cs_ti","cs_both","ipl"],pay:["cs_den"],load:["exp","photo"],port:["bl","freight"]};
+const REQL={kp:"КП",cs_ti:"контракт и спец. (Ти В.)",cs_both:"контракт и спец. (подписан обеими)",ipl:"инвойс и упаковочный",cs_den:"контракт и спец. (Ден Е.)",exp:"экспортная декларация",photo:"фотоотчёт",bl:"коносамент",freight:"счёт за отгрузку"};
+const UPK={kp:"kp",cs_ti:"cs",cs_both:"cs",cs_den:"cs",ipl:"ipl",exp:"exp",photo:"photo",bl:"bl",freight:"freight"};
 const SUPST={none:"Не запрошен",asked:"Запрошен, ждём",confirmed:"Подтверждён"};
 const PAY={none:["Не оплачен",""],partial:["Частично","warn"],paid:["Оплачен","ok"]};
-const SIGNERS=[["ti","Ти Валерий — для покупателя","Ти В."],["den","Ден Евгений — для банка","Ден Е."]];
+const SIGNERS=[["ti","Ти Валерий — для покупателя","Ти В."],["both","Подписан обеими сторонами","обе стороны"],["den","Ден Евгений — для банка","Ден Е."]];
 const SIGN=Object.fromEntries(SIGNERS.map(x=>[x[0],x]));
 const guessSigner=n=>{n=String(n).toLowerCase();
+  if(/подписан|обоюдн|signed|mutual|both/.test(n))return "both";
   if(/(^|[^а-яёa-z])ден([^а-яёa-z]|$)|(^|[^a-z])den([^a-z]|$)|евген|evgen/.test(n))return "den";
   if(/(^|[^а-яёa-z])ти([^а-яёa-z]|$)|(^|[^a-z])ti([^a-z]|$)|валер|valer/.test(n))return "ti";
   return ""};
@@ -694,6 +696,7 @@ const supAll=list=>list.length>0&&list.every(x=>x.st==="confirmed"&&x.date);
 function reqFiles(o,r){const fs=o.files||[];
   if(r==="cs_ti")return fs.filter(f=>kindOf(f.kind)==="cs"&&f.signer!=="den");
   if(r==="cs_den")return fs.filter(f=>kindOf(f.kind)==="cs"&&f.signer==="den");
+  if(r==="cs_both")return fs.filter(f=>kindOf(f.kind)==="cs"&&f.signer==="both");
   return fs.filter(f=>kindOf(f.kind)===r)}
 const linkOK=u=>/^https?:\/\/\S+\.\S+/i.test(String(u||"").trim());
 const hasDoc=(o,r)=>(r==="photo"&&linkOK(o.photoLink))||reqFiles(o,r).length>0;
@@ -743,7 +746,7 @@ function analyze0(o){
   let overdue=false;
   // a document is demanded only once it is due, so the board does not nag about a photo report before loading
   const due={
-    kp:()=>cur>=PIDX.docs||ph[PIDX.docs].any, cs_ti:()=>cur>=PIDX.docs||ph[PIDX.docs].any, ipl:()=>cur>=PIDX.docs||ph[PIDX.docs].any,
+    kp:()=>cur>=PIDX.docs||ph[PIDX.docs].any, cs_ti:()=>cur>=PIDX.docs||ph[PIDX.docs].any, cs_both:()=>cur>=PIDX.docs||ph[PIDX.docs].any, ipl:()=>cur>=PIDX.docs||ph[PIDX.docs].any,
     cs_den:()=>o.pay==="paid"||o.pay==="partial",
     exp:()=>cur>=PIDX.load||(!!o.loadAt&&days(o.loadAt)<=3),
     photo:()=>(!!o.loadAt&&days(o.loadAt)<0)||stepDone(o,"port"),
@@ -846,7 +849,7 @@ function archCard(o){
   const fs=o.files||[], kinds=[...new Set(fs.map(f=>kindOf(f.kind)))];
   return `<article class="oc arch" tabindex="0" data-id="${esc(o.id)}">
     <div class="h"><span class="num">${esc(o.num||"без номера")}</span><span class="who">${esc(o.buyer||"—")}</span>${o.goods?`<span class="gd">${esc(o.goods)}</span>`:""}<span class="pcap"><b>Архив</b>${o.date?" · "+fyl(o.date):""}${stepDone(o,"closed")?` · <span class="ok-t">завершена 🎉 ${fyl(stepDate(o,"closed"))}</span>`:""}</span><span class="rt"><span class="amt">${fm(o.amount,o.cur)}</span></span></div>
-    <div class="adocs">${kinds.length?kinds.map(k=>`<span class="pill">${esc(KIND[k]||"Прочее")}${k==="cs"?" ("+fs.filter(f=>kindOf(f.kind)==="cs").map(f=>f.signer==="den"?"Ден Е.":"Ти В.").join(", ")+")":""}</span>`).join(""):`<span class="note">Документы не загружены</span>`}</div>
+    <div class="adocs">${kinds.length?kinds.map(k=>`<span class="pill">${esc(KIND[k]||"Прочее")}${k==="cs"?" ("+fs.filter(f=>kindOf(f.kind)==="cs").map(f=>(SIGN[f.signer]||SIGN.ti)[2]).join(", ")+")":""}</span>`).join(""):`<span class="note">Документы не загружены</span>`}</div>
   </article>`;
 }
 function cardHTML(o){
@@ -1067,7 +1070,7 @@ $("cl").addEventListener("change",async e=>{
 $("cl").addEventListener("click",e=>{
   if(e.target.closest("[data-golink]")){const i=$("e_photoLink");i.scrollIntoView({behavior:"smooth",block:"center"});setTimeout(()=>i.focus(),300);return}
   const u=e.target.closest("[data-upk]");
-  if(u){const k=UPK[u.dataset.upk];$("upKind").value=k;$("upSigner").hidden=k!=="cs";if(k==="cs")$("upSigner").value=u.dataset.upk==="cs_den"?"den":"ti";$("upFile").click();return}
+  if(u){const k=UPK[u.dataset.upk];$("upKind").value=k;$("upSigner").hidden=k!=="cs";if(k==="cs")$("upSigner").value={cs_den:"den",cs_both:"both"}[u.dataset.upk]||"ti";$("upFile").click();return}
   const p=e.target.closest("[data-pack]");if(p){buildPack(p);return}
   if(e.target.closest(".tile.more,[data-showpics]")){e.preventDefault();$("fileList").scrollIntoView({behavior:"smooth",block:"start"});return}
   const b=e.target.closest("button");if(!b)return;
@@ -1094,7 +1097,8 @@ async function buildPack(btn){
   if(!dl){$("saveNote").textContent="Скачивание не удалось. Обновите страницу.";return}
   if(!window.JSZip){$("saveNote").textContent="Не загрузилась библиотека архивов. Обновите страницу.";return}
   const d=editing;
-  const files=[...reqFiles(d,"cs_ti"),...reqFiles(d,"ipl"),...reqFiles(d,"exp"),...reqFiles(d,"bl"),...(d.files||[]).filter(f=>kindOf(f.kind)==="cert")];
+  // the customs broker gets the contract signed by both sides when there is one
+  const files=[...(hasDoc(d,"cs_both")?reqFiles(d,"cs_both"):reqFiles(d,"cs_ti")),...reqFiles(d,"ipl"),...reqFiles(d,"exp"),...reqFiles(d,"bl"),...(d.files||[]).filter(f=>kindOf(f.kind)==="cert")];
   const miss=["cs_ti","ipl","exp","bl"].filter(r=>!hasDoc(d,r)).map(r=>REQL[r]);
   if(!files.length){$("saveNote").textContent="В заказе нет документов для пакета. Не хватает: "+miss.join(", ")+".";return}
   btn.disabled=true;$("saveNote").textContent="Собираю пакет…";
