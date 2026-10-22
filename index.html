@@ -546,7 +546,7 @@ textarea{min-height:70px;resize:vertical}
         <legend>Документы</legend>
         <div class="upl" id="upl">
           <select id="upKind" aria-label="Тип документа"></select>
-          <select id="upSigner" aria-label="Подпись" hidden><option value="">Подпись — по имени файла</option><option value="ti">Подпись: Ти Валерий (покупатель)</option><option value="both">Подписан обеими сторонами</option><option value="den">Подпись: Ден Евгений (банк)</option></select>
+          <select id="upSigner" aria-label="Подпись" hidden><option value="">Подпись — по имени файла</option><option value="ti">Подпись: Ти Валерий (покупатель)</option><option value="both">Ти В. — подписан обеими сторонами</option><option value="den">Подпись: Ден Евгений (банк)</option><option value="den_both">Ден Е. — подписан обеими сторонами</option></select>
           <input type="file" id="upFile" multiple style="width:auto;flex:1 1 200px" aria-label="Файлы">
           <span class="note" id="upNote">Word, Excel, PDF, фото — можно перетащить сюда</span>
         </div>
@@ -659,14 +659,15 @@ const STEP={
 // documents each phase must have once the order has reached it
 const REQ={docs:["kp","cs_ti","cs_both","ipl"],pay:["cs_den"],load:["exp","photo"],port:["bl","freight"]};
 const REQL={kp:"КП",cs_ti:"контракт и спец. (Ти В.)",cs_both:"контракт и спец. (подписан обеими)",ipl:"инвойс и упаковочный",cs_den:"контракт и спец. (Ден Е.)",exp:"экспортная декларация",photo:"фотоотчёт",bl:"коносамент",freight:"счёт за отгрузку"};
-const UPK={kp:"kp",cs_ti:"cs",cs_both:"cs",cs_den:"cs",ipl:"ipl",exp:"exp",photo:"photo",bl:"bl",freight:"freight"};
+const UPK={kp:"kp",cs_ti:"cs",cs_both:"cs",cs_den_both:"cs",cs_den:"cs",ipl:"ipl",exp:"exp",photo:"photo",bl:"bl",freight:"freight"};
 const SUPST={none:"Не запрошен",asked:"Запрошен, ждём",confirmed:"Подтверждён"};
 const PAY={none:["Не оплачен",""],partial:["Частично","warn"],paid:["Оплачен","ok"]};
-const SIGNERS=[["ti","Ти Валерий — для покупателя","Ти В."],["both","Подписан обеими сторонами","обе стороны"],["den","Ден Евгений — для банка","Ден Е."]];
+const SIGNERS=[["ti","Ти Валерий — для покупателя","Ти В."],["both","Ти В. — подписан обеими сторонами","Ти В., подписан обеими"],["den","Ден Евгений — для банка","Ден Е."],["den_both","Ден Е. — подписан обеими сторонами","Ден Е., подписан обеими"]];
 const SIGN=Object.fromEntries(SIGNERS.map(x=>[x[0],x]));
 const guessSigner=n=>{n=String(n).toLowerCase();
-  if(/подписан|обоюдн|signed|mutual|both/.test(n))return "both";
-  if(/(^|[^а-яёa-z])ден([^а-яёa-z]|$)|(^|[^a-z])den([^a-z]|$)|евген|evgen/.test(n))return "den";
+  const isDen=/(^|[^а-яёa-z])ден([^а-яёa-z]|$)|(^|[^a-z])den([^a-z]|$)|евген|evgen/.test(n);
+  if(/подписан|обоюдн|signed|mutual|both/.test(n))return isDen?"den_both":"both";
+  if(isDen)return "den";
   if(/(^|[^а-яёa-z])ти([^а-яёa-z]|$)|(^|[^a-z])ti([^a-z]|$)|валер|valer/.test(n))return "ti";
   return ""};
 const $=id=>document.getElementById(id);
@@ -694,8 +695,9 @@ const sups=o=>Array.isArray(o.suppliers)?o.suppliers:((o.sup||o.supDate)?[{name:
 const supMax=list=>list.map(x=>x.date).filter(Boolean).sort().pop()||"";
 const supAll=list=>list.length>0&&list.every(x=>x.st==="confirmed"&&x.date);
 function reqFiles(o,r){const fs=o.files||[];
-  if(r==="cs_ti")return fs.filter(f=>kindOf(f.kind)==="cs"&&f.signer!=="den");
-  if(r==="cs_den")return fs.filter(f=>kindOf(f.kind)==="cs"&&f.signer==="den");
+  // the Den version signed by both sides is kept for the archive and also counts as the Den version
+  if(r==="cs_ti")return fs.filter(f=>kindOf(f.kind)==="cs"&&!["den","den_both"].includes(f.signer));
+  if(r==="cs_den")return fs.filter(f=>kindOf(f.kind)==="cs"&&["den","den_both"].includes(f.signer));
   if(r==="cs_both")return fs.filter(f=>kindOf(f.kind)==="cs"&&f.signer==="both");
   return fs.filter(f=>kindOf(f.kind)===r)}
 const linkOK=u=>/^https?:\/\/\S+\.\S+/i.test(String(u||"").trim());
@@ -999,6 +1001,10 @@ function clRow(d,id){
     ctrl=`<input type="checkbox" data-step="${id}" ${done?"checked":""} ${!canWrite||blocked?"disabled":""} aria-label="${esc(s.t)}">`;
     if(blocked)hint=`<small class="bad">${esc(s.reqMsg)}</small>`;
     if(id==="broker")act=`<button class="btn" type="button" data-pack>Собрать пакет</button>`;
+    // after the bank deal the Den version signed by both sides is stored for the archive
+    if(id==="bank"){const sb=(d.files||[]).filter(f=>kindOf(f.kind)==="cs"&&f.signer==="den_both");
+      hint+=sb.length?`<small class="ok-t">✓ Подписанный обеими сторонами: ${sb.map(f=>esc(f.name)).join(", ")}</small>`:`<small>Подписанную обеими сторонами версию Ден Е. можно загрузить для хранения</small>`;
+      if(canWrite&&assets&&editing.id)act=`<button class="btn" type="button" data-upk="cs_den_both">${sb.length?"+ Ещё файл":"Загрузить подписанный"}</button>`}
   }else{
     ctrl=`<span class="ico" aria-hidden="true">${done?"✓":""}</span>`;
     if(s.mode==="doc"){
@@ -1070,7 +1076,7 @@ $("cl").addEventListener("change",async e=>{
 $("cl").addEventListener("click",e=>{
   if(e.target.closest("[data-golink]")){const i=$("e_photoLink");i.scrollIntoView({behavior:"smooth",block:"center"});setTimeout(()=>i.focus(),300);return}
   const u=e.target.closest("[data-upk]");
-  if(u){const k=UPK[u.dataset.upk];$("upKind").value=k;$("upSigner").hidden=k!=="cs";if(k==="cs")$("upSigner").value={cs_den:"den",cs_both:"both"}[u.dataset.upk]||"ti";$("upFile").click();return}
+  if(u){const k=UPK[u.dataset.upk];$("upKind").value=k;$("upSigner").hidden=k!=="cs";if(k==="cs")$("upSigner").value={cs_den:"den",cs_both:"both",cs_den_both:"den_both"}[u.dataset.upk]||"ti";$("upFile").click();return}
   const p=e.target.closest("[data-pack]");if(p){buildPack(p);return}
   if(e.target.closest(".tile.more,[data-showpics]")){e.preventDefault();$("fileList").scrollIntoView({behavior:"smooth",block:"start"});return}
   const b=e.target.closest("button");if(!b)return;
@@ -1680,7 +1686,7 @@ function renderFiles(){
   $("fileList").innerHTML=(pics.length?galleryRow(pics,editing.id):"")+(shown.length?[...shown].sort((a,b)=>KINDS.findIndex(k=>k[0]===kindOf(a.kind))-KINDS.findIndex(k=>k[0]===kindOf(b.kind))).map(f=>{
     if(fDel===f.aid)return `<div class="frow"><span class="confirm" style="grid-column:1/3">Удалить «${esc(f.name)}» навсегда?</span><span class="acts"><button class="btn danger" type="button" data-fdelyes="${esc(f.aid)}">Удалить</button><button class="btn ghost" type="button" data-fcancel>Отмена</button></span></div>`;
     const signUI=kindOf(f.kind)==="cs"?(canWrite?`<select class="fsign" data-fsign="${esc(f.aid)}" aria-label="Подпись" style="width:auto;margin-top:4px;padding:3px 6px;font-size:12px"><option value="" ${!f.signer?"selected":""}>подпись?</option>${SIGNERS.map(x=>`<option value="${x[0]}" ${f.signer===x[0]?"selected":""}>${x[1]}</option>`).join("")}</select>`:`<small>${f.signer?SIGN[f.signer][1]:""}</small>`):"";
-    const canDen=kindOf(f.kind)==="cs"&&!["den","both"].includes(f.signer)&&extOf(f.name)==="docx"&&assets&&canWrite;
+    const canDen=kindOf(f.kind)==="cs"&&!["den","both","den_both"].includes(f.signer)&&extOf(f.name)==="docx"&&assets&&canWrite;
     const splitBtn=kindOf(f.kind)==="calc"&&/\.xlsx$/i.test(f.name)&&assets&&canWrite?`<button class="btn" type="button" data-split="${esc(f.aid)}" title="Сделать из вкладок КП, заказы поставщикам и инвойсы">Разобрать на документы</button>`:"";
     const denBtn=canDen?`<button class="btn" type="button" data-mkden="${esc(f.aid)}" title="Создать копию с именами и подписью Ден Евгения — для корейского банка">Сделать вариант Ден Е.</button>`:"";
     return `<div class="frow"><span style="justify-self:start;display:flex;flex-direction:column;align-items:flex-start">${canWrite?`<select class="fkind" data-fkind="${esc(f.aid)}" aria-label="Тип документа «${esc(f.name)}»">${KINDS.map(([k,v])=>`<option value="${k}" ${kindOf(f.kind)===k?"selected":""}>${v}</option>`).join("")}</select>`:`<span class="pill acc">${KIND[f.kind]||"Прочее"}</span>`}${signUI}</span><span class="fn"><span class="ext ${extOf(f.name)}">${extOf(f.name)||"файл"}</span>${esc(f.name)}${f.from==="calc"?`<span class="pill" title="Сделано из вкладки «${esc(f.sheet||"")}» калькуляции">из калькуляции</span>`:""}<small>${fsize(f.size||0)} · ${f.at?fd(f.at.slice(0,10)):""}</small></span><span class="acts">${splitBtn}${denBtn}${fileActs(f,editing.id,true,true)}</span></div>`}).join("")
