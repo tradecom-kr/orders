@@ -1016,7 +1016,9 @@ function clRow(d,id){
       else if(done)hint=reqFiles(d,s.doc).map(f=>fDel===f.aid
         ?`<small class="bad">Удалить «${esc(f.name)}»? <button class="lnk danger" type="button" data-fdelyes="${esc(f.aid)}">Да, удалить</button> <button class="lnk" type="button" data-fcancel>Отмена</button></small>`
         :`<small>${esc(f.name)}${canWrite?` · ${assets?`<button class="lnk" type="button" data-repl="${esc(f.aid)}">заменить</button> · `:""}<button class="lnk danger" type="button" data-fdel="${esc(f.aid)}">удалить</button>`:""}</small>`).join("");
-      else{
+      // a signed scan and its Word file can sit side by side: one more file of the same kind
+      if(done&&s.doc!=="photo"&&canWrite&&assets&&editing.id)act=`<button class="btn" type="button" data-upk="${s.doc}" title="Например, Word-версия рядом с подписанным PDF">${/^cs/.test(s.doc)?"+ Word или PDF":"+ Ещё файл"}</button>`;
+      if(!done&&s.doc!=="photo"){
         hint=id==="exp"&&!hasDoc(d,"ipl")?`<small class="bad">Для экспортной декларации нужны инвойс и упаковочный лист</small>`:`<small>Отметится само, когда загрузите файл</small>`;
         if(canWrite&&assets&&editing.id)act=`<button class="btn" type="button" data-upk="${s.doc}">Загрузить</button>`;
         else if(canWrite&&!editing.id){const pf=pendingFiles.find(f=>guessKind(f.name)===UPK[s.doc]);hint=pf?`<small class="ok-t">Выбран «${esc(pf.name)}» — прикрепится при сохранении</small>`:hint+`<small>Перетащите файл в зону «Начните с документов» выше</small>`}
