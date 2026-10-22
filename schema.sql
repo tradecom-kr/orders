@@ -7,14 +7,15 @@ alter table public.allowed enable row level security;
 
 create or replace function public.is_allowed() returns boolean
 language sql stable security definer set search_path = public as $$
-  select exists (select 1 from public.allowed where lower(email) = lower(auth.jwt() ->> 'email'))
+  select exists (select 1 from public.allowed
+    where lower(trim(both E' \n\r\t' from email)) = lower(trim(auth.jwt() ->> 'email')))
 $$;
 grant execute on function public.is_allowed() to authenticated;
 
 -- the sign-in page asks this before emailing a link, so strangers cannot use up the email quota
 create or replace function public.can_sign_in(e text) returns boolean
 language sql stable security definer set search_path = public as $$
-  select exists (select 1 from public.allowed where lower(email) = lower(trim(e)))
+  select exists (select 1 from public.allowed where lower(trim(both E' \n\r\t' from email)) = lower(trim(e)))
 $$;
 grant execute on function public.can_sign_in(text) to anon, authenticated;
 
