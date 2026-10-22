@@ -546,7 +546,7 @@ textarea{min-height:70px;resize:vertical}
         <legend>Документы</legend>
         <div class="upl" id="upl">
           <select id="upKind" aria-label="Тип документа"></select>
-          <select id="upSigner" aria-label="Подпись" hidden><option value="">Подпись — по имени файла</option><option value="ti">Подпись: Ти Валерий (покупатель)</option><option value="both">Ти В. — подписан обеими сторонами</option><option value="den">Подпись: Ден Евгений (банк)</option><option value="den_both">Ден Е. — подписан обеими сторонами</option></select>
+          <select id="upSigner" aria-label="Подпись" hidden><option value="">Подпись — по имени файла</option><option value="ti">Подпись: Ти Валерий (покупатель)</option><option value="both">Ти В. — подписан обеими сторонами</option><option value="den">Подпись: Ден Евгений (банк)</option><option value="den_both">Ден Е. — подписан обеими сторонами</option><option value="nosig">Без подписей и печатей</option></select>
           <input type="file" id="upFile" multiple style="width:auto;flex:1 1 200px" aria-label="Файлы">
           <span class="note" id="upNote">Word, Excel, PDF, фото — можно перетащить сюда</span>
         </div>
@@ -662,9 +662,10 @@ const REQL={kp:"КП",cs_ti:"контракт и спец. (Ти В.)",cs_both:"
 const UPK={kp:"kp",cs_ti:"cs",cs_both:"cs",cs_den_both:"cs",cs_den:"cs",ipl:"ipl",exp:"exp",photo:"photo",bl:"bl",freight:"freight"};
 const SUPST={none:"Не запрошен",asked:"Запрошен, ждём",confirmed:"Подтверждён"};
 const PAY={none:["Не оплачен",""],partial:["Частично","warn"],paid:["Оплачен","ok"]};
-const SIGNERS=[["ti","Ти Валерий — для покупателя","Ти В."],["both","Ти В. — подписан обеими сторонами","Ти В., подписан обеими"],["den","Ден Евгений — для банка","Ден Е."],["den_both","Ден Е. — подписан обеими сторонами","Ден Е., подписан обеими"]];
+const SIGNERS=[["ti","Ти Валерий — для покупателя","Ти В."],["both","Ти В. — подписан обеими сторонами","Ти В., подписан обеими"],["den","Ден Евгений — для банка","Ден Е."],["den_both","Ден Е. — подписан обеими сторонами","Ден Е., подписан обеими"],["nosig","Без подписей и печатей","без подписей"]];
 const SIGN=Object.fromEntries(SIGNERS.map(x=>[x[0],x]));
 const guessSigner=n=>{n=String(n).toLowerCase();
+  if(/без\s*подпис|unsigned|no[\s_-]*sign/.test(n))return "nosig";
   const isDen=/(^|[^а-яёa-z])ден([^а-яёa-z]|$)|(^|[^a-z])den([^a-z]|$)|евген|evgen/.test(n);
   if(/подписан|обоюдн|signed|mutual|both/.test(n))return isDen?"den_both":"both";
   if(isDen)return "den";
@@ -696,7 +697,7 @@ const supMax=list=>list.map(x=>x.date).filter(Boolean).sort().pop()||"";
 const supAll=list=>list.length>0&&list.every(x=>x.st==="confirmed"&&x.date);
 function reqFiles(o,r){const fs=o.files||[];
   // the Den version signed by both sides is kept for the archive and also counts as the Den version
-  if(r==="cs_ti")return fs.filter(f=>kindOf(f.kind)==="cs"&&!["den","den_both"].includes(f.signer));
+  if(r==="cs_ti")return fs.filter(f=>kindOf(f.kind)==="cs"&&!["den","den_both","nosig"].includes(f.signer));
   if(r==="cs_den")return fs.filter(f=>kindOf(f.kind)==="cs"&&["den","den_both"].includes(f.signer));
   if(r==="cs_both")return fs.filter(f=>kindOf(f.kind)==="cs"&&f.signer==="both");
   return fs.filter(f=>kindOf(f.kind)===r)}
@@ -1688,10 +1689,10 @@ function renderFiles(){
   $("fileList").innerHTML=(pics.length?galleryRow(pics,editing.id):"")+(shown.length?[...shown].sort((a,b)=>KINDS.findIndex(k=>k[0]===kindOf(a.kind))-KINDS.findIndex(k=>k[0]===kindOf(b.kind))).map(f=>{
     if(fDel===f.aid)return `<div class="frow"><span class="confirm" style="grid-column:1/3">Удалить «${esc(f.name)}» навсегда?</span><span class="acts"><button class="btn danger" type="button" data-fdelyes="${esc(f.aid)}">Удалить</button><button class="btn ghost" type="button" data-fcancel>Отмена</button></span></div>`;
     const signUI=kindOf(f.kind)==="cs"?(canWrite?`<select class="fsign" data-fsign="${esc(f.aid)}" aria-label="Подпись" style="width:auto;margin-top:4px;padding:3px 6px;font-size:12px"><option value="" ${!f.signer?"selected":""}>подпись?</option>${SIGNERS.map(x=>`<option value="${x[0]}" ${f.signer===x[0]?"selected":""}>${x[1]}</option>`).join("")}</select>`:`<small>${f.signer?SIGN[f.signer][1]:""}</small>`):"";
-    const canDen=kindOf(f.kind)==="cs"&&!["den","both","den_both"].includes(f.signer)&&extOf(f.name)==="docx"&&assets&&canWrite;
+    const canDen=kindOf(f.kind)==="cs"&&!["den","both","den_both","nosig"].includes(f.signer)&&extOf(f.name)==="docx"&&assets&&canWrite;
     const splitBtn=kindOf(f.kind)==="calc"&&/\.xlsx$/i.test(f.name)&&assets&&canWrite?`<button class="btn" type="button" data-split="${esc(f.aid)}" title="Сделать из вкладок КП, заказы поставщикам и инвойсы">Разобрать на документы</button>`:"";
     const denBtn=canDen?`<button class="btn" type="button" data-mkden="${esc(f.aid)}" title="Создать копию с именами и подписью Ден Евгения — для корейского банка">Сделать вариант Ден Е.</button>`:"";
-    return `<div class="frow"><span style="justify-self:start;display:flex;flex-direction:column;align-items:flex-start">${canWrite?`<select class="fkind" data-fkind="${esc(f.aid)}" aria-label="Тип документа «${esc(f.name)}»">${KINDS.map(([k,v])=>`<option value="${k}" ${kindOf(f.kind)===k?"selected":""}>${v}</option>`).join("")}</select>`:`<span class="pill acc">${KIND[f.kind]||"Прочее"}</span>`}${signUI}</span><span class="fn"><span class="ext ${extOf(f.name)}">${extOf(f.name)||"файл"}</span>${esc(f.name)}${f.from==="calc"?`<span class="pill" title="Сделано из вкладки «${esc(f.sheet||"")}» калькуляции">из калькуляции</span>`:""}<small>${fsize(f.size||0)} · ${f.at?fd(f.at.slice(0,10)):""}</small></span><span class="acts">${splitBtn}${denBtn}${fileActs(f,editing.id,true,true)}</span></div>`}).join("")
+    return `<div class="frow"><span style="justify-self:start;display:flex;flex-direction:column;align-items:flex-start">${canWrite?`<select class="fkind" data-fkind="${esc(f.aid)}" aria-label="Тип документа «${esc(f.name)}»">${KINDS.map(([k,v])=>`<option value="${k}" ${kindOf(f.kind)===k?"selected":""}>${v}</option>`).join("")}</select>`:`<span class="pill acc">${KIND[f.kind]||"Прочее"}</span>`}${signUI}</span><span class="fn"><span class="ext ${extOf(f.name)}">${extOf(f.name)||"файл"}</span>${esc(f.name)}${f.from==="calc"?`<span class="pill" title="Сделано из вкладки «${esc(f.sheet||"")}» калькуляции">из калькуляции</span>`:""}<small>${fsize(f.size||0)} · ${f.at?fd(f.at.slice(0,10)):""}</small></span><span class="acts">${splitBtn}${denBtn}${kindOf(f.kind)==="cs"&&f.signer!=="nosig"&&extOf(f.name)==="docx"&&assets&&canWrite?`<button class="btn" type="button" data-nosig="${esc(f.aid)}" title="Копия этого контракта в Word без факсимиле подписей и печатей">Без подписей</button>`:""}${fileActs(f,editing.id,true,true)}</span></div>`}).join("")
     :pics.length?"":`<div class="frow"><span class="note" style="grid-column:1/-1">Документов пока нет. Прикрепите калькуляцию, КП, контракт и спецификацию, инвойс и упаковочный и другие файлы по заказу.</span></div>`);
 }
 function toB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]||"");r.onerror=()=>rej(r.error);r.readAsDataURL(file)})}
@@ -2107,6 +2108,33 @@ async function splitStoredCalc(aid){
   catch(e){ $("upNote").textContent = "Не получилось прочитать калькуляцию (" + (e && e.code || e && e.message || "ошибка") + ")."; }
 }
 $("fileList").addEventListener("click", e => { const b = e.target.closest("[data-split]"); if(b) splitStoredCalc(b.dataset.split); });
+
+/* a Word contract without facsimile signatures and stamps: every floating picture in the body goes
+   (signatures and seals are floating; logos sit in headers or inline and stay) */
+async function makeNoSig(aid, btn){
+  const f = (editing.files || []).find(x => x.aid === aid); if(!f || !assets || !window.JSZip) return;
+  const note = t => { $("upNote").textContent = t; };
+  btn.disabled = true; note("Делаю копию без подписей…");
+  try{
+    const zip = await JSZip.loadAsync(await blobBytes(f));
+    let x = await zip.file("word/document.xml").async("string"), n = 0;
+    x = x.replace(/<mc:AlternateContent>(?:(?!<\/mc:AlternateContent>)[\s\S])*?<\/mc:AlternateContent>/g, m => /<wp:anchor\b/.test(m) ? (n++, "") : m);
+    x = x.replace(/<w:drawing>(?:(?!<\/w:drawing>)[\s\S])*?<\/w:drawing>/g, m => /<wp:anchor\b/.test(m) ? (n++, "") : m);
+    if(!n){ note("В этом файле нет подписей и печатей картинками — копия не нужна."); btn.disabled = false; return; }
+    zip.file("word/document.xml", x);
+    const bytes = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
+    const name = f.name.replace(/\s*—\s*(Ти|Ден)\s*[ВЕ]\.?(?=\.docx$)/i, "").replace(/\.docx$/i, " — без подписей.docx");
+    const b64 = await toB64(new Blob([bytes]));
+    const up = await assets.upload(new Blob([b64], { type: "text/plain" }), { type: "text/plain" });
+    const rec = { aid: up.id, name, kind: "cs", signer: "nosig", size: bytes.length, mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", enc: "b64", at: new Date().toISOString(), from: f.aid };
+    const files = [...(editing.files || []), rec];
+    await db.collection("orders").doc(editing.id).update({ files, updatedAt: new Date().toISOString() });
+    editing.files = files; renderFiles(); refreshDerived();
+    note(`Готово: «${name}». Убрано картинок подписей и печатей: ${n}. Строки для подписей остались — их можно подписать от руки.`);
+  }catch(e){ note("Не получилось сделать копию без подписей (" + (e && e.code || e && e.message || "ошибка") + ")."); }
+  btn.disabled = false;
+}
+$("fileList").addEventListener("click", e => { const b = e.target.closest("[data-nosig]"); if(b) makeNoSig(b.dataset.nosig, b); });
 
 $("tPrev").onclick=()=>calStep(-1);
 $("tNext").onclick=()=>calStep(1);
