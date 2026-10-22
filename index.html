@@ -422,6 +422,13 @@ textarea{min-height:70px;resize:vertical}
 .dgrp .frow.ord{grid-template-columns:150px minmax(0,1fr) auto;border-top:1px dashed var(--line)}
 .dgrp .frow.ord.one{grid-template-columns:minmax(0,1fr) auto}
 @media (max-width:640px){.dgrp .frow.ord{grid-template-columns:minmax(0,1fr)}}
+
+/* key dates side by side, in the order they happen */
+.kds{flex-direction:row;flex:0 0 auto;align-items:center;align-self:center;gap:6px}
+.kds .kdb{min-width:118px;justify-content:center}
+.kar{align-self:center;color:var(--muted);font-size:18px}
+.oc.mini .kds{gap:6px}
+@media (max-width:640px){.kds{flex-direction:row}.kds .kdb{min-width:0}}
 </style>
 
 </head>
@@ -854,7 +861,7 @@ function keyDates(o,loaded){
   const port=stepDone(o,"port"), dcls=(d,done)=>!d||done?"":days(d)<0?"bad":days(d)<=3?"warn":"";
   const box=(l,d,done,sub)=>`<div class="kdb ${dcls(d,done)} ${done?"ok":""}"><span class="kl">${l}</span><b>${d?String(d).slice(5,7)+"."+String(d).slice(8,10):"—"}${done?" ✓":""}</b></div>`;
   const rel=d=>{const n=days(d);return n===0?"сегодня":n>0?"через "+n+" дн.":n<0?Math.abs(n)+" дн. назад":""};
-  return `<div class="kds">${box("Загрузка",o.loadAt,loaded,o.loadAt?rel(o.loadAt)+(o.loadTime?" · "+esc(o.loadTime):""):"")}${box("Выход судна",o.etd,port,o.etd?rel(o.etd):"")}</div>`;
+  return `<div class="kds">${box("Загрузка",o.loadAt,loaded,o.loadAt?rel(o.loadAt)+(o.loadTime?" · "+esc(o.loadTime):""):"")}<span class="kar" aria-hidden="true">→</span>${box("Выход судна",o.etd,port,o.etd?rel(o.etd):"")}</div>`;
 }
 function archCard(o){
   const fs=o.files||[], kinds=[...new Set(fs.map(f=>kindOf(f.kind)))];
