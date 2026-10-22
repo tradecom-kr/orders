@@ -1245,6 +1245,15 @@ $("expRead").onclick=async()=>{
   $("expRead").disabled=false;
 };
 
+// whose signature a contract carries, read from the text when the file name does not say
+async function signerFromText(file){
+  try{
+    const t = String(await fileText(new Uint8Array(await file.arrayBuffer()), file.name)).replace(/\s+/g, " ");
+    const m = t.match(/в лице\s+(?:генерального\s+)?директора\s+(Ти|Ден)(?=[\s,.])/i) || t.match(/represented by\s+(?:general\s+)?director\s+(Ti|Den)\b/i);
+    return m ? (/^(Ден|Den)$/i.test(m[1]) ? "den" : "ti") : "";
+  }catch(e){ return ""; }
+}
+
 /* ---------- fill the order from its documents (contract, invoice, offer, calculation, export declaration) ---------- */
 const RU_MON={января:1,февраля:2,марта:3,апреля:4,мая:5,июня:6,июля:7,августа:8,сентября:9,октября:10,ноября:11,декабря:12};
 const EN_MON={january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12};
@@ -1671,7 +1680,7 @@ function renderFiles(){
   $("fileList").innerHTML=(pics.length?galleryRow(pics,editing.id):"")+(shown.length?[...shown].sort((a,b)=>KINDS.findIndex(k=>k[0]===kindOf(a.kind))-KINDS.findIndex(k=>k[0]===kindOf(b.kind))).map(f=>{
     if(fDel===f.aid)return `<div class="frow"><span class="confirm" style="grid-column:1/3">Удалить «${esc(f.name)}» навсегда?</span><span class="acts"><button class="btn danger" type="button" data-fdelyes="${esc(f.aid)}">Удалить</button><button class="btn ghost" type="button" data-fcancel>Отмена</button></span></div>`;
     const signUI=kindOf(f.kind)==="cs"?(canWrite?`<select class="fsign" data-fsign="${esc(f.aid)}" aria-label="Подпись" style="width:auto;margin-top:4px;padding:3px 6px;font-size:12px"><option value="" ${!f.signer?"selected":""}>подпись?</option>${SIGNERS.map(x=>`<option value="${x[0]}" ${f.signer===x[0]?"selected":""}>${x[1]}</option>`).join("")}</select>`:`<small>${f.signer?SIGN[f.signer][1]:""}</small>`):"";
-    const canDen=kindOf(f.kind)==="cs"&&f.signer==="ti"&&extOf(f.name)==="docx"&&assets&&canWrite;
+    const canDen=kindOf(f.kind)==="cs"&&!["den","both"].includes(f.signer)&&extOf(f.name)==="docx"&&assets&&canWrite;
     const splitBtn=kindOf(f.kind)==="calc"&&/\.xlsx$/i.test(f.name)&&assets&&canWrite?`<button class="btn" type="button" data-split="${esc(f.aid)}" title="Сделать из вкладок КП, заказы поставщикам и инвойсы">Разобрать на документы</button>`:"";
     const denBtn=canDen?`<button class="btn" type="button" data-mkden="${esc(f.aid)}" title="Создать копию с именами и подписью Ден Евгения — для корейского банка">Сделать вариант Ден Е.</button>`:"";
     return `<div class="frow"><span style="justify-self:start;display:flex;flex-direction:column;align-items:flex-start">${canWrite?`<select class="fkind" data-fkind="${esc(f.aid)}" aria-label="Тип документа «${esc(f.name)}»">${KINDS.map(([k,v])=>`<option value="${k}" ${kindOf(f.kind)===k?"selected":""}>${v}</option>`).join("")}</select>`:`<span class="pill acc">${KIND[f.kind]||"Прочее"}</span>`}${signUI}</span><span class="fn"><span class="ext ${extOf(f.name)}">${extOf(f.name)||"файл"}</span>${esc(f.name)}${f.from==="calc"?`<span class="pill" title="Сделано из вкладки «${esc(f.sheet||"")}» калькуляции">из калькуляции</span>`:""}<small>${fsize(f.size||0)} · ${f.at?fd(f.at.slice(0,10)):""}</small></span><span class="acts">${splitBtn}${denBtn}${fileActs(f,editing.id,true,true)}</span></div>`}).join("")
@@ -1693,7 +1702,7 @@ async function uploadFiles(list){
       else{const b64=await toB64(file);r=await assets.upload(new Blob([b64],{type:"text/plain"}),{type:"text/plain"});enc="b64"}
       const kind=kindSel||guessKind(file.name)||"other";
       const rec={aid:r.id,name:up.name,kind,size:r.sizeBytes||up.size,mime:up.type||"",enc,at:new Date().toISOString()};
-      if(kindOf(kind)==="cs")rec.signer=signSel||guessSigner(file.name)||sigByName[file.name]||"";
+      if(kindOf(kind)==="cs"){rec.signer=signSel||guessSigner(file.name)||sigByName[file.name]||"";if(!rec.signer)rec.signer=await signerFromText(file)}
       added.push(rec);
       if(kindOf(rec.kind)==="exp")expList.push(file);
       if(/\.xlsx$/i.test(file.name)&&["calc","other",""].includes(kindOf(rec.kind))){const bytes=new Uint8Array(await file.arrayBuffer());if(await isCalcBook(bytes)){if(!kindSel)rec.kind="calc";if(kindOf(rec.kind)==="calc")calcList.push({rec,bytes})}}
