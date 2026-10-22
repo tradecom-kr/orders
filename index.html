@@ -412,7 +412,8 @@ textarea{min-height:70px;resize:vertical}
 .oc.arch .pcap b{color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-size:11px}
 .adocs{display:flex;flex-wrap:wrap;gap:6px}
 .archbox{padding:8px 10px;border:1px dashed var(--line);border-radius:10px;font-size:13px;align-items:flex-start}
-.fkind{width:auto;max-width:100%;padding:3px 6px;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft,var(--bg));border-radius:999px}
+.fkind{width:auto;max-width:140px;text-overflow:ellipsis;padding:3px 6px;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft,var(--bg));border-radius:999px}
+.fn .pill{white-space:nowrap;margin-left:6px;font-size:10px}
 </style>
 
 </head>
@@ -1667,8 +1668,9 @@ function renderFiles(){
     if(fDel===f.aid)return `<div class="frow"><span class="confirm" style="grid-column:1/3">Удалить «${esc(f.name)}» навсегда?</span><span class="acts"><button class="btn danger" type="button" data-fdelyes="${esc(f.aid)}">Удалить</button><button class="btn ghost" type="button" data-fcancel>Отмена</button></span></div>`;
     const signUI=kindOf(f.kind)==="cs"?(canWrite?`<select class="fsign" data-fsign="${esc(f.aid)}" aria-label="Подпись" style="width:auto;margin-top:4px;padding:3px 6px;font-size:12px"><option value="" ${!f.signer?"selected":""}>подпись?</option>${SIGNERS.map(x=>`<option value="${x[0]}" ${f.signer===x[0]?"selected":""}>${x[1]}</option>`).join("")}</select>`:`<small>${f.signer?SIGN[f.signer][1]:""}</small>`):"";
     const canDen=kindOf(f.kind)==="cs"&&f.signer==="ti"&&extOf(f.name)==="docx"&&assets&&canWrite;
+    const splitBtn=kindOf(f.kind)==="calc"&&/\.xlsx$/i.test(f.name)&&assets&&canWrite?`<button class="btn" type="button" data-split="${esc(f.aid)}" title="Сделать из вкладок КП, заказы поставщикам и инвойсы">Разобрать на документы</button>`:"";
     const denBtn=canDen?`<button class="btn" type="button" data-mkden="${esc(f.aid)}" title="Создать копию с именами и подписью Ден Евгения — для корейского банка">Сделать вариант Ден Е.</button>`:"";
-    return `<div class="frow"><span style="justify-self:start;display:flex;flex-direction:column;align-items:flex-start">${canWrite?`<select class="fkind" data-fkind="${esc(f.aid)}" aria-label="Тип документа «${esc(f.name)}»">${KINDS.map(([k,v])=>`<option value="${k}" ${kindOf(f.kind)===k?"selected":""}>${v}</option>`).join("")}</select>`:`<span class="pill acc">${KIND[f.kind]||"Прочее"}</span>`}${signUI}</span><span class="fn"><span class="ext ${extOf(f.name)}">${extOf(f.name)||"файл"}</span>${esc(f.name)}<small>${fsize(f.size||0)} · ${f.at?fd(f.at.slice(0,10)):""}</small></span><span class="acts">${denBtn}${fileActs(f,editing.id,true,true)}</span></div>`}).join("")
+    return `<div class="frow"><span style="justify-self:start;display:flex;flex-direction:column;align-items:flex-start">${canWrite?`<select class="fkind" data-fkind="${esc(f.aid)}" aria-label="Тип документа «${esc(f.name)}»">${KINDS.map(([k,v])=>`<option value="${k}" ${kindOf(f.kind)===k?"selected":""}>${v}</option>`).join("")}</select>`:`<span class="pill acc">${KIND[f.kind]||"Прочее"}</span>`}${signUI}</span><span class="fn"><span class="ext ${extOf(f.name)}">${extOf(f.name)||"файл"}</span>${esc(f.name)}${f.from==="calc"?`<span class="pill" title="Сделано из вкладки «${esc(f.sheet||"")}» калькуляции">из калькуляции</span>`:""}<small>${fsize(f.size||0)} · ${f.at?fd(f.at.slice(0,10)):""}</small></span><span class="acts">${splitBtn}${denBtn}${fileActs(f,editing.id,true,true)}</span></div>`}).join("")
     :pics.length?"":`<div class="frow"><span class="note" style="grid-column:1/-1">Документов пока нет. Прикрепите калькуляцию, КП, контракт и спецификацию, инвойс и упаковочный и другие файлы по заказу.</span></div>`);
 }
 function toB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]||"");r.onerror=()=>rej(r.error);r.readAsDataURL(file)})}
@@ -1677,7 +1679,7 @@ async function uploadFiles(list){
   if(!editing.id){pendingFiles.push(...list);renderPending();$("upFile").value="";autofillFiles(await Promise.all([...list].map(async f=>({bytes:new Uint8Array(await f.arrayBuffer()),name:f.name}))),false);return}
   if(!assets)return;
   const repl=replAid&&(editing.files||[]).find(f=>f.aid===replAid); replAid=null;
-  const kindSel=repl?repl.kind:$("upKind").value, signSel=repl?(repl.signer||""):$("upSigner").value, added=[], expList=[];
+  const kindSel=repl?repl.kind:$("upKind").value, signSel=repl?(repl.signer||""):$("upSigner").value, added=[], expList=[], calcList=[];
   for(const file of list){
     $("upNote").textContent=`Загружаю «${file.name}»…`;
     try{
@@ -1690,6 +1692,7 @@ async function uploadFiles(list){
       if(kindOf(kind)==="cs")rec.signer=signSel||guessSigner(file.name)||sigByName[file.name]||"";
       added.push(rec);
       if(kindOf(rec.kind)==="exp")expList.push(file);
+      if(/\.xlsx$/i.test(file.name)&&["calc","other",""].includes(kindOf(rec.kind))){const bytes=new Uint8Array(await file.arrayBuffer());if(await isCalcBook(bytes)){if(!kindSel)rec.kind="calc";if(kindOf(rec.kind)==="calc")calcList.push({rec,bytes})}}
     }catch(e){
       const m=e&&e.code==="too_large"?"слишком большой файл (до 20 МБ; Word и Excel — до 15 МБ)":e&&e.code==="quota_exceeded"?"хранилище заполнено":(e&&e.code)||"ошибка";
       $("upNote").textContent=`«${file.name}» не загружен: ${m}.`;
@@ -1701,7 +1704,8 @@ async function uploadFiles(list){
       $("upNote").textContent=(repl?`Заменено: «${repl.name}» → `:"Загружено: ")+added.map(a=>a.name).join(", ");
       if(repl&&assets)assets.delete(repl.aid).catch(()=>{});
       if(expList.length){const l=[];for(const f of expList)l.push({bytes:new Uint8Array(await f.arrayBuffer()),name:f.name});applyExpNo(l,false)}
-      autofillFiles(await Promise.all([...list].map(async f=>({bytes:new Uint8Array(await f.arrayBuffer()),name:f.name}))),true)}
+      autofillFiles(await Promise.all([...list].map(async f=>({bytes:new Uint8Array(await f.arrayBuffer()),name:f.name}))),true);
+      if(calcList.length)await autoSplitCalc(calcList)}
   catch(e){$("upNote").textContent="Файлы загружены, но не привязались к заказу ("+(e&&e.code||"ошибка")+"). Попробуйте ещё раз."}
   $("upFile").value="";
 }
@@ -1924,6 +1928,164 @@ $("fileList").addEventListener("change",async e=>{
   try{await db.collection("orders").doc(editing.id).update({files,updatedAt:new Date().toISOString()});editing.files=files;renderFiles();refreshDerived();$("upNote").textContent="Тип документа изменён."}
   catch(err){$("upNote").textContent="Не получилось сменить тип ("+(err&&err.code||"ошибка")+")."}
 });
+
+/* ---------- calculation workbook → separate documents (КП, 구매발주서, Commercial invoice) ----------
+   Each target tab becomes its own .xlsx with the original layout, logo, print area and page setup.
+   Formulas are replaced by their saved values (the other tabs are not in the new file), and everything
+   outside the tab's print area is dropped, so the internal calculation never leaves the company. */
+const SPLIT_TABS = [
+  { re: /^\s*(OFFER|КП|КОММЕРЧЕСКОЕ\s+ПРЕДЛОЖЕНИЕ)\b/i, kind: "kp", label: "КП" },
+  { re: /구매\s*발주서|발주서/, kind: "po", label: "구매발주서" },
+  { re: /COMMERCIAL\s+INVOICE|ИНВОЙС/i, kind: "ipl", label: "Commercial invoice" }
+];
+const xmlEsc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const colNum = c => [...c].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
+function parseRef(ref){ const m = String(ref).replace(/\$/g, "").match(/^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/); if(!m) return null;
+  return { c1: colNum(m[1]), r1: +m[2], c2: colNum(m[3] || m[1]), r2: +(m[4] || m[2]) }; }
+const unXml = s => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+
+async function listSplitTabs(bytes){
+  const z = await JSZip.loadAsync(bytes);
+  const wb = await z.file("xl/workbook.xml").async("string");
+  const sheets = [...wb.matchAll(/<sheet\b[^>]*?name="([^"]*)"[^>]*?\/>/g)].map((m, i) => ({ name: unXml(m[1]), idx: i, tag: m[0] }));
+  return { z, wb, sheets, targets: sheets.map(s => ({ ...s, t: SPLIT_TABS.find(t => t.re.test(s.name)) })).filter(s => s.t && !/hidden/.test(s.tag)) };
+}
+
+async function splitCalcBook(bytes){
+  const { z, wb, sheets, targets } = await listSplitTabs(bytes);
+  if(!targets.length) return [];
+  const rels = await z.file("xl/_rels/workbook.xml.rels").async("string");
+  const ct = await z.file("[Content_Types].xml").async("string");
+  const relTarget = id => { const m = rels.match(new RegExp('<Relationship\\b[^>]*Id="' + id + '"[^>]*/>')); const t = m && m[0].match(/Target="([^"]+)"/); return t ? t[1].replace(/^\/?xl\//, "").replace(/^\//, "") : null; };
+  const sheetPath = s => "xl/" + relTarget(s.tag.match(/r:id="([^"]+)"/)[1]);
+  const out = [];
+  for(const tg of targets){
+    const keepPath = sheetPath(tg);
+    const dropSheets = sheets.filter(s => s.idx !== tg.idx).map(sheetPath);
+    const n = new JSZip();
+    const drop = new Set(["xl/calcChain.xml", "docProps/app.xml"]);
+    for(const p of dropSheets){ drop.add(p); drop.add(p.replace(/worksheets\//, "worksheets/_rels/") + ".rels"); }
+    // parts used only by the dropped tabs (drawings, comments, tables, printer settings)
+    const used = new Set();
+    const addUsed = async (owner) => { const rp = owner.replace(/([^/]+)$/, "_rels/$1.rels"); const f = z.file(rp); if(!f) return;
+      const x = await f.async("string"); for(const m of x.matchAll(/Target="([^"]+)"/g)){ if(/^https?:/.test(m[1])) continue;
+        const abs = new URL(m[1], "http://x/" + owner).pathname.slice(1); if(!used.has(abs)){ used.add(abs); await addUsed(abs); } } };
+    await addUsed(keepPath);
+    const dropTree = async owner => { const rp = owner.replace(/([^/]+)$/, "_rels/$1.rels"); const f = z.file(rp); if(!f) return;
+      const x = await f.async("string"); for(const m of x.matchAll(/Target="([^"]+)"/g)){ if(/^https?:/.test(m[1])) continue;
+        const abs = new URL(m[1], "http://x/" + owner).pathname.slice(1);
+        if(!used.has(abs) && !drop.has(abs)){ drop.add(abs); drop.add(abs.replace(/([^/]+)$/, "_rels/$1.rels")); await dropTree(abs); } } };
+    for(const p of dropSheets) await dropTree(p);
+    // workbook: one sheet, its own defined names only
+    let w = wb.replace(/<sheets>[\s\S]*?<\/sheets>/, "<sheets>" + tg.tag + "</sheets>");
+    w = w.replace(/<definedNames>([\s\S]*?)<\/definedNames>/, (all, inner) => {
+      const keep = [...inner.matchAll(/<definedName\b[^>]*>[\s\S]*?<\/definedName>/g)].map(m => m[0])
+        .filter(d => (d.match(/localSheetId="(\d+)"/) || [])[1] === String(tg.idx))
+        .map(d => d.replace(/localSheetId="\d+"/, 'localSheetId="0"'));
+      return keep.length ? "<definedNames>" + keep.join("") + "</definedNames>" : ""; });
+    w = w.replace(/<externalReferences>[\s\S]*?<\/externalReferences>/, "").replace(/activeTab="\d+"/, 'activeTab="0"').replace(/firstSheet="\d+"/, 'firstSheet="0"');
+    w = w.replace(/<calcPr\b[^>]*\/>/, '<calcPr calcId="191029"/>');
+    const pa = (w.match(/<definedName name="_xlnm\.Print_Area"[^>]*>([^<]*)<\/definedName>/) || [])[1];
+    const area = pa ? parseRef(pa.split("!").pop().split(",")[0]) : null;
+    // rels and content types follow the parts that remain
+    let r = rels.replace(/<Relationship\b[^>]*\/>/g, m => { const t = (m.match(/Target="([^"]+)"/) || [])[1] || ""; const abs = "xl/" + t.replace(/^\/?xl\//, "");
+      return drop.has(abs) || /externalLink/.test(m) ? "" : m; });
+    let c = ct.replace(/<Override\b[^>]*PartName="\/([^"]+)"[^>]*\/>/g, (m, part) => drop.has(part) ? "" : m);
+    // the sheet itself: values instead of formulas, nothing outside the print area
+    let s = await z.file(keepPath).async("string");
+    s = s.replace(/<c\b([^>]*?)(\/>|>([\s\S]*?)<\/c>)/g, (m, attrs, _e, body) => {
+      const ref = (attrs.match(/\br="([A-Z]+)(\d+)"/) || []);
+      if(area && ref[1] && (colNum(ref[1]) < area.c1 || colNum(ref[1]) > area.c2 || +ref[2] < area.r1 || +ref[2] > area.r2))
+        return "";
+      attrs = attrs.replace(/\s(cm|vm)="\d+"/g, "");
+      if(body === undefined) return "<c" + attrs + "/>";
+      body = body.replace(/<f\b[^>]*\/>|<f\b[^>]*>[\s\S]*?<\/f>/g, "");
+      if(/\bt="str"/.test(attrs)){ const v = (body.match(/<v>([\s\S]*?)<\/v>/) || [])[1];
+        return v === undefined ? "<c" + attrs.replace(/\st="str"/, "") + "/>" : "<c" + attrs.replace(/\bt="str"/, 't="inlineStr"') + '><is><t xml:space="preserve">' + v + "</t></is></c>"; }
+      if(!/<v>|<is>/.test(body)) return "<c" + attrs + "/>";
+      return "<c" + attrs + ">" + body + "</c>"; });
+    // shared strings: only the texts this tab shows (the calculation's texts must not travel inside the file)
+    let sst = null;
+    const sstPath = "xl/" + (relTarget((rels.match(/<Relationship\b[^>]*sharedStrings[^>]*\/>/) || [""])[0].match(/Id="([^"]+)"/)?.[1] || "") || "sharedStrings.xml");
+    if(z.file(sstPath)){
+      const sx = await z.file(sstPath).async("string");
+      const items = [...sx.matchAll(/<si>[\s\S]*?<\/si>|<si\/>/g)].map(m => m[0]);
+      const map = new Map(), keepItems = [];
+      s = s.replace(/<c\b([^>]*?\bt="s"[^>]*)>([\s\S]*?)<\/c>/g, (m, attrs, body) => body.replace(/<v>(\d+)<\/v>/, (vm, i) => {
+        if(!map.has(i)){ map.set(i, keepItems.length); keepItems.push(items[+i] || "<si><t></t></si>"); }
+        return "<v>" + map.get(i) + "</v>"; }).replace(/^/, "<c" + attrs + ">") + "</c>");
+      sst = sx.replace(/<sst\b([^>]*)>[\s\S]*<\/sst>/, (all, at) => "<sst" + at.replace(/\s(count|uniqueCount)="\d+"/g, "") + ` count="${keepItems.length}" uniqueCount="${keepItems.length}">` + keepItems.join("") + "</sst>");
+    }
+    s = s.replace(/<dataValidations\b[\s\S]*?<\/dataValidations>/, "").replace(/<extLst>[\s\S]*?<\/extLst>/, "").replace(/<hyperlinks>[\s\S]*?<\/hyperlinks>/, "");
+    if(area) s = s.replace(/<mergeCells\b[^>]*>([\s\S]*?)<\/mergeCells>/, (all, inner) => {
+      const ms = [...inner.matchAll(/<mergeCell ref="([^"]+)"\s*\/>/g)].filter(m => { const q = parseRef(m[1]); return q && q.c1 >= area.c1 && q.c2 <= area.c2 && q.r1 >= area.r1 && q.r2 <= area.r2; }).map(m => m[0]);
+      return ms.length ? `<mergeCells count="${ms.length}">${ms.join("")}</mergeCells>` : ""; });
+    s = s.replace(/<sheetView\b([^>]*?)tabSelected="1"/, "<sheetView$1").replace(/<sheetView\b/, '<sheetView tabSelected="1"');
+    // tables keep their data but lose calculated-column formulas
+    for(const p of used) if(/tables\/table\d+\.xml$/.test(p) && z.file(p)){
+      n.file(p, (await z.file(p).async("string")).replace(/<calculatedColumnFormula>[\s\S]*?<\/calculatedColumnFormula>/g, "")); drop.add(p + "#done"); }
+    // root rels: drop app.xml
+    const root = (await z.file("_rels/.rels").async("string")).replace(/<Relationship\b[^>]*Target="docProps\/app\.xml"[^>]*\/>/, "");
+    for(const [p, f] of Object.entries(z.files)){
+      if(f.dir || drop.has(p) || drop.has(p + "#done")) continue;
+      if(p === "xl/workbook.xml") n.file(p, w);
+      else if(p === "xl/_rels/workbook.xml.rels") n.file(p, r);
+      else if(p === "[Content_Types].xml") n.file(p, c);
+      else if(p === "_rels/.rels") n.file(p, root);
+      else if(p === keepPath) n.file(p, s);
+      else if(p === sstPath && sst) n.file(p, sst);
+      else n.file(p, await f.async("uint8array"));
+    }
+    const blob = await n.generateAsync({ type: "uint8array", compression: "DEFLATE", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    out.push({ sheet: tg.name, kind: tg.t.kind, label: tg.t.label, bytes: blob });
+  }
+  return out;
+}
+
+/* board side: a calculation that comes in brings its documents along */
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+async function isCalcBook(bytes){
+  try{ const { sheets, targets } = await listSplitTabs(bytes); return targets.length > 0 && sheets.some(s => /калькуляц|calc/i.test(s.name)); }catch(e){ return false; }
+}
+async function autoSplitCalc(srcs){ // srcs: [{rec, bytes}]
+  if(!editing || !editing.id || !assets) return;
+  const note = t => { $("upNote").textContent = t; };
+  let files = [...(editing.files || [])], made = [], gone = [];
+  for(const { rec, bytes } of srcs){
+    let parts;
+    try{ note("Разбираю калькуляцию на документы…"); parts = await splitCalcBook(bytes); }
+    catch(e){ note("Не получилось разобрать калькуляцию (" + (e && e.message || "ошибка") + ")."); continue; }
+    const base = String(editing.num || rec.name.replace(/\.[^.]+$/, "")).trim();
+    for(const part of parts){
+      try{
+        const b64 = await toB64(new Blob([part.bytes], { type: XLSX_MIME }));
+        const r = await assets.upload(new Blob([b64], { type: "text/plain" }), { type: "text/plain" });
+        const old = files.filter(f => f.from === "calc" && f.sheet === part.sheet);
+        gone.push(...old.map(f => f.aid));
+        files = files.filter(f => !old.includes(f));
+        files.push({ aid: r.id, name: `${base} ${part.sheet}.xlsx`.replace(/[\\/:*?"<>|]/g, "-"), kind: part.kind, size: part.bytes.length, mime: XLSX_MIME, enc: "b64",
+          at: new Date().toISOString(), from: "calc", src: rec.aid, sheet: part.sheet });
+        made.push(part);
+      }catch(e){ note("Не получилось сохранить «" + part.sheet + "» (" + (e && e.code || "ошибка") + ")."); }
+    }
+  }
+  if(!made.length) return;
+  try{
+    await db.collection("orders").doc(editing.id).update({ files, updatedAt: new Date().toISOString() });
+    editing.files = files; renderFiles(); refreshDerived();
+    gone.forEach(id => assets.delete(id).catch(() => {}));
+    const cnt = k => made.filter(p => p.kind === k).length;
+    note("Из калькуляции добавлено: " + [cnt("kp") && "КП", cnt("po") && `заказ поставщику ×${cnt("po")}`, cnt("ipl") && `инвойс и упаковочный ×${cnt("ipl")}`].filter(Boolean).join(", ")
+      + ". Любой из них можно удалить или заменить своим файлом.");
+  }catch(e){ note("Документы из калькуляции не привязались к заказу (" + (e && e.code || "ошибка") + ")."); }
+}
+// a calculation already on the board can be split again from its row
+async function splitStoredCalc(aid){
+  const f = (editing.files || []).find(x => x.aid === aid); if(!f) return;
+  try{ $("upNote").textContent = "Читаю калькуляцию…"; await autoSplitCalc([{ rec: f, bytes: await blobBytes(f) }]); }
+  catch(e){ $("upNote").textContent = "Не получилось прочитать калькуляцию (" + (e && e.code || e && e.message || "ошибка") + ")."; }
+}
+$("fileList").addEventListener("click", e => { const b = e.target.closest("[data-split]"); if(b) splitStoredCalc(b.dataset.split); });
 
 $("tPrev").onclick=()=>calStep(-1);
 $("tNext").onclick=()=>calStep(1);
