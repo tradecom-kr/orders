@@ -429,6 +429,28 @@ textarea{min-height:70px;resize:vertical}
 .kar{align-self:center;color:var(--muted);font-size:18px}
 .oc.mini .kds{gap:6px}
 @media (max-width:640px){.kds{flex-direction:row}.kds .kdb{min-width:0}}
+
+/* documents: one column per document type, files stacked under their type */
+#docsAll{border:0;background:none}
+.dmx{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.dtab{border-collapse:collapse;width:max-content;min-width:100%;font-size:13px}
+.dtab caption{caption-side:top;text-align:left;padding:10px 12px;font:700 15px var(--f-display);background:var(--soft,var(--bg))}
+.dtab th{font:700 11px var(--f-body);text-transform:uppercase;letter-spacing:.05em;color:var(--accent);text-align:left;padding:9px 10px;background:var(--soft,var(--bg));border-bottom:2px solid var(--line);white-space:nowrap}
+.dtab td{vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line);border-left:1px solid var(--line);width:230px;min-width:200px}
+.dtab th.dord{position:sticky;left:0;z-index:1;min-width:84px;border-right:1px solid var(--line)}
+.dtab tbody th.dord{background:var(--panel);color:var(--ink);font:700 14px var(--f-display);text-transform:none;letter-spacing:0;vertical-align:top}
+.dtab tbody th.dord small{display:block;font:500 11px var(--f-body);color:var(--muted)}
+.dc{display:flex;align-items:flex-start;gap:6px;padding:6px 0;border-bottom:1px dashed var(--line)}
+.dc .dw{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:1px}
+.dc:last-child{border-bottom:0}
+.dc .dn{min-width:0;overflow-wrap:anywhere;color:var(--ink);text-decoration:none;font:inherit;text-align:left;background:none;border:0;padding:0;cursor:pointer}
+.dc .dn:hover{color:var(--accent);text-decoration:underline}
+.dc .dt{font-size:11px;color:var(--muted)}
+.dc .da{display:flex;gap:2px;flex:none}
+.ib{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:1px 7px;font-size:12px;cursor:pointer;color:var(--ink)}
+.ib:hover{border-color:var(--accent)} .ib.danger{color:var(--danger)}
+.dc.del{background:var(--warn-soft,#fbf1df);padding:5px}
+.dnone{color:var(--muted)}
 </style>
 
 </head>
@@ -1864,38 +1886,41 @@ function renderDocsAll(){
   sel.innerHTML=`<option value="">Все типы документов</option>`+KINDS.map(([k,v])=>`<option value="${k}">${v}</option>`).join("");sel.value=cur;
   const all=visible({all:true}); fillOrderPick(all);
   const oid=$("fOrder")?$("fOrder").value:"", one=oid?all.find(o=>o.id===oid):null;
-  const src=one?[one]:all;
-  const groups=new Map(); let nFiles=0;
-  const add=(k,item)=>{if(cur&&k!==cur)return; if(!groups.has(k))groups.set(k,[]); groups.get(k).push(item);};
-  src.forEach(o=>{
-    const fs=o.files||[];
-    fs.filter(f=>!isPic(f)).forEach(f=>{add(kindOf(f.kind),{o,f,at:String(f.at||"")}); });
-    const pics=fs.filter(isPic); if(pics.length)add("photo",{o,pics,at:pics.map(f=>String(f.at||"")).sort().pop()});
-    if(linkOK(o.photoLink))add("photo",{o,link:o.photoLink.trim(),at:String(o.photoAt||o.updatedAt||"")});
-  });
-  // with one order picked, the documents the deal needs show up even while missing
-  if(one&&!one.arch)["kp","cs","ipl","exp","photo","bl","freight"].forEach(k=>{if((!cur||cur===k)&&!groups.has(k))groups.set(k,[])});
   const by=$("dSort").value||"num";
-  const order=[...groups.keys()].sort((a,b)=>{const ia=KINDS.findIndex(x=>x[0]===a),ib=KINDS.findIndex(x=>x[0]===b);return (ia<0?99:ia)-(ib<0?99:ib)});
+  const lastAt=o=>(o.files||[]).map(f=>String(f.at||"")).sort().pop()||"";
+  const rowsO=(one?[one]:all).slice().sort(by==="num"?(a,b)=>onumOf(b)-onumOf(a)||String(b.num||"").localeCompare(String(a.num||"")):(a,b)=>lastAt(b).localeCompare(lastAt(a)));
+  // columns: document types, in the order of the deal; the ones a live deal needs are always there
+  const cell=new Map(), used=new Set(cur?[cur]:[]);
+  const put=(o,k,item)=>{if(cur&&k!==cur)return;used.add(k);const key=o.id+"|"+k;if(!cell.has(key))cell.set(key,[]);cell.get(key).push(item)};
+  let nFiles=0;
+  rowsO.forEach(o=>{
+    const fs=o.files||[];
+    fs.filter(f=>!isPic(f)).forEach(f=>put(o,kindOf(f.kind),{f}));
+    const pics=fs.filter(isPic); if(pics.length)put(o,"photo",{pics});
+    if(linkOK(o.photoLink))put(o,"photo",{link:o.photoLink.trim()});
+  });
+  if(!cur&&rowsO.some(o=>!o.arch))["kp","cs","ipl","exp","photo","bl","freight"].forEach(k=>used.add(k));
+  const cols=[...used].sort((a,b)=>{const ia=KINDS.findIndex(x=>x[0]===a),ib=KINDS.findIndex(x=>x[0]===b);return (ia<0?99:ia)-(ib<0?99:ib)});
   const sigOrder=k=>["ti","both","den","den_both","nosig",""].indexOf(k||"");
-  const fileRow=(r)=>{
-    const oc=one?"":`<span class="on" data-open="${esc(r.o.id)}">${esc(r.o.num||"")}<br><span class="note" style="font:12px var(--f-body)">${esc(r.o.buyer||"")}</span></span>`;
-    if(r.link)return `<div class="frow ord ${one?"one":""}">${oc}<span class="fn"><span class="ext">📁</span>Google Диск · ${esc(r.link.replace(/^https?:\/\//,"").slice(0,60))}${r.link.length>68?"…":""}</span><span class="acts"><a class="btn" href="${esc(r.link)}" target="_blank" rel="noopener" data-ext>Открыть ↗</a></span></div>`;
-    if(r.pics)return `<div class="frow ord ${one?"one":""}">${oc}<div class="gal">${picTiles(r.pics,r.o.id,{del:true,max:8})}</div><span class="acts">${picActs(r.pics,r.o.id)}</span></div>`;
-    const f=r.f, tag=kindOf(f.kind)==="cs"&&f.signer&&SIGN[f.signer]?`<span class="pill">${esc(SIGN[f.signer][2])}</span>`:f.from==="calc"?`<span class="pill">из калькуляции</span>`:"";
-    return `<div class="frow ord ${one?"one":""}">${oc}<span class="fn"><span class="ext ${extOf(f.name)}">${extOf(f.name)||"файл"}</span>${esc(f.name)}${tag}<small>${fsize(f.size||0)} · ${f.at?fd(f.at.slice(0,10)):""}</small></span><span class="acts">${fDel===f.aid?`<span class="confirm">Удалить?</span><button class="btn danger" type="button" data-fdelyes="${esc(f.aid)}" data-oid="${esc(r.o.id)}">Да</button><button class="btn ghost" type="button" data-fcancel>Нет</button>`:fileActs(f,r.o.id,true,false)}</span></div>`;
+  const chip=(o,it)=>{
+    if(it.link)return `<div class="dc"><a class="dn" href="${esc(it.link)}" target="_blank" rel="noopener" data-ext title="${esc(it.link)}">📁 Google Диск ↗</a></div>`;
+    if(it.pics)return `<div class="dc"><span class="dn">Фото: ${it.pics.length}</span><span class="da"><button type="button" class="ib" data-dlpics="${esc(o.id)}" title="Скачать все фото (.zip)">⬇</button></span></div>`;
+    const f=it.f, ext=extOf(f.name), view=f.enc==="raw"&&/pdf|image/.test(f.mime||"");
+    const tag=kindOf(f.kind)==="cs"&&f.signer&&SIGN[f.signer]?SIGN[f.signer][2]:f.from==="calc"?"из калькуляции":"";
+    if(fDel===f.aid)return `<div class="dc del"><span class="dn">Удалить «${esc(f.name)}»?</span><span class="da"><button type="button" class="ib danger" data-fdelyes="${esc(f.aid)}" data-oid="${esc(o.id)}">Да</button><button type="button" class="ib" data-fcancel>Нет</button></span></div>`;
+    return `<div class="dc"><span class="ext ${ext}">${ext||"файл"}</span><span class="dw">`
+      +(view?`<a href="#" class="dn" data-view="${esc(f.aid)}" data-oid="${esc(o.id)}" title="${esc(f.name)} — открыть">${esc(f.name)}</a>`:`<button type="button" class="dn lnkb" data-dl="${esc(f.aid)}" data-oid="${esc(o.id)}" title="${esc(f.name)} — скачать">${esc(f.name)}</button>`)
+      +(tag?`<small class="dt">${esc(tag)}</small>`:"")
+      +`</span><span class="da"><button type="button" class="ib" data-dl="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Скачать" aria-label="Скачать ${esc(f.name)}">⬇</button>${canWrite?`<button type="button" class="ib danger" data-fdel="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Удалить" aria-label="Удалить ${esc(f.name)}">✕</button>`:""}</span></div>`;
   };
-  let html="";
-  for(const k of order){
-    const items=groups.get(k);
-    items.sort(by==="num"?(a,b)=>onumOf(b.o)-onumOf(a.o)||(k==="cs"?sigOrder(a.f&&a.f.signer)-sigOrder(b.f&&b.f.signer):0)||b.at.localeCompare(a.at):(a,b)=>b.at.localeCompare(a.at));
-    const cnt=items.reduce((n,r)=>n+(r.pics?r.pics.length:1),0); nFiles+=cnt;
-    html+=`<div class="dgrp"><div class="dgh"><b>${esc(k==="photo"?"Фотоотчёт о загрузке":KIND[k]||"Прочее")}</b><span class="note">${cnt?cnt+" "+(cnt===1?"файл":cnt<5?"файла":"файлов"):"нет файлов"}</span></div>`
-      +(items.length?items.map(fileRow).join(""):`<div class="frow ord one"><span class="note" style="grid-column:1/-1">— не загружено</span></div>`)+`</div>`;
-  }
+  const head=`<tr>${one?"":`<th class="dord">Заказ</th>`}${cols.map(k=>`<th>${esc(k==="photo"?"Фотоотчёт":KIND[k]||"Прочее")}</th>`).join("")}</tr>`;
+  const body=rowsO.map(o=>`<tr>${one?"":`<th class="dord" scope="row"><span class="on" data-open="${esc(o.id)}">${esc(o.num||"")}</span>${o.arch?`<small>архив</small>`:""}</th>`}${cols.map(k=>{
+    const items=(cell.get(o.id+"|"+k)||[]).slice().sort((a,b)=>k==="cs"?sigOrder(a.f&&a.f.signer)-sigOrder(b.f&&b.f.signer):String(b.f&&b.f.at||"").localeCompare(String(a.f&&a.f.at||"")));
+    nFiles+=items.reduce((n,it)=>n+(it.pics?it.pics.length:1),0);
+    return `<td>${items.length?items.map(it=>chip(o,it)).join(""):`<span class="dnone">—</span>`}</td>`}).join("")}</tr>`).join("");
   $("docsCount").textContent=nFiles?`Файлов: ${nFiles}`:"";
-  $("docsAll").classList.toggle("oneord",!!one);
-  $("docsAll").innerHTML=html||`<div class="frow"><span class="note" style="grid-column:1/-1">Документов пока нет. Откройте заказ и прикрепите файлы в блоке «Документы».</span></div>`;
+  $("docsAll").innerHTML=rowsO.length?`<div class="dmx"><table class="dtab">${one?`<caption>Заказ ${esc(one.num||"")}${one.buyer?" · "+esc(one.buyer):""}</caption>`:""}<thead>${head}</thead><tbody>${body}</tbody></table></div>`
+    :`<div class="frow"><span class="note" style="grid-column:1/-1">Заказов пока нет.</span></div>`;
 }
 try{const v=localStorage.getItem("docSort");if(v)$("dSort").value=v}catch(e){}
 $("dSort").addEventListener("change",()=>{try{localStorage.setItem("docSort",$("dSort").value)}catch(e){}renderDocsAll()});
