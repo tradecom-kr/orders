@@ -2123,10 +2123,14 @@ async function makeNoSig(aid, btn){
     if(!n){ note("В этом файле нет подписей и печатей картинками — копия не нужна."); btn.disabled = false; return; }
     zip.file("word/document.xml", x);
     const bytes = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
-    const name = f.name.replace(/\s*—\s*(Ти|Ден)\s*[ВЕ]\.?(?=\.docx$)/i, "").replace(/\.docx$/i, " — без подписей.docx");
+    // whose contract this is: the file's own mark first, otherwise the text («в лице директора Ден Евгения»)
+    const txt = x.replace(/<[^>]+>/g, "");
+    const who = ["den", "den_both"].includes(f.signer) ? "Ден Е." : ["ti", "both"].includes(f.signer) && !/Ден\s+Евгени|DEN\s+EVGENY/i.test(txt) ? "Ти В."
+      : /Ден\s+Евгени|DEN\s+EVGENY/i.test(txt) ? "Ден Е." : "Ти В.";
+    const name = f.name.replace(/\s*[—–-]?\s*(Ти|Ден)\s*[ВЕE]\.?(?=\.docx$)/i, "").replace(/\.docx$/i, ` — ${who} без подписей.docx`);
     const b64 = await toB64(new Blob([bytes]));
     const up = await assets.upload(new Blob([b64], { type: "text/plain" }), { type: "text/plain" });
-    const rec = { aid: up.id, name, kind: "cs", signer: "nosig", size: bytes.length, mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", enc: "b64", at: new Date().toISOString(), from: f.aid };
+    const rec = { aid: up.id, name, kind: "cs", signer: "nosig", who: who === "Ден Е." ? "den" : "ti", size: bytes.length, mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", enc: "b64", at: new Date().toISOString(), from: f.aid };
     const files = [...(editing.files || []), rec];
     await db.collection("orders").doc(editing.id).update({ files, updatedAt: new Date().toISOString() });
     editing.files = files; renderFiles(); refreshDerived();
