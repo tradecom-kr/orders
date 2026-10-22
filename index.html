@@ -1599,7 +1599,7 @@ function makeDenVariant(env){
       Array.from(doc.getElementsByTagNameNS(W,"p")).forEach(p=>{names+=replaceInParagraph(p)});
       if(part==="word/document.xml"){
         // swap Ti's facsimile signature for Den's, resized the way the generator sizes it
-        const blips=Array.from(doc.getElementsByTagName("a:blip")).filter(b=>b.getAttributeNS(RELNS,"embed")==="rIdFax_sig_ti"||b.getAttribute("r:embed")==="rIdFax_sig_ti");
+        const tiIds=new Set(["rIdFax_sig_ti"]); const relsXml=zip.file("word/_rels/document.xml.rels")?await zip.file("word/_rels/document.xml.rels").async("string"):""; for(const m of relsXml.matchAll(/<Relationship\b[^>]*>/g)){ const id=(m[0].match(/Id="([^"]+)"/)||[])[1], tg=(m[0].match(/Target="([^"]+)"/)||[])[1]||""; if(!id||!/\/image"/.test(m[0]))continue; const mf=zip.file("word/"+tg.replace(/^\.?\//,"")); if(!mf)continue; const b=await mf.async("uint8array"); const png=b.length>24&&b[0]===0x89&&b[1]===0x50, w=png?(b[16]<<24|b[17]<<16|b[18]<<8|b[19]):0, h=png?(b[20]<<24|b[21]<<16|b[22]<<8|b[23]):0; if(png&&w===220&&h===176)tiIds.add(id); } const blips=Array.from(doc.getElementsByTagName("a:blip")).filter(b=>tiIds.has(b.getAttributeNS(RELNS,"embed")||b.getAttribute("r:embed")));
         const cx=Math.round(DEN.w*EMU), h=DEN.w*DEN.ratio, cy=Math.round(h*EMU);
         blips.forEach(b=>{
           b.setAttributeNS(RELNS,"r:embed","rIdFax_sig_den");
