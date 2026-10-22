@@ -414,6 +414,14 @@ textarea{min-height:70px;resize:vertical}
 .archbox{padding:8px 10px;border:1px dashed var(--line);border-radius:10px;font-size:13px;align-items:flex-start}
 .fkind{width:auto;max-width:140px;text-overflow:ellipsis;padding:3px 6px;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft,var(--bg));border-radius:999px}
 .fn .pill{white-space:nowrap;margin-left:6px;font-size:10px}
+
+.dgrp{border-top:2px solid var(--line)}
+.dgrp:first-child{border-top:0}
+.dgh{display:flex;align-items:baseline;gap:10px;padding:10px 12px 6px;background:var(--soft,var(--bg));font:600 13px var(--f-body)}
+.dgh b{font:700 13px var(--f-display);letter-spacing:.04em;text-transform:uppercase;color:var(--accent)}
+.dgrp .frow.ord{grid-template-columns:150px minmax(0,1fr) auto;border-top:1px dashed var(--line)}
+.dgrp .frow.ord.one{grid-template-columns:minmax(0,1fr) auto}
+@media (max-width:640px){.dgrp .frow.ord{grid-template-columns:minmax(0,1fr)}}
 </style>
 
 </head>
@@ -464,7 +472,7 @@ textarea{min-height:70px;resize:vertical}
     <div class="agenda" id="agenda"></div>
   </section>
   <section id="docsView" hidden style="display:flex;flex-direction:column;gap:10px">
-    <div class="bar"><select id="fKind" aria-label="Тип документа" style="width:auto;background:var(--panel)"></select><select id="dSort" aria-label="Сортировка документов" style="width:auto;background:var(--panel)"><option value="num">По номеру заказа</option><option value="date">По дате загрузки</option></select><span class="note" id="docsCount"></span><span id="stor" class="stor" hidden></span></div>
+    <div class="bar"><select id="fOrder" aria-label="Номер заказа" style="width:auto;max-width:260px;background:var(--panel)"><option value="">Все заказы</option></select><select id="fKind" aria-label="Тип документа" style="width:auto;background:var(--panel)"></select><select id="dSort" aria-label="Сортировка документов" style="width:auto;background:var(--panel)"><option value="num">По номеру заказа</option><option value="date">По дате загрузки</option></select><span class="note" id="docsCount"></span><span id="stor" class="stor" hidden></span></div>
     <div class="files" id="docsAll"></div>
   </section>
 </div>
@@ -1835,34 +1843,57 @@ async function dlPics(oid){
     say(`Фото скачаны: ${pics.length}.`);
   }catch(e){if(!(e&&e.code==="declined"))say("Не получилось скачать фото ("+(e&&e.code||e&&e.message||"ошибка")+").")}
 }
-/* all documents view: photos of one order collapse into one gallery row */
+/* documents view: a table grouped by document type, each type a header row with its files beneath;
+   one order can be picked, then the required types show even when nothing is uploaded yet */
+const onumOf=o=>parseInt(String(o.num||"").replace(/\D+/g," ").trim().split(" ").pop())||0;
+function fillOrderPick(all){
+  const sel=$("fOrder"); if(!sel) return; const cur=sel.value||sel.dataset.want||""; delete sel.dataset.want;
+  const list=[...all].sort((a,b)=>onumOf(b)-onumOf(a)||String(b.num||"").localeCompare(String(a.num||"")));
+  sel.innerHTML=`<option value="">Все заказы</option>`+list.map(o=>`<option value="${esc(o.id)}">${esc(o.num||"без номера")}${o.buyer?" · "+esc(String(o.buyer).replace(/^ООО\s*/,"").replace(/[«»"]/g,"").slice(0,28)):""}${o.arch?" · архив":""}</option>`).join("");
+  sel.value=list.some(o=>o.id===cur)?cur:"";
+}
 function renderDocsAll(){
   const sel=$("fKind"),cur=sel.value;
   sel.innerHTML=`<option value="">Все типы документов</option>`+KINDS.map(([k,v])=>`<option value="${k}">${v}</option>`).join("");sel.value=cur;
-  const rows=[];let nFiles=0;
-  visible({all:true}).forEach(o=>{
-    const fs=(o.files||[]).filter(f=>!cur||kindOf(f.kind)===cur);nFiles+=fs.length;
-    const pics=fs.filter(isPic);
-    fs.filter(f=>!isPic(f)).forEach(f=>rows.push({o,f,at:String(f.at||"")}));
-    if(pics.length)rows.push({o,pics,at:pics.map(f=>String(f.at||"")).sort().pop()});
-    if(linkOK(o.photoLink)&&(!cur||cur==="photo")){nFiles++;rows.push({o,link:o.photoLink.trim(),at:String(o.photoAt||o.updatedAt||"")})}
+  const all=visible({all:true}); fillOrderPick(all);
+  const oid=$("fOrder")?$("fOrder").value:"", one=oid?all.find(o=>o.id===oid):null;
+  const src=one?[one]:all;
+  const groups=new Map(); let nFiles=0;
+  const add=(k,item)=>{if(cur&&k!==cur)return; if(!groups.has(k))groups.set(k,[]); groups.get(k).push(item);};
+  src.forEach(o=>{
+    const fs=o.files||[];
+    fs.filter(f=>!isPic(f)).forEach(f=>{add(kindOf(f.kind),{o,f,at:String(f.at||"")}); });
+    const pics=fs.filter(isPic); if(pics.length)add("photo",{o,pics,at:pics.map(f=>String(f.at||"")).sort().pop()});
+    if(linkOK(o.photoLink))add("photo",{o,link:o.photoLink.trim(),at:String(o.photoAt||o.updatedAt||"")});
   });
-  const by=$("dSort").value||"num", ki=r=>{const k=r.pics||r.link?"photo":kindOf(r.f.kind);const i=KINDS.findIndex(x=>x[0]===k);return i<0?99:i};
-  const onum=o=>parseInt(String(o.num||"").replace(/\D+/g," ").trim().split(" ").pop())||0;
-  // by order: newest order number first, documents inside an order in process order (КП → контракт → инвойс → …)
-  rows.sort(by==="num"?(a,b)=>onum(b.o)-onum(a.o)||String(b.o.num||"").localeCompare(String(a.o.num||""))||ki(a)-ki(b)||b.at.localeCompare(a.at):(a,b)=>b.at.localeCompare(a.at));
-  if(by==="num")rows.forEach((r,i)=>{r.first=!i||rows[i-1].o.id!==r.o.id});
+  // with one order picked, the documents the deal needs show up even while missing
+  if(one&&!one.arch)["kp","cs","ipl","exp","photo","bl","freight"].forEach(k=>{if((!cur||cur===k)&&!groups.has(k))groups.set(k,[])});
+  const by=$("dSort").value||"num";
+  const order=[...groups.keys()].sort((a,b)=>{const ia=KINDS.findIndex(x=>x[0]===a),ib=KINDS.findIndex(x=>x[0]===b);return (ia<0?99:ia)-(ib<0?99:ib)});
+  const sigOrder=k=>["ti","both","den","den_both","nosig",""].indexOf(k||"");
+  const fileRow=(r)=>{
+    const oc=one?"":`<span class="on" data-open="${esc(r.o.id)}">${esc(r.o.num||"")}<br><span class="note" style="font:12px var(--f-body)">${esc(r.o.buyer||"")}</span></span>`;
+    if(r.link)return `<div class="frow ord ${one?"one":""}">${oc}<span class="fn"><span class="ext">📁</span>Google Диск · ${esc(r.link.replace(/^https?:\/\//,"").slice(0,60))}${r.link.length>68?"…":""}</span><span class="acts"><a class="btn" href="${esc(r.link)}" target="_blank" rel="noopener" data-ext>Открыть ↗</a></span></div>`;
+    if(r.pics)return `<div class="frow ord ${one?"one":""}">${oc}<div class="gal">${picTiles(r.pics,r.o.id,{del:true,max:8})}</div><span class="acts">${picActs(r.pics,r.o.id)}</span></div>`;
+    const f=r.f, tag=kindOf(f.kind)==="cs"&&f.signer&&SIGN[f.signer]?`<span class="pill">${esc(SIGN[f.signer][2])}</span>`:f.from==="calc"?`<span class="pill">из калькуляции</span>`:"";
+    return `<div class="frow ord ${one?"one":""}">${oc}<span class="fn"><span class="ext ${extOf(f.name)}">${extOf(f.name)||"файл"}</span>${esc(f.name)}${tag}<small>${fsize(f.size||0)} · ${f.at?fd(f.at.slice(0,10)):""}</small></span><span class="acts">${fDel===f.aid?`<span class="confirm">Удалить?</span><button class="btn danger" type="button" data-fdelyes="${esc(f.aid)}" data-oid="${esc(r.o.id)}">Да</button><button class="btn ghost" type="button" data-fcancel>Нет</button>`:fileActs(f,r.o.id,true,false)}</span></div>`;
+  };
+  let html="";
+  for(const k of order){
+    const items=groups.get(k);
+    items.sort(by==="num"?(a,b)=>onumOf(b.o)-onumOf(a.o)||(k==="cs"?sigOrder(a.f&&a.f.signer)-sigOrder(b.f&&b.f.signer):0)||b.at.localeCompare(a.at):(a,b)=>b.at.localeCompare(a.at));
+    const cnt=items.reduce((n,r)=>n+(r.pics?r.pics.length:1),0); nFiles+=cnt;
+    html+=`<div class="dgrp"><div class="dgh"><b>${esc(k==="photo"?"Фотоотчёт о загрузке":KIND[k]||"Прочее")}</b><span class="note">${cnt?cnt+" "+(cnt===1?"файл":cnt<5?"файла":"файлов"):"нет файлов"}</span></div>`
+      +(items.length?items.map(fileRow).join(""):`<div class="frow ord one"><span class="note" style="grid-column:1/-1">— не загружено</span></div>`)+`</div>`;
+  }
   $("docsCount").textContent=nFiles?`Файлов: ${nFiles}`:"";
-  const oc=(o,r)=>by==="num"&&!r.first?`<span></span>`:`<span class="on" data-open="${esc(o.id)}">${esc(o.num)}<br><span class="note" style="font:12px var(--f-body)">${esc(o.buyer||"")}</span></span>`;
-  $("docsAll").innerHTML=rows.map(r=>r.link
-    ?`<div class="frow ord ${r.first?"gfirst":""}">${oc(r.o,r)}<span class="pill acc" style="justify-self:start">Фотоотчёт · Google Диск</span><span class="fn"><span class="ext">📁</span>${esc(r.link.replace(/^https?:\/\//,"").slice(0,60))}${r.link.length>68?"…":""}</span><span class="acts"><a class="btn" href="${esc(r.link)}" target="_blank" rel="noopener" data-ext>Открыть ↗</a></span></div>`
-    :r.pics
-    ?`<div class="frow ord ${r.first?"gfirst":""}">${oc(r.o,r)}<span class="pill acc" style="justify-self:start">Фотоотчёт · ${r.pics.length}</span><div class="gal">${picTiles(r.pics,r.o.id,{del:true,max:8})}</div><span class="acts">${picActs(r.pics,r.o.id)}</span></div>`
-    :`<div class="frow ord ${r.first?"gfirst":""}">${oc(r.o,r)}<span class="pill acc" style="justify-self:start">${KIND[r.f.kind]||"Прочее"}${kindOf(r.f.kind)==="cs"&&r.f.signer?" · "+SIGN[r.f.signer][2]:""}</span><span class="fn"><span class="ext ${extOf(r.f.name)}">${extOf(r.f.name)||"файл"}</span>${esc(r.f.name)}<small>${fsize(r.f.size||0)} · ${r.f.at?fd(r.f.at.slice(0,10)):""}</small></span><span class="acts">${fDel===r.f.aid?`<span class="confirm">Удалить?</span><button class="btn danger" type="button" data-fdelyes="${esc(r.f.aid)}" data-oid="${esc(r.o.id)}">Да</button><button class="btn ghost" type="button" data-fcancel>Нет</button>`:fileActs(r.f,r.o.id,true,false)}</span></div>`).join("")
-    ||`<div class="frow"><span class="note" style="grid-column:1/-1">Документов пока нет. Откройте заказ и прикрепите файлы в блоке «Документы».</span></div>`;
+  $("docsAll").classList.toggle("oneord",!!one);
+  $("docsAll").innerHTML=html||`<div class="frow"><span class="note" style="grid-column:1/-1">Документов пока нет. Откройте заказ и прикрепите файлы в блоке «Документы».</span></div>`;
 }
 try{const v=localStorage.getItem("docSort");if(v)$("dSort").value=v}catch(e){}
 $("dSort").addEventListener("change",()=>{try{localStorage.setItem("docSort",$("dSort").value)}catch(e){}renderDocsAll()});
+try{const v=localStorage.getItem("docOrder");if(v!==null&&$("fOrder"))$("fOrder").dataset.want=v}catch(e){}
+if($("fOrder"))$("fOrder").addEventListener("change",()=>{try{localStorage.setItem("docOrder",$("fOrder").value)}catch(e){}renderDocsAll()});
 $("fKind").addEventListener("change",renderDocsAll);
 $("docsAll").addEventListener("click",e=>{const b=e.target.closest("[data-dl]");if(b){downloadFile(b.dataset.dl,b.dataset.oid);return}
   const x=e.target.closest("button");
