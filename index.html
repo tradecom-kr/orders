@@ -468,6 +468,11 @@ textarea{min-height:70px;resize:vertical}
 .sdr:first-child{border-top:0}.sdr:hover{background:var(--soft,var(--bg))}
 .sdr .sdo{font:700 13px var(--f-display)} .sdr b{font:600 13px var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
 @media (max-width:640px){.sdr{grid-template-columns:60px minmax(0,1fr) auto}.sdr .note{display:none}}
+
+.psl li.sub .samt{font-family:var(--f-mono);font-size:10.5px;color:var(--warn)}
+.psl li.sub .samt.paid{color:var(--ok)}
+.psl li.sub.due{color:var(--warn)!important;font-weight:600;padding-left:12px}
+.pseg.next .psl{opacity:1}.pseg.next .psl li:not(.sub){opacity:.5}
 </style>
 
 </head>
@@ -878,9 +883,9 @@ function stageCap(a){
 function stLi(z,a){
   let h=`<li class="${z.done?"ok":""}">${z.done?"✓":"✗"} ${SHORT[z.id]}</li>`;
   if(z.id==="photo"&&linkOK(a.photoLink))h+=`<li class="sub ok"><a href="${esc(a.photoLink.trim())}" target="_blank" rel="noopener" data-ext title="Папка с фото в Google Диске">📁 Google Диск ↗</a></li>`;
-  if(z.id==="suppay")h+=(a.supsAll||[]).map(x=>`<li class="sub ${x.paid?"ok":"no"}" title="${esc(x.name+(x.amt?" — "+fm(x.amt,"KRW"):"")+(x.paid?" · оплачен":" · не оплачен"))}">${x.paid?"✓":"✗"} ${esc(x.name)}${x.amt?" · "+esc(mln(x.amt)):""}</li>`).join("");
   if(z.id==="supconf")h+=(a.sups||[]).map(x=>{const ok=x.st==="confirmed"&&x.date;const md=x.date?String(x.date).slice(5,7)+"."+String(x.date).slice(8,10):"";
-    return `<li class="sub ${ok?"ok":"no"}" title="${esc((x.name||"Поставщик")+" — "+(SUPST[x.st]||SUPST.none).toLowerCase()+(x.date?" · "+fd(x.date):""))}">${ok?"✓":"✗"} ${esc(x.name||"Поставщик")}${md?" · "+md:""}</li>`}).join("");
+    return `<li class="sub ${ok?"ok":"no"}" title="${esc((x.name||"Поставщик")+" — "+(SUPST[x.st]||SUPST.none).toLowerCase()+(x.date?" · "+fd(x.date):""))}">${ok?"✓":"✗"} ${esc(x.name||"Поставщик")}${md?" · "+md:""}${x.amt?`<br><span class="samt ${x.paid?"paid":""}">${esc(mln(x.amt))} ₩${x.paid?" · оплачен":""}</span>`:""}</li>`}).join("")
+    +(()=>{const L=a.sups||[], due=L.filter(x=>!x.paid).reduce((t,x)=>t+(x.amt||0),0);return due?`<li class="sub due">К оплате: ${esc(mln(due))} ₩</li>`:""})();
   if(z.id==="vessel"&&a.vsl){const v=a.vsl,md=d=>String(d).slice(5,7)+"."+String(d).slice(8,10);
     const txt=v.name||v.carrier||(v.etd?"ETD "+md(v.etd):"судно не указано");
     h+=`<li class="sub ${z.done?"ok":"no"}" title="${esc([v.name&&"Судно: "+v.name,v.carrier&&"Линия: "+v.carrier,v.etd&&"ETD "+fd(v.etd),z.done?"расписание утверждено":"не утверждено"].filter(Boolean).join(" · "))}">${z.done?"✓":"✗"} ${esc(txt)}</li>`}
@@ -955,7 +960,6 @@ function cardHTML(o){
   </article>`;
 }
 function renderOverview(){
-  renderSupDue();
   // newest deal on top: by deal date, then by creation time, then by number
   // a deal without a contract date counts from the day it was created; Latin M and Cyrillic М compare by the digits
   const key=o=>String(o.date||o.createdAt||"").slice(0,10), nn=o=>parseInt(String(o.num||"").replace(/\D+/g," ").trim().split(" ").pop())||0;
