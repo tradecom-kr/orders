@@ -179,7 +179,7 @@ textarea{min-height:70px;resize:vertical}
 .tlbar .rng{font:500 13px var(--f-mono);color:var(--muted)}
 .legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);margin-left:auto}
 .legend i{display:inline-block;width:18px;height:9px;border-radius:3px;vertical-align:middle;margin-right:5px}
-.sups{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 140px 160px 100px 34px;gap:6px;align-items:center;padding:6px 8px;border-top:1px solid var(--line)}
+.sups{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) 120px 140px 150px 100px 34px;gap:6px;align-items:center;padding:6px 8px;border-top:1px solid var(--line)}
 .sups:first-child{border-top:0}
 .sups.hdr{background:var(--soft);font:600 11px var(--f-body);text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
 @media (max-width:640px){.sups{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.sups.hdr{display:none}.sups .x{justify-self:end}}
@@ -457,6 +457,17 @@ textarea{min-height:70px;resize:vertical}
 .kwho.none{color:var(--muted);font-weight:400}
 .kds .kar{align-self:flex-end;margin-bottom:14px}
 @media (max-width:640px){.kcol{flex:1}.kwho{max-width:none}}
+
+/* what we owe suppliers */
+.supdue{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin-bottom:12px;overflow:hidden}
+.sdh{display:flex;align-items:baseline;gap:12px;width:100%;padding:10px 14px;border:0;background:none;cursor:pointer;text-align:left;font:600 13px var(--f-body);color:var(--ink);flex-wrap:wrap}
+.sdh b{font:700 18px var(--f-mono);font-variant-numeric:tabular-nums;color:var(--warn)}
+.sdh .sdc{margin-left:auto;color:var(--muted)}
+.sdl{border-top:1px solid var(--line)}
+.sdr{display:grid;grid-template-columns:70px minmax(0,1fr) 130px 170px;gap:10px;align-items:baseline;padding:7px 14px;border-top:1px dashed var(--line);cursor:pointer;font-size:13px}
+.sdr:first-child{border-top:0}.sdr:hover{background:var(--soft,var(--bg))}
+.sdr .sdo{font:700 13px var(--f-display)} .sdr b{font:600 13px var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+@media (max-width:640px){.sdr{grid-template-columns:60px minmax(0,1fr) auto}.sdr .note{display:none}}
 </style>
 
 </head>
@@ -491,7 +502,7 @@ textarea{min-height:70px;resize:vertical}
 
   <div class="status" id="status">Загружаю заказы…</div>
 
-  <section id="overView"><div class="ovl" id="ovl"></div></section>
+  <section id="overView"><div class="supdue" id="supDue" hidden></div><div class="ovl" id="ovl"></div></section>
   <section id="timeView" hidden style="display:flex;flex-direction:column;gap:12px">
     <div class="upcoming" id="upcoming" hidden></div>
     <div class="tlbar">
@@ -735,7 +746,12 @@ const num=v=>{if(v==null)return null;const s=String(v).replace(/[\s ]/g,"").rep
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
 const kindOf=k=>(k==="contract"||k==="spec")?"cs":(k==="invoice"||k==="pl")?"ipl":k;
-const sups=o=>Array.isArray(o.suppliers)?o.suppliers:((o.sup||o.supDate)?[{name:o.sup||"",date:o.supDate||"",st:o.supSt||"none",what:""}]:[]);
+// supplier amount: typed in, or taken from the calculation summary «…, 19 152 000 KRW»
+const amtFromWhat=w=>{const m=String(w||"").match(/(\d[\d\s\u00a0\u202f]*\d)\s*KRW/i);return m?Number(m[1].replace(/\D/g,""))||null:null};
+const sups0=o=>Array.isArray(o.suppliers)?o.suppliers:((o.sup||o.supDate)?[{name:o.sup||"",date:o.supDate||"",st:o.supSt||"none",what:""}]:[]);
+const sups=o=>sups0(o).map(x=>x.amt!=null&&x.amt!==""?x:{...x,amt:amtFromWhat(x.what)});
+// what is still owed to suppliers on one deal
+const supDue=o=>sups(o).filter(x=>x.name&&!x.paid);
 const supMax=list=>list.map(x=>x.date).filter(Boolean).sort().pop()||"";
 const supAll=list=>list.length>0&&list.every(x=>x.st==="confirmed"&&x.date);
 function reqFiles(o,r){const fs=o.files||[];
@@ -816,7 +832,7 @@ function analyze0(o){
   }
   let next="";
   for(const p of PHASES){for(const id of p.steps){if(id==="got"||stepDone(o,id))continue;next=nextText(o,id);break}if(next)break}
-  return {ph,cur,alerts,missing,overdue,closed,next:next||"Все шаги выполнены",created:o.date||o.createdAt||"",sups:sups(o).filter(x=>x.name||x.date),photoLink:o.photoLink||"",vsl:{name:o.vessel||"",carrier:o.carrier||"",etd:o.etd||""}};
+  return {ph,cur,alerts,missing,overdue,closed,next:next||"Все шаги выполнены",created:o.date||o.createdAt||"",sups:sups(o).filter(x=>x.name||x.date),supsAll:sups(o).filter(x=>x.name),photoLink:o.photoLink||"",vsl:{name:o.vessel||"",carrier:o.carrier||"",etd:o.etd||""}};
 }
 const AN=new WeakMap();
 const an=o=>{let a=AN.get(o);if(!a){a=analyze(o);AN.set(o,a)}return a};
@@ -862,6 +878,7 @@ function stageCap(a){
 function stLi(z,a){
   let h=`<li class="${z.done?"ok":""}">${z.done?"✓":"✗"} ${SHORT[z.id]}</li>`;
   if(z.id==="photo"&&linkOK(a.photoLink))h+=`<li class="sub ok"><a href="${esc(a.photoLink.trim())}" target="_blank" rel="noopener" data-ext title="Папка с фото в Google Диске">📁 Google Диск ↗</a></li>`;
+  if(z.id==="suppay")h+=(a.supsAll||[]).map(x=>`<li class="sub ${x.paid?"ok":"no"}" title="${esc(x.name+(x.amt?" — "+fm(x.amt,"KRW"):"")+(x.paid?" · оплачен":" · не оплачен"))}">${x.paid?"✓":"✗"} ${esc(x.name)}${x.amt?" · "+esc(mln(x.amt)):""}</li>`).join("");
   if(z.id==="supconf")h+=(a.sups||[]).map(x=>{const ok=x.st==="confirmed"&&x.date;const md=x.date?String(x.date).slice(5,7)+"."+String(x.date).slice(8,10):"";
     return `<li class="sub ${ok?"ok":"no"}" title="${esc((x.name||"Поставщик")+" — "+(SUPST[x.st]||SUPST.none).toLowerCase()+(x.date?" · "+fd(x.date):""))}">${ok?"✓":"✗"} ${esc(x.name||"Поставщик")}${md?" · "+md:""}</li>`}).join("");
   if(z.id==="vessel"&&a.vsl){const v=a.vsl,md=d=>String(d).slice(5,7)+"."+String(d).slice(8,10);
@@ -885,6 +902,23 @@ function alertsHTML(a){
   return a.alerts.map(x=>`<div class="al ${x.c}"><i>!</i><span>${esc(x.t)}</span></div>`).join("")
     +`<div class="al next"><i>→</i><span><b>Дальше:</b> ${esc(a.next)}</span></div>`;
 }
+const mln=n=>n>=1e6?(n/1e6).toLocaleString("ru-RU",{maximumFractionDigits:1})+" млн":Number(n).toLocaleString("ru-RU");
+/* overview: what the company still owes suppliers, deal by deal */
+function renderSupDue(){
+  const el=$("supDue"); if(!el)return;
+  const rows=[]; orders.filter(o=>!o.arch&&!stepDone(o,"closed")).forEach(o=>supDue(o).forEach(x=>rows.push({o,x})));
+  if(!rows.length){el.hidden=true;return}
+  rows.sort((a,b)=>String(a.x.date||"9").localeCompare(String(b.x.date||"9"))||String(a.o.num).localeCompare(String(b.o.num)));
+  const tot=rows.reduce((s,r)=>s+(r.x.amt||0),0), noAmt=rows.filter(r=>!r.x.amt).length;
+  const open=load("supDueOpen",false);
+  el.hidden=false;
+  el.innerHTML=`<button type="button" class="sdh" id="supDueT" aria-expanded="${open}"><span>К оплате поставщикам</span><b>${tot?fm(tot,"KRW"):"—"}</b><span class="note">${rows.length} ${rows.length===1?"платёж":rows.length<5?"платежа":"платежей"}${noAmt?` · у ${noAmt} нет суммы`:""}</span><span class="sdc">${open?"▾":"▸"}</span></button>`
+    +(open?`<div class="sdl">${rows.map(r=>`<div class="sdr" data-open="${esc(r.o.id)}" data-ph="suppay"><span class="sdo">${esc(r.o.num||"")}</span><span class="sdn">${esc(r.x.name)}</span><span class="note">${r.x.date?"поставка "+fds(r.x.date):""}</span><b class="${r.x.amt?"":"note"}">${r.x.amt?fm(r.x.amt,"KRW"):"сумма не указана"}</b></div>`).join("")}</div>`:"");
+}
+document.addEventListener("click",e=>{
+  if(e.target.closest("#supDueT")){save("supDueOpen",!load("supDueOpen",false));renderSupDue();return}
+  const r=e.target.closest("#supDue [data-open]"); if(r){const o=orders.find(x=>x.id===r.dataset.open);if(o)openEditor(o,"suppay")}
+});
 function keyDates(o,loaded){
   const port=stepDone(o,"port"), dcls=(d,done)=>!d||done?"":days(d)<0?"bad":days(d)<=3?"warn":"";
   const box=(l,d,done,sub)=>`<div class="kdb ${dcls(d,done)} ${done?"ok":""}"><span class="kl">${l}</span><b>${d?String(d).slice(5,7)+"."+String(d).slice(8,10):"—"}${done?" ✓":""}</b></div>`;
@@ -921,6 +955,7 @@ function cardHTML(o){
   </article>`;
 }
 function renderOverview(){
+  renderSupDue();
   // newest deal on top: by deal date, then by creation time, then by number
   // a deal without a contract date counts from the day it was created; Latin M and Cyrillic М compare by the digits
   const key=o=>String(o.date||o.createdAt||"").slice(0,10), nn=o=>parseInt(String(o.num||"").replace(/\D+/g," ").trim().split(" ").pop())||0;
@@ -1359,7 +1394,7 @@ function extractCalc(wb){
     for(const r of pr){const i=r.findIndex(v=>String(v).trim()==="상호");const v=i>=0?r.slice(i+1).find(x=>String(x).trim()):"";if(v){kor=String(v).trim();break}}
     for(const r of pr){const i=r.findIndex(v=>/납기일자/.test(String(v)));if(i<0)continue;const v=String(r.slice(i+1).find(x=>String(x).trim())||"");
       const d=v.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);if(d){const y=today().getFullYear();due=isoOf(y,d[1],d[2]);dueSt=/협의|쯤|예정|미정/.test(v)?"asked":"confirmed"}break}}
-  if(g.size)f.suppliers=[...g].map(([s,x])=>({name:s+(kor&&g.size===1?` (${kor})`:""),what:`${[...x.what].slice(0,2).join(", ")}${x.what.size?", ":""}${x.n} SKU, ${x.box.toLocaleString("ru-RU")} кор., ${Math.round(x.sum).toLocaleString("ru-RU")} KRW`,date:g.size===1?due:"",st:g.size===1&&due?dueSt:"none",paid:false}));
+  if(g.size)f.suppliers=[...g].map(([s,x])=>({name:s+(kor&&g.size===1?` (${kor})`:""),what:`${[...x.what].slice(0,2).join(", ")}${x.what.size?", ":""}${x.n} SKU, ${x.box.toLocaleString("ru-RU")} кор., ${Math.round(x.sum).toLocaleString("ru-RU")} KRW`,date:g.size===1?due:"",st:g.size===1&&due?dueSt:"none",paid:false,amt:Math.round(x.sum)||null}));
   return f;
 }
 const numFromName=n=>{const m=String(n).match(/(?:^|[^A-Za-zА-Яа-яЁё])([МM])\s?[-–_]?\s?(\d{1,5})(?!\d)/);return m?`${m[1]==="M"?"М":m[1]}-${m[2]}`:""};
@@ -1589,21 +1624,23 @@ $("bList").addEventListener("click",async e=>{
 function supRow(x,i){const ro=canWrite?"":"disabled";return `<div class="sups" data-i="${i}">
   <input class="s_name" list="supNames" value="${esc(x.name||"")}" placeholder="Поставщик" aria-label="Поставщик" ${ro}>
   <input class="s_what" value="${esc(x.what||"")}" placeholder="Что поставляет" aria-label="Позиции" ${ro}>
+  <input class="s_amt" inputmode="numeric" value="${x.amt!=null&&x.amt!==""?Number(x.amt).toLocaleString("ru-RU"):""}" placeholder="—" aria-label="Сумма поставщику, KRW" ${ro}>
   <input class="s_date" type="date" value="${esc(x.date||"")}" aria-label="Поставка к" ${ro}>
   <select class="s_st" aria-label="Статус срока" ${ro}>${Object.entries(SUPST).map(([k,v])=>`<option value="${k}" ${x.st===k?"selected":""}>${v}</option>`).join("")}</select>
   <label class="chk" style="color:var(--ink)"><input type="checkbox" class="s_paid" ${x.paid?"checked":""} ${ro}> оплачен</label>
   ${canWrite?`<button type="button" class="x" data-rm="${i}" aria-label="Убрать поставщика">✕</button>`:"<span></span>"}</div>`}
 function renderSups(list){
   if(!list.length)list=[{name:"",what:"",date:"",st:"none"}];
-  $("supList").innerHTML=`<div class="sups hdr"><span>Поставщик</span><span>Что поставляет</span><span>Поставка к</span><span>Срок</span><span>Оплата</span><span></span></div>`+list.map(supRow).join("");
+  $("supList").innerHTML=`<div class="sups hdr"><span>Поставщик</span><span>Что поставляет</span><span>Сумма, KRW</span><span>Поставка к</span><span>Срок</span><span>Оплата</span><span></span></div>`+list.map(supRow).join("");
   const names=new Set();orders.forEach(o=>sups(o).forEach(x=>x.name&&names.add(x.name)));
   $("supNames").innerHTML=[...names].sort().map(n=>`<option value="${esc(n)}">`).join("");
   supSum();
 }
-function readSups(){return [...$("supList").querySelectorAll(".sups[data-i]")].map(r=>({name:r.querySelector(".s_name").value.trim(),what:r.querySelector(".s_what").value.trim(),date:r.querySelector(".s_date").value,st:r.querySelector(".s_st").value,paid:r.querySelector(".s_paid").checked}))}
+function readSups(){return [...$("supList").querySelectorAll(".sups[data-i]")].map(r=>({name:r.querySelector(".s_name").value.trim(),what:r.querySelector(".s_what").value.trim(),date:r.querySelector(".s_date").value,amt:num(r.querySelector(".s_amt").value),st:r.querySelector(".s_st").value,paid:r.querySelector(".s_paid").checked}))}
 function supSum(){
   const L=readSups().filter(x=>x.name||x.date), m=supMax(L), ok=L.filter(x=>x.st==="confirmed"&&x.date).length;
-  $("supSum").textContent=L.length?`Весь товар будет к ${m?fd(m):"—"} (по последнему поставщику) · подтверждено ${ok} из ${L.length}`:"";
+  const tot=L.reduce((s,x)=>s+(x.amt||0),0), due=L.filter(x=>!x.paid).reduce((s,x)=>s+(x.amt||0),0);
+  $("supSum").textContent=L.length?`Весь товар будет к ${m?fd(m):"—"} (по последнему поставщику) · подтверждено ${ok} из ${L.length}`+(tot?` · поставщикам всего ${fm(tot,"KRW")}, к оплате ${fm(due,"KRW")}`:""):"";
 }
 $("supAdd").onclick=()=>{const L=readSups();L.push({name:"",what:"",date:"",st:"none"});renderSups(L);sched();const rs=$("supList").querySelectorAll(".s_name");rs[rs.length-1].focus()};
 $("supList").addEventListener("click",e=>{const b=e.target.closest("[data-rm]");if(!b)return;const L=readSups();L.splice(Number(b.dataset.rm),1);renderSups(L);sched()});
