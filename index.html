@@ -935,8 +935,9 @@ document.addEventListener("click",e=>{
   const r=e.target.closest("#supDue [data-open]"); if(r){const o=orders.find(x=>x.id===r.dataset.open);if(o)openEditor(o,"suppay")}
 });
 // equivalent from the commercial invoices, next to the order amount: «≈ 9 702 430 JPY»
-const eqOf=o=>(o.files||[]).filter(f=>kindOf(f.kind)==="ipl"&&f.eq).reduce((t,f)=>{for(const[k,v]of Object.entries(f.eq))if(v&&k!==(o.cur||"KRW"))t[k]=(t[k]||0)+v;return t},{});
-const eqText=o=>Object.entries(eqOf(o)).map(([k,v])=>` <span class="eqv" title="Эквивалент по Commercial invoice">≈ ${Math.round(v).toLocaleString("ru-RU")} ${esc(k)}</span>`).join("");
+// the invoice's own figure in the other currency — «Total Invoice Value» or «Equivalent Value», exactly as written there
+const eqOf=o=>(o.files||[]).filter(f=>kindOf(f.kind)==="ipl"&&(f.eq||f.inv)).reduce((t,f)=>{for(const[k,v]of Object.entries({...(f.inv||{}),...(f.eq||{})}))if(v&&k!==(o.cur||"KRW"))t[k]=(t[k]||0)+v;return t},{});
+const eqText=o=>Object.entries(eqOf(o)).map(([k,v])=>` <span class="eqv" title="Сумма из Commercial invoice">${Math.round(v).toLocaleString("ru-RU")} ${esc(k)} по инвойсу</span>`).join("");
 function keyDates(o,loaded){
   const port=stepDone(o,"port"), dcls=(d,done)=>!d||done?"":days(d)<0?"bad":days(d)<=3?"warn":"";
   const box=(l,d,done,sub)=>`<div class="kdb ${dcls(d,done)} ${done?"ok":""}"><span class="kl">${l}</span><b>${d?String(d).slice(5,7)+"."+String(d).slice(8,10):"—"}${done?" ✓":""}</b></div>`;
