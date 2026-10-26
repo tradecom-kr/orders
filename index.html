@@ -451,6 +451,12 @@ textarea{min-height:70px;resize:vertical}
 .ib:hover{border-color:var(--accent)} .ib.danger{color:var(--danger)}
 .dc.del{background:var(--warn-soft,#fbf1df);padding:5px}
 .dnone{color:var(--muted)}
+
+.kcol{display:flex;flex-direction:column;gap:3px;min-width:0}
+.kwho{font:600 12px var(--f-body);color:var(--ink);max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kwho.none{color:var(--muted);font-weight:400}
+.kds .kar{align-self:flex-end;margin-bottom:14px}
+@media (max-width:640px){.kcol{flex:1}.kwho{max-width:none}}
 </style>
 
 </head>
@@ -883,7 +889,11 @@ function keyDates(o,loaded){
   const port=stepDone(o,"port"), dcls=(d,done)=>!d||done?"":days(d)<0?"bad":days(d)<=3?"warn":"";
   const box=(l,d,done,sub)=>`<div class="kdb ${dcls(d,done)} ${done?"ok":""}"><span class="kl">${l}</span><b>${d?String(d).slice(5,7)+"."+String(d).slice(8,10):"—"}${done?" ✓":""}</b></div>`;
   const rel=d=>{const n=days(d);return n===0?"сегодня":n>0?"через "+n+" дн.":n<0?Math.abs(n)+" дн. назад":""};
-  return `<div class="kds">${box("Загрузка",o.loadAt,loaded,o.loadAt?rel(o.loadAt)+(o.loadTime?" · "+esc(o.loadTime):""):"")}<span class="kar" aria-hidden="true">→</span>${box("Выход судна",o.etd,port,o.etd?rel(o.etd):"")}</div>`;
+  // who loads (suppliers) above the loading date, which ship above the departure date
+  const short=n=>String(n).replace(/\([^)]*\)/g,"").replace(/주식회사|영어조합법인|농업회사법인|\(주\)|\(유\)|co\.?,?\s*ltd\.?|llc/ig,"").trim()||String(n);
+  const supN=sups(o).map(x=>x.name).filter(Boolean), sup=supN.map(short).join(", "), ship=o.vessel||o.carrier||"";
+  const col=(top,full,boxHtml)=>`<div class="kcol"><span class="kwho ${top?"":"none"}" title="${esc(full||"")}">${esc(top||"—")}</span>${boxHtml}</div>`;
+  return `<div class="kds">${col(sup,supN.join(", "),box("Загрузка",o.loadAt,loaded,""))}<span class="kar" aria-hidden="true">→</span>${col(ship,[o.vessel,o.carrier].filter(Boolean).join(" · "),box("Выход судна",o.etd,port,""))}</div>`;
 }
 function archCard(o){
   const fs=o.files||[], kinds=[...new Set(fs.map(f=>kindOf(f.kind)))];
