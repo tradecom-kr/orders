@@ -474,6 +474,8 @@ textarea{min-height:70px;resize:vertical}
 .psl li.sub.due{color:var(--warn)!important;font-weight:600;padding-left:12px}
 .pseg.next .psl{opacity:1}.pseg.next .psl li:not(.sub){opacity:.5}
 .psl li.sub.eq{color:var(--ink)!important;font-family:var(--f-mono);font-size:10.5px}
+.oc .amt .eqv{color:var(--muted);margin-left:6px}
+#e_amtEq{font:500 12px var(--f-mono);color:var(--muted)}
 </style>
 
 </head>
@@ -553,7 +555,7 @@ textarea{min-height:70px;resize:vertical}
           <label class="f"><span>Дата контракта</span><input id="e_date" type="date"></label>
           <label class="f"><span>Покупатель *</span><select id="e_buyerSel"></select><input id="e_buyer" placeholder="Название нового покупателя" hidden></label>
           <label class="f"><span>Товар</span><input id="e_goods" placeholder="—"></label>
-          <label class="f"><span>Сумма</span><input id="e_amount" inputmode="decimal" placeholder="—"></label>
+          <label class="f"><span>Сумма <span id="e_amtEq"></span></span><input id="e_amount" inputmode="decimal" placeholder="—"></label>
           <label class="f"><span>Валюта</span><select id="e_cur"><option>KRW</option><option>USD</option><option>RUB</option><option>JPY</option><option>CNY</option></select></label>
           <label class="f"><span>Инкотермс</span><input id="e_inco" placeholder="—"></label>
           <label class="f"><span>Ответственный</span><input id="e_owner" placeholder="—"></label>
@@ -889,7 +891,7 @@ function stLi(z,a){
       +(due?`<li class="sub due">К оплате: ${esc(mln(due))} ₩</li>`:"")}
   // payment block: what the buyer still owes
   if(z.id==="paid"&&a.money&&a.money.amount){const m=a.money, left=Math.max(0,m.amount-(m.paid||0));
-    const eqs=Object.entries(m.eq||{}).filter(([k,v])=>v&&k!=="KRW").map(([k,v])=>`<li class="sub eq" title="Эквивалент по Commercial invoice">≈ ${esc(mln(v))} ${esc(k)}</li>`).join("");
+    const eqs="";
     h+=(m.pay==="paid"?`<li class="sub ok">Получено: ${esc(mln(m.amount))} ${esc(m.cur)}</li>`
       :`<li class="sub due">К получению: ${esc(mln(left))} ${esc(m.cur)}</li>`+(m.paid?`<li class="sub ok">Получено: ${esc(mln(m.paid))} ${esc(m.cur)}</li>`:""))+eqs}
   if(z.id==="supconf")h+=(a.sups||[]).map(x=>{const ok=x.st==="confirmed"&&x.date;const md=x.date?String(x.date).slice(5,7)+"."+String(x.date).slice(8,10):"";
@@ -932,6 +934,9 @@ document.addEventListener("click",e=>{
   if(e.target.closest("#supDueT")){save("supDueOpen",!load("supDueOpen",false));renderSupDue();return}
   const r=e.target.closest("#supDue [data-open]"); if(r){const o=orders.find(x=>x.id===r.dataset.open);if(o)openEditor(o,"suppay")}
 });
+// equivalent from the commercial invoices, next to the order amount: «≈ 9 702 430 JPY»
+const eqOf=o=>(o.files||[]).filter(f=>kindOf(f.kind)==="ipl"&&f.eq).reduce((t,f)=>{for(const[k,v]of Object.entries(f.eq))if(v&&k!==(o.cur||"KRW"))t[k]=(t[k]||0)+v;return t},{});
+const eqText=o=>Object.entries(eqOf(o)).map(([k,v])=>` <span class="eqv" title="Эквивалент по Commercial invoice">≈ ${Math.round(v).toLocaleString("ru-RU")} ${esc(k)}</span>`).join("");
 function keyDates(o,loaded){
   const port=stepDone(o,"port"), dcls=(d,done)=>!d||done?"":days(d)<0?"bad":days(d)<=3?"warn":"";
   const box=(l,d,done,sub)=>`<div class="kdb ${dcls(d,done)} ${done?"ok":""}"><span class="kl">${l}</span><b>${d?String(d).slice(5,7)+"."+String(d).slice(8,10):"—"}${done?" ✓":""}</b></div>`;
@@ -945,7 +950,7 @@ function keyDates(o,loaded){
 function archCard(o){
   const fs=o.files||[], kinds=[...new Set(fs.map(f=>kindOf(f.kind)))];
   return `<article class="oc arch" tabindex="0" data-id="${esc(o.id)}">
-    <div class="h"><span class="num">${esc(o.num||"без номера")}</span><span class="who">${esc(o.buyer||"—")}</span>${o.goods?`<span class="gd">${esc(o.goods)}</span>`:""}<span class="pcap"><b>Архив</b>${o.date?" · "+fyl(o.date):""}${stepDone(o,"closed")?` · <span class="ok-t">завершена 🎉 ${fyl(stepDate(o,"closed"))}</span>`:""}</span><span class="rt"><span class="amt">${fm(o.amount,o.cur)}</span></span></div>
+    <div class="h"><span class="num">${esc(o.num||"без номера")}</span><span class="who">${esc(o.buyer||"—")}</span>${o.goods?`<span class="gd">${esc(o.goods)}</span>`:""}<span class="pcap"><b>Архив</b>${o.date?" · "+fyl(o.date):""}${stepDone(o,"closed")?` · <span class="ok-t">завершена 🎉 ${fyl(stepDate(o,"closed"))}</span>`:""}</span><span class="rt"><span class="amt">${fm(o.amount,o.cur)}${eqText(o)}</span></span></div>
     <div class="adocs">${kinds.length?kinds.map(k=>`<span class="pill">${esc(KIND[k]||"Прочее")}${k==="cs"?" ("+fs.filter(f=>kindOf(f.kind)==="cs").map(f=>(SIGN[f.signer]||SIGN.ti)[2]).join(", ")+")":""}</span>`).join(""):`<span class="note">Документы не загружены</span>`}</div>
   </article>`;
 }
@@ -960,7 +965,7 @@ function cardHTML(o){
     +((o.schedHist||[]).length?`<span>Расписание менялось <b class="warn">${o.schedHist.length}</b> раз</span>`:"");
   const mini=folded.has(o.id);
   return `<article class="oc ${a.closed?"closed":bad?"bad":warn?"warn":""} ${mini?"mini":""}" tabindex="0" data-id="${esc(o.id)}">
-    <div class="h"><span class="num">${esc(o.num||"без номера")}</span><span class="who">${esc(o.buyer||"—")}</span>${o.goods?`<span class="gd">${esc(o.goods)}</span>`:""}<span class="pcap">${stageCap(a)}</span><span class="rt"><span class="amt">${fm(o.amount,o.cur)}</span><button type="button" class="fold" data-fold="${esc(o.id)}" aria-expanded="${!mini}" title="${mini?"Развернуть":"Свернуть"}">${mini?"▸":"▾"}</button></span></div>
+    <div class="h"><span class="num">${esc(o.num||"без номера")}</span><span class="who">${esc(o.buyer||"—")}</span>${o.goods?`<span class="gd">${esc(o.goods)}</span>`:""}<span class="pcap">${stageCap(a)}</span><span class="rt"><span class="amt">${fm(o.amount,o.cur)}${eqText(o)}</span><button type="button" class="fold" data-fold="${esc(o.id)}" aria-expanded="${!mini}" title="${mini?"Развернуть":"Свернуть"}">${mini?"▸":"▾"}</button></span></div>
     <div class="ocb"><div class="ocm">
     <div class="pwrap">${phaseCells(a)}</div>
     <div class="alerts">${a.closed?`<div class="al win"><i>🎉</i><span><b>Сделка успешно завершена</b> ${fds(stepDate(o,"closed"))} — отличная работа!</span></div>`:alertsHTML(a)}</div>
@@ -1126,6 +1131,7 @@ function clRow(d,id){
 }
 function refreshDerived(){
   if(!editing)return;
+  if($("e_amtEq"))$("e_amtEq").innerHTML=eqText(editing);
   const d=formOrder(), a=analyze(d);
   $("dPh").innerHTML=`<div class="pcap">${stageCap(a)}</div>`+phaseCells(a);
   $("dAl").innerHTML=a.closed?`<div class="al win"><i>🎉</i><span><b>Сделка успешно завершена</b> — отличная работа!</span></div>`:alertsHTML(a);
