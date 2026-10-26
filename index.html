@@ -473,6 +473,7 @@ textarea{min-height:70px;resize:vertical}
 .psl li.sub .samt.paid{color:var(--ok)}
 .psl li.sub.due{color:var(--warn)!important;font-weight:600;padding-left:12px}
 .pseg.next .psl{opacity:1}.pseg.next .psl li:not(.sub){opacity:.5}
+.psl li.sub.eq{color:var(--ink)!important;font-family:var(--f-mono);font-size:10.5px}
 </style>
 
 </head>
@@ -837,7 +838,7 @@ function analyze0(o){
   }
   let next="";
   for(const p of PHASES){for(const id of p.steps){if(id==="got"||stepDone(o,id))continue;next=nextText(o,id);break}if(next)break}
-  return {ph,cur,alerts,missing,overdue,closed,next:next||"Все шаги выполнены",created:o.date||o.createdAt||"",sups:sups(o).filter(x=>x.name||x.date),supsAll:sups(o).filter(x=>x.name),money:{amount:Number(o.amount)||0,paid:Number(o.paid)||0,pay:o.pay,cur:o.cur==="KRW"||!o.cur?"₩":o.cur},photoLink:o.photoLink||"",vsl:{name:o.vessel||"",carrier:o.carrier||"",etd:o.etd||""}};
+  return {ph,cur,alerts,missing,overdue,closed,next:next||"Все шаги выполнены",created:o.date||o.createdAt||"",sups:sups(o).filter(x=>x.name||x.date),supsAll:sups(o).filter(x=>x.name),money:{amount:Number(o.amount)||0,paid:Number(o.paid)||0,pay:o.pay,cur:o.cur==="KRW"||!o.cur?"₩":o.cur,eq:(o.files||[]).filter(f=>kindOf(f.kind)==="ipl"&&f.eq).reduce((t,f)=>{for(const[k,v]of Object.entries(f.eq))t[k]=(t[k]||0)+v;return t},{})},photoLink:o.photoLink||"",vsl:{name:o.vessel||"",carrier:o.carrier||"",etd:o.etd||""}};
 }
 const AN=new WeakMap();
 const an=o=>{let a=AN.get(o);if(!a){a=analyze(o);AN.set(o,a)}return a};
@@ -888,8 +889,9 @@ function stLi(z,a){
       +(due?`<li class="sub due">К оплате: ${esc(mln(due))} ₩</li>`:"")}
   // payment block: what the buyer still owes
   if(z.id==="paid"&&a.money&&a.money.amount){const m=a.money, left=Math.max(0,m.amount-(m.paid||0));
-    h+=m.pay==="paid"?`<li class="sub ok">Получено: ${esc(mln(m.amount))} ${esc(m.cur)}</li>`
-      :`<li class="sub due">К получению: ${esc(mln(left))} ${esc(m.cur)}</li>`+(m.paid?`<li class="sub ok">Получено: ${esc(mln(m.paid))} ${esc(m.cur)}</li>`:"")}
+    const eqs=Object.entries(m.eq||{}).filter(([k,v])=>v&&k!=="KRW").map(([k,v])=>`<li class="sub eq" title="Эквивалент по Commercial invoice">≈ ${esc(mln(v))} ${esc(k)}</li>`).join("");
+    h+=(m.pay==="paid"?`<li class="sub ok">Получено: ${esc(mln(m.amount))} ${esc(m.cur)}</li>`
+      :`<li class="sub due">К получению: ${esc(mln(left))} ${esc(m.cur)}</li>`+(m.paid?`<li class="sub ok">Получено: ${esc(mln(m.paid))} ${esc(m.cur)}</li>`:""))+eqs}
   if(z.id==="supconf")h+=(a.sups||[]).map(x=>{const ok=x.st==="confirmed"&&x.date;const md=x.date?String(x.date).slice(5,7)+"."+String(x.date).slice(8,10):"";
     return `<li class="sub ${ok?"ok":"no"}" title="${esc((x.name||"Поставщик")+" — "+(SUPST[x.st]||SUPST.none).toLowerCase()+(x.date?" · "+fd(x.date):""))}">${ok?"✓":"✗"} ${esc(x.name||"Поставщик")}${md?" · "+md:""}</li>`}).join("");
   if(z.id==="vessel"&&a.vsl){const v=a.vsl,md=d=>String(d).slice(5,7)+"."+String(d).slice(8,10);
@@ -1808,6 +1810,7 @@ async function uploadFiles(list){
       if(kindOf(kind)==="cs"){rec.signer=signSel||guessSigner(file.name)||sigByName[file.name]||"";if(!rec.signer)rec.signer=await signerFromText(file)}
       added.push(rec);
       if(kindOf(rec.kind)==="exp")expList.push(file);
+      if(kindOf(rec.kind)==="ipl"&&/\.xlsx?$/i.test(file.name))Object.assign(rec,invEquiv(new Uint8Array(await file.arrayBuffer())));
       if(/\.xlsx$/i.test(file.name)&&!repl){const bytes=new Uint8Array(await file.arrayBuffer());if(await isCalcBook(bytes)){rec.kind="calc";calcList.push({rec,bytes})}}
     }catch(e){
       const m=e&&e.code==="too_large"?"слишком большой файл (до 20 МБ; Word и Excel — до 15 МБ)":e&&e.code==="quota_exceeded"?"хранилище заполнено":(e&&e.code)||"ошибка";
@@ -2209,7 +2212,7 @@ async function autoSplitCalc(srcs){ // srcs: [{rec, bytes}]
         gone.push(...old.map(f => f.aid));
         files = files.filter(f => !old.includes(f));
         files.push({ aid: r.id, name: `${base} ${part.sheet}.xlsx`.replace(/[\\/:*?"<>|]/g, "-"), kind: part.kind, size: part.bytes.length, mime: XLSX_MIME, enc: "b64",
-          at: new Date().toISOString(), from: "calc", src: rec.aid, sheet: part.sheet });
+          at: new Date().toISOString(), from: "calc", src: rec.aid, sheet: part.sheet, ...(part.kind === "ipl" ? invEquiv(part.bytes) : {}) });
         made.push(part);
       }catch(e){ note("Не получилось сохранить «" + part.sheet + "» (" + (e && e.code || "ошибка") + ")."); }
     }
@@ -2262,6 +2265,37 @@ async function makeNoSig(aid, btn){
   btn.disabled = false;
 }
 $("fileList").addEventListener("click", e => { const b = e.target.closest("[data-nosig]"); if(b) makeNoSig(b.dataset.nosig, b); });
+
+/* invoice totals: «Total Invoice Value (KRW)» and «Equivalent Value (JPY)» are read off the invoice sheets */
+function invEquiv(bytes){
+  const out={inv:{},eq:{},eqChecked:true};
+  try{
+    const wb=XLSX.read(bytes,{type:"array"});
+    const names=wb.SheetNames.length>1?wb.SheetNames.filter(n=>/INVOICE|ИНВОЙС/i.test(n)):wb.SheetNames;
+    for(const n of names){
+      const ws=wb.Sheets[n]; if(!ws||!ws["!ref"])continue;
+      const R=XLSX.utils.decode_range(ws["!ref"]);
+      for(let r=R.s.r;r<=R.e.r;r++)for(let c=R.s.c;c<=R.e.c;c++){
+        const cell=ws[XLSX.utils.encode_cell({r,c})]; if(!cell||typeof cell.v!=="string")continue;
+        const m=cell.v.match(/(Equivalent|Total\s+Invoice)\s+Value\s*\(\s*([A-Z]{3})\s*\)/i); if(!m)continue;
+        for(let k=c+1;k<=Math.min(R.e.c,c+8);k++){const v=ws[XLSX.utils.encode_cell({r,c:k})]; if(v&&typeof v.v==="number"){const bag=/^Equiv/i.test(m[1])?out.eq:out.inv; bag[m[2].toUpperCase()]=(bag[m[2].toUpperCase()]||0)+v.v; break}}
+      }
+    }
+  }catch(e){}
+  return out;
+}
+// invoices uploaded before this existed get their totals read once, when the order is opened
+async function backfillEquiv(){
+  if(!editing||!editing.id||!assets||!canWrite||!window.XLSX)return;
+  const todo=(editing.files||[]).filter(f=>kindOf(f.kind)==="ipl"&&/\.xlsx?$/i.test(f.name)&&!f.eqChecked);
+  if(!todo.length)return;
+  const id=editing.id, got={};
+  for(const f of todo){try{got[f.aid]=invEquiv(await blobBytes(f))}catch(e){}}
+  if(!editing||editing.id!==id||!Object.keys(got).length)return;
+  const files=(editing.files||[]).map(f=>got[f.aid]?{...f,...got[f.aid]}:f);
+  try{await db.collection("orders").doc(id).update({files});editing.files=files;refreshDerived()}catch(e){}
+}
+{const _oe=openEditor;openEditor=function(){const r=_oe.apply(this,arguments);backfillEquiv();return r};}
 
 $("tPrev").onclick=()=>calStep(-1);
 $("tNext").onclick=()=>calStep(1);
