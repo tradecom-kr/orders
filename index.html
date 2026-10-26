@@ -837,7 +837,7 @@ function analyze0(o){
   }
   let next="";
   for(const p of PHASES){for(const id of p.steps){if(id==="got"||stepDone(o,id))continue;next=nextText(o,id);break}if(next)break}
-  return {ph,cur,alerts,missing,overdue,closed,next:next||"Все шаги выполнены",created:o.date||o.createdAt||"",sups:sups(o).filter(x=>x.name||x.date),supsAll:sups(o).filter(x=>x.name),photoLink:o.photoLink||"",vsl:{name:o.vessel||"",carrier:o.carrier||"",etd:o.etd||""}};
+  return {ph,cur,alerts,missing,overdue,closed,next:next||"Все шаги выполнены",created:o.date||o.createdAt||"",sups:sups(o).filter(x=>x.name||x.date),supsAll:sups(o).filter(x=>x.name),money:{amount:Number(o.amount)||0,paid:Number(o.paid)||0,pay:o.pay,cur:o.cur==="KRW"||!o.cur?"₩":o.cur},photoLink:o.photoLink||"",vsl:{name:o.vessel||"",carrier:o.carrier||"",etd:o.etd||""}};
 }
 const AN=new WeakMap();
 const an=o=>{let a=AN.get(o);if(!a){a=analyze(o);AN.set(o,a)}return a};
@@ -883,9 +883,15 @@ function stageCap(a){
 function stLi(z,a){
   let h=`<li class="${z.done?"ok":""}">${z.done?"✓":"✗"} ${SHORT[z.id]}</li>`;
   if(z.id==="photo"&&linkOK(a.photoLink))h+=`<li class="sub ok"><a href="${esc(a.photoLink.trim())}" target="_blank" rel="noopener" data-ext title="Папка с фото в Google Диске">📁 Google Диск ↗</a></li>`;
+  if(z.id==="suppay"){const L=a.supsAll||[], due=L.filter(x=>!x.paid).reduce((t,x)=>t+(x.amt||0),0);
+    h+=L.map(x=>`<li class="sub ${x.paid?"ok":"no"}" title="${esc(x.name+(x.amt?" — "+fm(x.amt,"KRW"):"")+(x.paid?" · оплачен":" · не оплачен"))}">${x.paid?"✓":"✗"} ${esc(x.name)}${x.amt?`<br><span class="samt ${x.paid?"paid":""}">${esc(mln(x.amt))} ₩</span>`:""}</li>`).join("")
+      +(due?`<li class="sub due">К оплате: ${esc(mln(due))} ₩</li>`:"")}
+  // payment block: what the buyer still owes
+  if(z.id==="paid"&&a.money&&a.money.amount){const m=a.money, left=Math.max(0,m.amount-(m.paid||0));
+    h+=m.pay==="paid"?`<li class="sub ok">Получено: ${esc(mln(m.amount))} ${esc(m.cur)}</li>`
+      :`<li class="sub due">К получению: ${esc(mln(left))} ${esc(m.cur)}</li>`+(m.paid?`<li class="sub ok">Получено: ${esc(mln(m.paid))} ${esc(m.cur)}</li>`:"")}
   if(z.id==="supconf")h+=(a.sups||[]).map(x=>{const ok=x.st==="confirmed"&&x.date;const md=x.date?String(x.date).slice(5,7)+"."+String(x.date).slice(8,10):"";
-    return `<li class="sub ${ok?"ok":"no"}" title="${esc((x.name||"Поставщик")+" — "+(SUPST[x.st]||SUPST.none).toLowerCase()+(x.date?" · "+fd(x.date):""))}">${ok?"✓":"✗"} ${esc(x.name||"Поставщик")}${md?" · "+md:""}${x.amt?`<br><span class="samt ${x.paid?"paid":""}">${esc(mln(x.amt))} ₩${x.paid?" · оплачен":""}</span>`:""}</li>`}).join("")
-    +(()=>{const L=a.sups||[], due=L.filter(x=>!x.paid).reduce((t,x)=>t+(x.amt||0),0);return due?`<li class="sub due">К оплате: ${esc(mln(due))} ₩</li>`:""})();
+    return `<li class="sub ${ok?"ok":"no"}" title="${esc((x.name||"Поставщик")+" — "+(SUPST[x.st]||SUPST.none).toLowerCase()+(x.date?" · "+fd(x.date):""))}">${ok?"✓":"✗"} ${esc(x.name||"Поставщик")}${md?" · "+md:""}</li>`}).join("");
   if(z.id==="vessel"&&a.vsl){const v=a.vsl,md=d=>String(d).slice(5,7)+"."+String(d).slice(8,10);
     const txt=v.name||v.carrier||(v.etd?"ETD "+md(v.etd):"судно не указано");
     h+=`<li class="sub ${z.done?"ok":"no"}" title="${esc([v.name&&"Судно: "+v.name,v.carrier&&"Линия: "+v.carrier,v.etd&&"ETD "+fd(v.etd),z.done?"расписание утверждено":"не утверждено"].filter(Boolean).join(" · "))}">${z.done?"✓":"✗"} ${esc(txt)}</li>`}
