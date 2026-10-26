@@ -1682,14 +1682,14 @@ const extOf=n=>(String(n).match(/\.([a-z0-9]+)$/i)||["",""])[1].toLowerCase();
 const fsize=b=>b>1048576?(b/1048576).toFixed(1)+" МБ":Math.max(1,Math.round(b/1024))+" КБ";
 function guessKind(name){const n=String(name).toLowerCase();
   const w=(re)=>re.test(n);
-  if(w(/калькул|calc/))return "calc";
+  if(w(/калькул|calc|расч[её]т|(^|[^a-z])rasch/))return "calc";
   if(w(/коммерческ|предложени|offer|(^|[^а-яёa-z])кп([^а-яёa-z]|$)/))return "kp";
   if(w(/спец|spec|контракт|contract|договор/))return "cs";
   if(w(/invoice|инвойс|packing|упак/))return "ipl";
   if(w(/발주|purchase|(^|[^a-z])po([^a-z]|$)/))return "po";
   if(w(/export|экспорт|수출|면장/))return "exp";
   if(w(/(^|[^a-z])b\/?l([^a-z]|$)|bill of lading|коносам/))return "bl";
-  if(w(/freight|фрахт|сч[её]т/))return "freight";
+  if(w(/freight|фрахт|(^|[^а-яё])сч[её]т/))return "freight";
   if(w(/cert|сертиф|origin/))return "cert";
   if(w(/(^|[^а-яёa-z])дт([^а-яёa-z]|$)|декларац/))return "dt";
   if(w(/плат|payment|swift/))return "pay";
@@ -1751,7 +1751,7 @@ async function uploadFiles(list){
       if(kindOf(kind)==="cs"){rec.signer=signSel||guessSigner(file.name)||sigByName[file.name]||"";if(!rec.signer)rec.signer=await signerFromText(file)}
       added.push(rec);
       if(kindOf(rec.kind)==="exp")expList.push(file);
-      if(/\.xlsx$/i.test(file.name)&&["calc","other",""].includes(kindOf(rec.kind))){const bytes=new Uint8Array(await file.arrayBuffer());if(await isCalcBook(bytes)){if(!kindSel)rec.kind="calc";if(kindOf(rec.kind)==="calc")calcList.push({rec,bytes})}}
+      if(/\.xlsx$/i.test(file.name)&&!repl){const bytes=new Uint8Array(await file.arrayBuffer());if(await isCalcBook(bytes)){rec.kind="calc";calcList.push({rec,bytes})}}
     }catch(e){
       const m=e&&e.code==="too_large"?"слишком большой файл (до 20 МБ; Word и Excel — до 15 МБ)":e&&e.code==="quota_exceeded"?"хранилище заполнено":(e&&e.code)||"ошибка";
       $("upNote").textContent=`«${file.name}» не загружен: ${m}.`;
