@@ -1919,8 +1919,11 @@ function renderDocsAll(){
     nFiles+=items.reduce((n,it)=>n+(it.pics?it.pics.length:1),0);
     return `<td>${items.length?items.map(it=>chip(o,it)).join(""):`<span class="dnone">—</span>`}</td>`}).join("")}</tr>`).join("");
   $("docsCount").textContent=nFiles?`Файлов: ${nFiles}`:"";
+  // keep the table where it was scrolled: a delete confirmation must not jump back to the first column
+  const oldBox=$("docsAll").querySelector(".dmx"), keepX=oldBox?oldBox.scrollLeft:0;
   $("docsAll").innerHTML=rowsO.length?`<div class="dmx"><table class="dtab">${one?`<caption>Заказ ${esc(one.num||"")}${one.buyer?" · "+esc(one.buyer):""}</caption>`:""}<thead>${head}</thead><tbody>${body}</tbody></table></div>`
     :`<div class="frow"><span class="note" style="grid-column:1/-1">Заказов пока нет.</span></div>`;
+  const newBox=$("docsAll").querySelector(".dmx"); if(newBox&&keepX){newBox.scrollLeft=keepX;requestAnimationFrame(()=>{newBox.scrollLeft=keepX})}
 }
 try{const v=localStorage.getItem("docSort");if(v)$("dSort").value=v}catch(e){}
 $("dSort").addEventListener("change",()=>{try{localStorage.setItem("docSort",$("dSort").value)}catch(e){}renderDocsAll()});
