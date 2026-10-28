@@ -533,6 +533,8 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .psl li.sub.money.ok{font-weight:600}
 .psl li.sub.eqm{color:var(--muted)!important;padding-left:12px}
 .psl li.sub.due.money{white-space:normal}
+.psl li.sub.money.due{color:var(--warn)!important;font-weight:600}
+.psl li.sub.money.ok{color:var(--ok)!important}
 </style>
 
 </head>
@@ -944,16 +946,17 @@ function stageCap(a){
 // supplier lead times: one line per supplier under "Сроки поставщиков", confirmed or not
 function stLi(z,a){
   // vessel and supplier dates speak for themselves: their lines replace the step name
-  let h=z.id==="vessel"||z.id==="supconf"||(z.id==="paid"&&a.money&&(a.money.amount||a.money.tot.main))?"":`<li class="${z.done?"ok":""}">${z.done?"✓":"✗"} ${SHORT[z.id]}</li>`;
+  let h=z.id==="vessel"||z.id==="supconf"||(z.id==="paid"&&a.money&&(a.money.amount||a.money.tot.main))||(z.id==="suppay"&&(a.supsAll||[]).length)?"":`<li class="${z.done?"ok":""}">${z.done?"✓":"✗"} ${SHORT[z.id]}</li>`;
   if(z.id==="photo"&&linkOK(a.photoLink))h+=`<li class="sub ok"><a href="${esc(a.photoLink.trim())}" target="_blank" rel="noopener" data-ext title="Папка с фото в Google Диске">📁 Google Диск ↗</a></li>`;
-  if(z.id==="suppay"){const L=a.supsAll||[], due=L.filter(x=>!x.paid).reduce((t,x)=>t+(x.amt||0),0);
-    h+=L.map(x=>`<li class="sub supl ${x.paid?"ok":"no"}" title="${esc(x.name+(x.amt?" — "+fm(x.amt,"KRW"):"")+(x.paid?" · оплачен":" · не оплачен"))}">${x.paid?"✓":"✗"} ${esc(x.name)}${x.amt?`<br><span class="samt ${x.paid?"paid":""}">${Math.round(x.amt).toLocaleString("ru-RU")} KRW</span>`:""}</li>`).join("")
-      +(due?`<li class="sub due money">К оплате:<br>${Math.round(due).toLocaleString("ru-RU")} KRW</li>`:"")}
-  // payment block: what the buyer still owes
+  // suppliers: what is still to pay on top (level with the buyer's amount), then each supplier — red unpaid, green paid
+  if(z.id==="suppay"){const L=a.supsAll||[], due=L.filter(x=>!x.paid).reduce((t,x)=>t+(x.amt||0),0), all=L.reduce((t,x)=>t+(x.amt||0),0);
+    const full=v=>Math.round(v).toLocaleString("ru-RU")+" KRW";
+    if(L.length)h+=(all?`<li class="sub money ${due?"due":"ok"}" title="${due?"К оплате поставщикам":"Поставщикам оплачено"}">${full(due||all)}</li>`:"")
+      +L.map(x=>`<li class="sub supl ${x.paid?"ok":"no"}" title="${esc(x.name+(x.amt?" — "+full(x.amt):"")+(x.paid?" · оплачен":" · не оплачен"))}">${esc(x.name)}${x.amt?`<br><span class="samt ${x.paid?"paid":""}">${full(x.amt)}</span>`:""}</li>`).join("")}
   // payment block: the amount to be paid (from the invoice) and its equivalent, in full; green once paid
   if(z.id==="paid"&&a.money&&(a.money.amount||a.money.tot.main)){const m=a.money, t=m.tot, main=t.main||[m.cur==="₩"?"KRW":m.cur,m.amount];
     const full=(v,c)=>`${Math.round(v).toLocaleString("ru-RU")} ${esc(c)}`, cls=m.pay==="paid"?"ok":"due";
-    h+=`<li class="sub money ${cls}" title="${m.pay==="paid"?"Оплачено":"К оплате"}">${m.pay==="paid"?"✓ ":""}${full(main[1],main[0])}</li>`
+    h+=`<li class="sub money ${cls}" title="${m.pay==="paid"?"Оплачено":"К оплате"}">${full(main[1],main[0])}</li>`
       +t.eq.map(([k,v])=>`<li class="sub money eqm">${full(v,k)}</li>`).join("")}
   if(z.id==="supconf")h+=(a.sups||[]).map(x=>{const ok=x.st==="confirmed"&&x.date;const md=x.date?String(x.date).slice(5,7)+"."+String(x.date).slice(8,10):"";
     return `<li class="supl ${ok?"ok":"no"}" title="${esc((x.name||"Поставщик")+" — "+(SUPST[x.st]||SUPST.none).toLowerCase()+(x.date?" · "+fd(x.date):""))}">${ok?"✓":"✗"} ${esc(x.name||"Поставщик")}${md?" · "+md:""}</li>`}).join("")+((a.sups||[]).length?"":`<li class="supl no">✗ поставщики не указаны</li>`);
