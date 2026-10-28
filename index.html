@@ -559,6 +559,10 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .psl li.sub.supl.sc.no{color:var(--muted)!important;opacity:.6}
 .psl li.sub.supl.sc.ok .sdt{color:var(--ok)}
 .psl li.vsl{padding-left:12px;font-size:10.5px;font-weight:600}
+/* supplier dates to the right of the name; the row keeps the height of name + amount in «Поставщики» */
+.psl li.sub.supl.sc{display:flex;gap:6px;align-items:flex-start;min-height:calc(2.6em + 0px)}
+.psl li.sub.supl.sc .sn{flex:1;min-width:0}
+.psl li.sub.supl.sc .sdt{white-space:nowrap}
 </style>
 
 </head>
@@ -990,7 +994,7 @@ function stLi(z,a){
     h+=`<li class="sub money r1 ${cls}"${inv} title="${m.pay==="paid"?"Оплачено":"К оплате"}">${full(main[1],main[0])}</li>`
       +t.eq.map(([k,v])=>`<li class="sub money eqm"${inv}>${full(v,k)}</li>`).join("")}
   if(z.id==="supconf")h+=(a.sups||[]).map(x=>{const ok=x.st==="confirmed"&&x.date;const md=x.date?String(x.date).slice(5,7)+"."+String(x.date).slice(8,10):"";
-    return `<li class="sub supl sc ${ok?"ok":"no"}"${fOpen(a.o,kindFiles(a.o,"po","calc"))} title="${esc((x.name||"Поставщик")+" — "+(SUPST[x.st]||SUPST.none).toLowerCase()+(x.date?" · "+fd(x.date):""))}">${esc(x.name||"Поставщик")}<br><span class="sdt">${md||"дата не указана"}</span></li>`}).join("")+((a.sups||[]).length?"":`<li class="supl no">поставщики не указаны</li>`);
+    return `<li class="sub supl sc ${ok?"ok":"no"}"${fOpen(a.o,kindFiles(a.o,"po","calc"))} title="${esc((x.name||"Поставщик")+" — "+(SUPST[x.st]||SUPST.none).toLowerCase()+(x.date?" · "+fd(x.date):""))}"><span class="sn">${esc(x.name||"Поставщик")}</span><span class="sdt">${md||"—"}</span></li>`}).join("")+((a.sups||[]).length?"":`<li class="supl no">поставщики не указаны</li>`);
   if(z.id==="vessel"&&a.vsl){const v=a.vsl,md=d=>String(d).slice(5,7)+"."+String(d).slice(8,10);
     const txt=v.name||"судно не указано";
     h+=`<li class="vsl r1 ${z.done?"ok":"no"}" title="${esc([v.name&&"Судно: "+v.name,v.carrier&&"Линия: "+v.carrier,v.etd&&"ETD "+fd(v.etd),z.done?"расписание утверждено":"не утверждено"].filter(Boolean).join(" · "))}">${esc(txt)}</li>`}
