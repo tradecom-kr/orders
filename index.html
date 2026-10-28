@@ -2418,14 +2418,14 @@ let views={}, users={}, viewFor=null, viewAs=null;
 // ready-made views: yk gets the short card until someone saves other settings for her
 const VIEW_PRESET={"yk@tradecom.kr":{compact:true,cshow:CC_KEYS,hide:[]}};
 const viewOf=e=>{e=String(e||"").toLowerCase();return views[viewId(e)]||VIEW_PRESET[e]||{}};
-function myView(){return viewOf(viewAs||meEmail())}
+function myView(){return viewOf(meEmail())}
 // everyone who has signed in to the board, plus those with a saved or ready-made view
 function userList(){
   const s=new Set([...Object.keys(VIEW_PRESET),...Object.values(users).map(u=>u.email),...Object.values(views).map(v=>v.email)].filter(e=>e&&String(e).includes("@")).map(e=>String(e).toLowerCase()));
   s.delete(meEmail());return [...s].sort();
 }
 const whoOpts=sel=>{const me=meEmail();return `<option value="">Я${me!=="me"?" — "+esc(me):""}</option>`+userList().map(e=>`<option value="${esc(e)}" ${e===sel?"selected":""}>${esc(e)}${viewOf(e).compact?" · короткая карточка":""}</option>`).join("")};
-function fillViewSel(){const s=$("viewSel");if(!s)return;s.innerHTML=whoOpts(viewAs||"");s.value=viewAs||"";document.body.classList.toggle("as-other",!!viewAs)}
+function fillViewSel(){const s=$("viewSel");if(!s)return;s.value=myView().compact?"short":"full"}
 function applyView(){
   const hide=myView().hide||[];
   VIEW_KEYS.forEach(k=>document.body.classList.toggle("h-"+k,hide.includes(k)));
@@ -2459,12 +2459,16 @@ function viewDialog(){
   };
   if(!d.open)d.showModal();
 }
-// toolbar: «Вид» — whose view the board shows right now, and ⚙ to change it
+// toolbar: «Вид» — detailed board or the short card, for whoever is signed in; ⚙ sets it up in detail, also for others
 {const w=document.createElement("span");w.className="vwbar";
- w.innerHTML=`<label for="viewSel">Вид</label><select id="viewSel" title="Показать доску так, как её видит сотрудник"></select><button class="btn" type="button" id="viewBtn" title="Настроить, что показывать" aria-label="Настроить вид">⚙</button>`;
+ w.innerHTML=`<label for="viewSel">Вид</label><select id="viewSel"><option value="full">Подробный</option><option value="short">Короткая карточка</option></select><button class="btn" type="button" id="viewBtn" title="Настроить, что показывать" aria-label="Настроить вид">⚙</button>`;
  const anchor=$("buyersBtn");anchor.parentNode.insertBefore(w,anchor);
- $("viewSel").addEventListener("change",e=>{viewAs=e.target.value||null;fillViewSel();applyView();render()});
- $("viewBtn").onclick=()=>{viewFor=viewAs;viewDialog()};
+ $("viewSel").addEventListener("change",async e=>{
+   const me=meEmail(), v=myView(), rec={email:me,hide:v.hide||[],cshow:v.cshow||CC_KEYS,compact:e.target.value==="short"};
+   views[viewId(me)]=rec;applyView();render();
+   try{if(db)await db.collection("views").doc(viewId(me)).set({...rec,updatedAt:new Date().toISOString()})}catch(err){}
+ });
+ $("viewBtn").onclick=()=>{viewFor=null;viewDialog()};
  fillViewSel();}
 // views and the list of people live next to the orders; wait until the database is connected
 (function waitDb(){if(!db){setTimeout(waitDb,400);return}
@@ -2485,15 +2489,15 @@ function compactCard(o){
   // one table: section | name | amount or file — so amounts sit in one column and files in another
   const sec=[];  // [title, rows[[name, value, cls]]]
   if(sh.has("vessel")&&(o.vessel||"").trim())sec.push(["Судно",[[`<b>${esc(o.vessel)}</b>`,"","wide"]]]);
+  if(sh.has("money")){const t=invTotals(o);
+    if(t.main){const r=[[o.pay==="paid"?`Инвойс <small class="ok-t">оплачено</small>`:`Инвойс <small class="ccp">к оплате</small>`,amt(t.main[1],t.main[0]),"n"]];
+      t.eq.forEach(([k,v])=>r.push(["Эквивалент",amt(v,k),"n eqv"]));sec.push(["Покупатель",r])}}
   const money=[];
   if(sh.has("sup")){const L=sups(o).filter(x=>x.name);
     L.forEach(x=>money.push([esc(x.name)+(x.paid?` <small class="ok-t">оплачен</small>`:""),x.amt?amt(x.amt,"KRW"):`<span class="ccno">сумма не указана</span>`,"n"]));
     const tot=L.reduce((t,x)=>t+(Number(x.amt)||0),0);
     if(L.length>1&&tot)money.push(["Итого поставщикам",amt(tot,"KRW"),"n tot"]);
     if(money.length)sec.push(["Поставщикам",money.splice(0)])}
-  if(sh.has("money")){const t=invTotals(o);
-    if(t.main){const r=[[o.pay==="paid"?`Инвойс <small class="ok-t">оплачено</small>`:`Инвойс <small class="ccp">к оплате</small>`,amt(t.main[1],t.main[0]),"n"]];
-      t.eq.forEach(([k,v])=>r.push(["Эквивалент",amt(v,k),"n eqv"]));sec.push(["Покупатель",r])}}
   const ship=[];
   for(const k of CC_DOCS)if(sh.has(k)){const L=fs.filter(f=>kindOf(f.kind)===k), nm=KIND[k].replace(/ \(.*\)$/,"");
     if(L.length)L.forEach((f,i)=>ship.push([i?"":nm,`<span class="ok-t">✓</span> ${fileLink(o,f)}`,"f"]));else ship.push([nm,`<span class="ccno">✗ нет</span>`,"f"])}
