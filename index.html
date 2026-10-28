@@ -563,6 +563,11 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .psl li.sub.supl.sc{display:flex;gap:6px;align-items:flex-start;min-height:calc(2.6em + 0px)}
 .psl li.sub.supl.sc .sn{flex:1;min-width:0}
 .psl li.sub.supl.sc .sdt{white-space:nowrap}
+/* every block's first row is one fixed slot (vessel / amount + equivalent / supplier total / first step),
+   so the second rows line up across blocks: Контракт (Ти) ↔ Контракт (Ден Е.) ↔ first supplier */
+.psl>li:first-child{height:30px!important;min-height:0!important;margin:0 0 4px!important;padding-top:0!important;padding-bottom:0!important;line-height:1.3!important;overflow:hidden!important}
+.psl li.sub.money .eqm{color:var(--muted);font-weight:400}
+.psl li.sub{margin-top:0}
 </style>
 
 </head>
@@ -991,8 +996,7 @@ function stLi(z,a){
   if(z.id==="paid"&&a.money&&(a.money.amount||a.money.tot.main)){const m=a.money, t=m.tot, main=t.main||[m.cur==="₩"?"KRW":m.cur,m.amount];
     const full=(v,c)=>`${Math.round(v).toLocaleString("ru-RU")} ${esc(c)}`, cls=m.pay==="paid"?"ok":"due";
     const inv=fOpen(a.o,kindFiles(a.o,"ipl"));
-    h+=`<li class="sub money r1 ${cls}"${inv} title="${m.pay==="paid"?"Оплачено":"К оплате"}">${full(main[1],main[0])}</li>`
-      +t.eq.map(([k,v])=>`<li class="sub money eqm"${inv}>${full(v,k)}</li>`).join("")}
+    h+=`<li class="sub money r1 ${cls}"${inv} title="${m.pay==="paid"?"Оплачено":"К оплате"}">${full(main[1],main[0])}${t.eq.map(([k,v])=>`<br><span class="eqm">${full(v,k)}</span>`).join("")}</li>`}
   if(z.id==="supconf")h+=(a.sups||[]).map(x=>{const ok=x.st==="confirmed"&&x.date;const md=x.date?String(x.date).slice(5,7)+"."+String(x.date).slice(8,10):"";
     return `<li class="sub supl sc ${ok?"ok":"no"}"${fOpen(a.o,kindFiles(a.o,"po","calc"))} title="${esc((x.name||"Поставщик")+" — "+(SUPST[x.st]||SUPST.none).toLowerCase()+(x.date?" · "+fd(x.date):""))}"><span class="sn">${esc(x.name||"Поставщик")}</span><span class="sdt">${md||"—"}</span></li>`}).join("")+((a.sups||[]).length?"":`<li class="supl no">поставщики не указаны</li>`);
   if(z.id==="vessel"&&a.vsl){const v=a.vsl,md=d=>String(d).slice(5,7)+"."+String(d).slice(8,10);
