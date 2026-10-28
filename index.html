@@ -2411,6 +2411,8 @@ const CC_ITEMS=[
   ["freight","Счёт за отгрузку"],
   ["docs","Остальные загруженные документы"]];
 const CC_KEYS=CC_ITEMS.map(x=>x[0]), CC_DOCS=["exp","expd","bl","freight"];
+// rows of the short card; a saved list with nothing usable in it falls back to all rows
+const ccShow=v=>{const c=v&&v.cshow;return Array.isArray(c)&&c.some(k=>CC_KEYS.includes(k))?c:CC_KEYS};
 const VIEW_KEYS=VIEW_ITEMS.flatMap(g=>g[1].map(x=>x[0]));
 const meEmail=()=>String(window.TC_USER||"me").toLowerCase();
 const viewId=e=>String(e||"me").toLowerCase().replace(/[^a-z0-9._@+-]/g,"_");
@@ -2440,7 +2442,7 @@ function viewDialog(){
     <input id="vwNew" type="email" placeholder="почта сотрудника" style="display:none;margin-top:6px"></label>
     <fieldset class="vwc"><legend>Короткая карточка заказа</legend>
       <label class="chk"><input type="checkbox" id="vwCompact" ${v.compact?"checked":""}> <b>Вместо обычной карточки показывать только номер заказа и:</b></label>
-      <div class="vwcl">${CC_ITEMS.map(([k,l])=>`<label class="chk"><input type="checkbox" data-ck="${k}" ${(v.cshow||CC_KEYS).includes(k)?"checked":""}> ${esc(l)}</label>`).join("")}</div>
+      <div class="vwcl">${CC_ITEMS.map(([k,l])=>`<label class="chk"><input type="checkbox" data-ck="${k}" ${ccShow(v).includes(k)?"checked":""}> ${esc(l)}</label>`).join("")}</div>
     </fieldset>
     ${VIEW_ITEMS.map(([g,items])=>`<fieldset><legend>${esc(g)}</legend>${items.map(([k,l])=>`<label class="chk"><input type="checkbox" data-vk="${k}" ${hide.includes(k)?"":"checked"}> ${esc(l)}</label>`).join("")}</fieldset>`).join("")}
     <p class="note" id="vwNote" style="margin:0">Это настройка удобства: скрытое просто не показывается, доступ к данным не меняется.</p>
@@ -2464,7 +2466,7 @@ function viewDialog(){
  w.innerHTML=`<label for="viewSel">Вид</label><select id="viewSel"><option value="full">Подробный</option><option value="short">Короткая карточка</option></select><button class="btn" type="button" id="viewBtn" title="Настроить, что показывать" aria-label="Настроить вид">⚙</button>`;
  const anchor=$("buyersBtn");anchor.parentNode.insertBefore(w,anchor);
  $("viewSel").addEventListener("change",async e=>{
-   const me=meEmail(), v=myView(), rec={email:me,hide:v.hide||[],cshow:v.cshow||CC_KEYS,compact:e.target.value==="short"};
+   const me=meEmail(), v=myView(), rec={email:me,hide:v.hide||[],cshow:ccShow(v),compact:e.target.value==="short"};
    views[viewId(me)]=rec;applyView();render();
    try{if(db)await db.collection("views").doc(viewId(me)).set({...rec,updatedAt:new Date().toISOString()})}catch(err){}
  });
@@ -2484,7 +2486,7 @@ function fileLink(o,f){
     :`<a href="#" class="ccf" data-ccdl="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Скачать">${esc(f.name)}</a>`;
 }
 function compactCard(o){
-  const sh=new Set(myView().cshow||CC_KEYS), fs=o.files||[];
+  const sh=new Set(ccShow(myView())), fs=o.files||[];
   const amt=(n,c)=>`${Math.round(n).toLocaleString("ru-RU")} ${esc(c)}`;
   // one table: section | name | amount or file — so amounts sit in one column and files in another
   const sec=[];  // [title, rows[[name, value, cls]]]
