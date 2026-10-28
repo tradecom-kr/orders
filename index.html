@@ -1381,6 +1381,11 @@ async function signerFromText(file){
     return m ? (/^(Ден|Den)$/i.test(m[1]) ? "den" : "ti") : "";
   }catch(e){ return ""; }
 }
+// a PDF whose name says nothing is still recognised as the export declaration by its title (수출신고필증)
+async function isExpDecl(file){
+  try{const t=await fileText(new Uint8Array(await file.arrayBuffer()),file.name);
+    return /수\s*출\s*신\s*고\s*필\s*증|export\s+declaration|экспортн\S*\s+декларац/i.test(String(t||""))}catch(e){return false}
+}
 
 /* ---------- fill the order from its documents (contract, invoice, offer, calculation, export declaration) ---------- */
 const RU_MON={января:1,февраля:2,марта:3,апреля:4,мая:5,июня:6,июля:7,августа:8,сентября:9,октября:10,ноября:11,декабря:12};
@@ -1835,6 +1840,7 @@ async function uploadFiles(list){
       const rec={aid:r.id,name:up.name,kind,size:r.sizeBytes||up.size,mime:up.type||"",enc,at:new Date().toISOString()};
       if(kindOf(kind)==="cs"){rec.signer=signSel||guessSigner(file.name)||sigByName[file.name]||"";if(!rec.signer)rec.signer=await signerFromText(file)}
       added.push(rec);
+      if(rec.kind==="other"&&!kindSel&&/\.pdf$/i.test(file.name)&&await isExpDecl(file))rec.kind="exp";
       if(kindOf(rec.kind)==="exp")expList.push(file);
       if(kindOf(rec.kind)==="ipl"&&/\.xlsx?$/i.test(file.name))Object.assign(rec,invEquiv(new Uint8Array(await file.arrayBuffer())));
       if(/\.xlsx$/i.test(file.name)&&!repl){const bytes=new Uint8Array(await file.arrayBuffer());if(await isCalcBook(bytes)){rec.kind="calc";calcList.push({rec,bytes})}}
