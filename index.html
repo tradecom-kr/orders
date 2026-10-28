@@ -552,6 +552,13 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .vsheet table{border-collapse:collapse;background:#fff;color:#111;font-size:12px}
 .vsheet td{border:1px solid #d0d0d0;padding:3px 6px;white-space:nowrap}
 .psl li[data-view]{cursor:pointer}.psl li[data-view]:hover{text-decoration:underline}
+/* График · Оплата · Поставщики: first row (vessel / amount / total) the same height, so suppliers line up across blocks */
+.psl li.r1{height:30px!important;min-height:0;margin:0 0 4px!important;padding-top:0!important;padding-bottom:0!important;line-height:1.3!important;overflow:hidden!important}
+.psl li.sub.supl{font-size:10.5px;line-height:1.3;padding-left:12px;margin-bottom:4px}
+.psl li.sub.supl .sdt,.psl li.sub.supl .samt{font-family:var(--f-mono);font-size:10.5px}
+.psl li.sub.supl.sc.no{color:var(--muted)!important;opacity:.6}
+.psl li.sub.supl.sc.ok .sdt{color:var(--ok)}
+.psl li.vsl{padding-left:12px;font-size:10.5px;font-weight:600}
 </style>
 
 </head>
@@ -974,19 +981,19 @@ function stLi(z,a){
   if(z.id==="suppay"){const L=a.supsAll||[], due=L.filter(x=>!x.paid).reduce((t,x)=>t+(x.amt||0),0), all=L.reduce((t,x)=>t+(x.amt||0),0);
     const full=v=>Math.round(v).toLocaleString("ru-RU")+" KRW";
     const cf=fOpen(a.o,kindFiles(a.o,"calc","po"));
-    if(L.length)h+=(all?`<li class="sub money ${due?"due":"ok"}"${cf} title="${due?"К оплате поставщикам":"Поставщикам оплачено"}">${full(due||all)}</li>`:"")
+    if(L.length)h+=(all?`<li class="sub money r1 ${due?"due":"ok"}"${cf} title="${due?"К оплате поставщикам":"Поставщикам оплачено"}">${full(due||all)}</li>`:`<li class="sub r1"></li>`)
       +L.map(x=>`<li class="sub supl ${x.paid?"ok":"no"}"${cf} title="${esc(x.name+(x.amt?" — "+full(x.amt):"")+(x.paid?" · оплачен":" · не оплачен"))}">${esc(x.name)}${x.amt?`<br><span class="samt ${x.paid?"paid":""}">${full(x.amt)}</span>`:""}</li>`).join("")}
   // payment block: the amount to be paid (from the invoice) and its equivalent, in full; green once paid
   if(z.id==="paid"&&a.money&&(a.money.amount||a.money.tot.main)){const m=a.money, t=m.tot, main=t.main||[m.cur==="₩"?"KRW":m.cur,m.amount];
     const full=(v,c)=>`${Math.round(v).toLocaleString("ru-RU")} ${esc(c)}`, cls=m.pay==="paid"?"ok":"due";
     const inv=fOpen(a.o,kindFiles(a.o,"ipl"));
-    h+=`<li class="sub money ${cls}"${inv} title="${m.pay==="paid"?"Оплачено":"К оплате"}">${full(main[1],main[0])}</li>`
+    h+=`<li class="sub money r1 ${cls}"${inv} title="${m.pay==="paid"?"Оплачено":"К оплате"}">${full(main[1],main[0])}</li>`
       +t.eq.map(([k,v])=>`<li class="sub money eqm"${inv}>${full(v,k)}</li>`).join("")}
   if(z.id==="supconf")h+=(a.sups||[]).map(x=>{const ok=x.st==="confirmed"&&x.date;const md=x.date?String(x.date).slice(5,7)+"."+String(x.date).slice(8,10):"";
-    return `<li class="supl ${ok?"ok":"no"}"${fOpen(a.o,kindFiles(a.o,"po","calc"))} title="${esc((x.name||"Поставщик")+" — "+(SUPST[x.st]||SUPST.none).toLowerCase()+(x.date?" · "+fd(x.date):""))}">${esc(x.name||"Поставщик")}${md?" · "+md:""}</li>`}).join("")+((a.sups||[]).length?"":`<li class="supl no">поставщики не указаны</li>`);
+    return `<li class="sub supl sc ${ok?"ok":"no"}"${fOpen(a.o,kindFiles(a.o,"po","calc"))} title="${esc((x.name||"Поставщик")+" — "+(SUPST[x.st]||SUPST.none).toLowerCase()+(x.date?" · "+fd(x.date):""))}">${esc(x.name||"Поставщик")}<br><span class="sdt">${md||"дата не указана"}</span></li>`}).join("")+((a.sups||[]).length?"":`<li class="supl no">поставщики не указаны</li>`);
   if(z.id==="vessel"&&a.vsl){const v=a.vsl,md=d=>String(d).slice(5,7)+"."+String(d).slice(8,10);
     const txt=v.name||"судно не указано";
-    h+=`<li class="vsl ${z.done?"ok":"no"}" title="${esc([v.name&&"Судно: "+v.name,v.carrier&&"Линия: "+v.carrier,v.etd&&"ETD "+fd(v.etd),z.done?"расписание утверждено":"не утверждено"].filter(Boolean).join(" · "))}">${esc(txt)}</li>`}
+    h+=`<li class="vsl r1 ${z.done?"ok":"no"}" title="${esc([v.name&&"Судно: "+v.name,v.carrier&&"Линия: "+v.carrier,v.etd&&"ETD "+fd(v.etd),z.done?"расписание утверждено":"не утверждено"].filter(Boolean).join(" · "))}">${esc(txt)}</li>`}
   return h;
 }
 function phaseCells(a){
