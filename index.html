@@ -535,6 +535,11 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .psl li.sub.due.money{white-space:normal}
 .psl li.sub.money.due{color:var(--warn)!important;font-weight:600}
 .psl li.sub.money.ok{color:var(--ok)!important}
+/* stage lists: no ✓/✗ — done is clear, not done is grey; names wrap instead of being cut */
+.psl li{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:anywhere}
+.psl li:not(.ok):not(.sub),.pseg.now .psl li:not(.ok):not(.sub),.psl.now li:not(.ok):not(.sub){color:var(--muted)!important;opacity:.6!important}
+.psl li.ok:not(.sub){color:var(--ok);opacity:1!important}
+.psl li{margin-bottom:2px;line-height:1.3}
 </style>
 
 </head>
@@ -946,7 +951,7 @@ function stageCap(a){
 // supplier lead times: one line per supplier under "Сроки поставщиков", confirmed or not
 function stLi(z,a){
   // vessel and supplier dates speak for themselves: their lines replace the step name
-  let h=z.id==="vessel"||z.id==="supconf"||(z.id==="paid"&&a.money&&(a.money.amount||a.money.tot.main))||(z.id==="suppay"&&(a.supsAll||[]).length)?"":`<li class="${z.done?"ok":""}">${z.done?"✓":"✗"} ${SHORT[z.id]}</li>`;
+  let h=z.id==="vessel"||z.id==="supconf"||(z.id==="paid"&&a.money&&(a.money.amount||a.money.tot.main))||(z.id==="suppay"&&(a.supsAll||[]).length)?"":`<li class="${z.done?"ok":""}">${SHORT[z.id]}</li>`;
   if(z.id==="photo"&&linkOK(a.photoLink))h+=`<li class="sub ok"><a href="${esc(a.photoLink.trim())}" target="_blank" rel="noopener" data-ext title="Папка с фото в Google Диске">📁 Google Диск ↗</a></li>`;
   // suppliers: what is still to pay on top (level with the buyer's amount), then each supplier — red unpaid, green paid
   if(z.id==="suppay"){const L=a.supsAll||[], due=L.filter(x=>!x.paid).reduce((t,x)=>t+(x.amt||0),0), all=L.reduce((t,x)=>t+(x.amt||0),0);
@@ -959,10 +964,10 @@ function stLi(z,a){
     h+=`<li class="sub money ${cls}" title="${m.pay==="paid"?"Оплачено":"К оплате"}">${full(main[1],main[0])}</li>`
       +t.eq.map(([k,v])=>`<li class="sub money eqm">${full(v,k)}</li>`).join("")}
   if(z.id==="supconf")h+=(a.sups||[]).map(x=>{const ok=x.st==="confirmed"&&x.date;const md=x.date?String(x.date).slice(5,7)+"."+String(x.date).slice(8,10):"";
-    return `<li class="supl ${ok?"ok":"no"}" title="${esc((x.name||"Поставщик")+" — "+(SUPST[x.st]||SUPST.none).toLowerCase()+(x.date?" · "+fd(x.date):""))}">${ok?"✓":"✗"} ${esc(x.name||"Поставщик")}${md?" · "+md:""}</li>`}).join("")+((a.sups||[]).length?"":`<li class="supl no">✗ поставщики не указаны</li>`);
+    return `<li class="supl ${ok?"ok":"no"}" title="${esc((x.name||"Поставщик")+" — "+(SUPST[x.st]||SUPST.none).toLowerCase()+(x.date?" · "+fd(x.date):""))}">${esc(x.name||"Поставщик")}${md?" · "+md:""}</li>`}).join("")+((a.sups||[]).length?"":`<li class="supl no">поставщики не указаны</li>`);
   if(z.id==="vessel"&&a.vsl){const v=a.vsl,md=d=>String(d).slice(5,7)+"."+String(d).slice(8,10);
     const txt=v.name||"судно не указано";
-    h+=`<li class="vsl ${z.done?"ok":"no"}" title="${esc([v.name&&"Судно: "+v.name,v.carrier&&"Линия: "+v.carrier,v.etd&&"ETD "+fd(v.etd),z.done?"расписание утверждено":"не утверждено"].filter(Boolean).join(" · "))}">${z.done?"✓":"✗"} ${esc(txt)}</li>`}
+    h+=`<li class="vsl ${z.done?"ok":"no"}" title="${esc([v.name&&"Судно: "+v.name,v.carrier&&"Линия: "+v.carrier,v.etd&&"ETD "+fd(v.etd),z.done?"расписание утверждено":"не утверждено"].filter(Boolean).join(" · "))}">${esc(txt)}</li>`}
   return h;
 }
 function phaseCells(a){
@@ -972,7 +977,7 @@ function phaseCells(a){
   const segs=PHASES.map((p,i)=>{
     const st=i<cur?"done":i===cur?"now":"next";
     const w=st==="done"?100:st==="now"?Math.max(6,Math.round(x.done/x.total*100)):0;
-    return `<div class="pseg ${st} ${st==="now"&&x.issue?"issue":""}" data-ph="${p.id}" title="Открыть: ${p.t}"><span class="tr"><span class="fl" style="width:${w}%"></span></span><span class="pl">${st==="done"?"✓ ":""}${p.t}</span><ul class="psl">${a.ph[i].sd.map(z=>stLi(z,a)).join("")}</ul></div>`}).join("");
+    return `<div class="pseg ${st} ${st==="now"&&x.issue?"issue":""}" data-ph="${p.id}" title="Открыть: ${p.t}"><span class="tr"><span class="fl" style="width:${w}%"></span></span><span class="pl">${p.t}</span><ul class="psl">${a.ph[i].sd.map(z=>stLi(z,a)).join("")}</ul></div>`}).join("");
   const nowList=cur<n?`<ul class="psl now">${a.ph[cur].sd.map(z=>stLi(z,a)).join("")}</ul>`:"";
   const cap=a.closed?`<b class="win">🎉 Сделка успешно завершена</b>`:`Стадия <b>${cur+1} из ${n}: ${PHASES[cur].t}</b> · сделано ${x.done} из ${x.total}${x.issue?` · <span class="bad">есть проблемы</span>`:""}`;
   return `<div class="pbar ${a.closed?"closed":""}" role="img" aria-label="${a.closed?"Сделка успешно завершена":`Стадия ${cur+1} из ${n}: ${PHASES[cur].t}`}">${segs}</div><div class="pdates"><span class="done" title="Дата создания сделки">${fyl(a.created)}</span></div>${nowList}`;
