@@ -2378,6 +2378,38 @@ function viewDialog(){
   db.collection("views").onSnapshot(snap=>{views={};snap.docs.filter(x=>x.exists).forEach(x=>views[x.id]=x.data());applyView()},()=>{});
 })();
 
+/* export declaration file name: «M-34 ЭД 49 024 800 KRW (5 913 862 JPY).pdf»
+   amount = Commercial invoice total (order amount if no invoice has been read yet), equivalent from the invoice when it has one.
+   Worked out every time an order is read, so it follows the invoice and also covers declarations uploaded earlier. */
+const _normBase=normalize;
+const nsp=n=>Math.round(n).toLocaleString("ru-RU").replace(/\s/g," ");
+function invTotals(o){
+  const inv={},eq={};
+  for(const f of (o.files||[]))if(kindOf(f.kind)==="ipl"){
+    for(const[k,v]of Object.entries(f.inv||{}))if(v)inv[k]=(inv[k]||0)+v;
+    for(const[k,v]of Object.entries(f.eq||{}))if(v)eq[k]=(eq[k]||0)+v}
+  const cur=o.cur||"KRW";
+  let main=inv[cur]!=null?[cur,inv[cur]]:Object.entries(inv)[0];
+  if(!main&&Number(o.amount))main=[cur,Number(o.amount)];
+  const others={...inv,...eq};if(main)delete others[main[0]];
+  return {main,eq:Object.entries(others)};
+}
+function expNames(o){
+  for(const f of (o.files||[]))if(f.orig&&kindOf(f.kind)!=="exp"){f.name=f.orig;delete f.orig}
+  const ex=(o.files||[]).filter(f=>kindOf(f.kind)==="exp");
+  if(!ex.length)return o;
+  const t=invTotals(o);
+  let base=(o.num||"").trim()+" ЭД";
+  if(t.main)base+=` ${nsp(t.main[1])} ${t.main[0]}`+t.eq.map(([k,v])=>` (${nsp(v)} ${k})`).join("");
+  ex.forEach((f,i)=>{
+    f.orig=f.orig||f.name;
+    const m=String(f.orig).match(/\.[A-Za-z0-9]{1,5}$/);
+    f.name=base.trim()+(ex.length>1?` (${i+1})`:"")+(m?m[0].toLowerCase():"");
+  });
+  return o;
+}
+normalize=o=>expNames(_normBase(o));
+
 $("tPrev").onclick=()=>calStep(-1);
 $("tNext").onclick=()=>calStep(1);
 $("tToday").onclick=()=>{calA=null;renderTimeline()};
