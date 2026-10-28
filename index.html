@@ -2322,6 +2322,23 @@ async function backfillEquiv(){
   try{await db.collection("orders").doc(id).update({files});editing.files=files;refreshDerived()}catch(e){}
 }
 {const _oe=openEditor;openEditor=function(){const r=_oe.apply(this,arguments);backfillEquiv();return r};}
+// …and for every order on the board, so amounts and equivalents show without opening each order
+const _eqTried=new Set();let _eqBusy=false;
+async function backfillAllEquiv(){
+  if(_eqBusy||!db||!assets||!canWrite||!window.XLSX)return;_eqBusy=true;
+  try{
+    for(const o of orders.slice()){
+      const todo=(o.files||[]).filter(f=>kindOf(f.kind)==="ipl"&&/\.xlsx?$/i.test(f.orig||f.name)&&!f.eqChecked&&!_eqTried.has(f.aid));
+      if(!todo.length)continue;
+      const got={};
+      for(const f of todo){_eqTried.add(f.aid);try{got[f.aid]=invEquiv(await blobBytes(f))}catch(e){}}
+      const cur=orders.find(x=>x.id===o.id);if(!cur||!Object.keys(got).length)continue;
+      const files=(cur.files||[]).map(f=>got[f.aid]?{...f,...got[f.aid]}:f);
+      try{await db.collection("orders").doc(o.id).update({files})}catch(e){}
+    }
+  }finally{_eqBusy=false}
+}
+setInterval(()=>{if(orders.length)backfillAllEquiv()},4000);
 
 /* ---------- personal view: each person picks which parts of the board they see (convenience, not access control) ---------- */
 const VIEW_ITEMS=[
