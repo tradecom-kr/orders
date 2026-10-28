@@ -514,6 +514,17 @@ body.h-s_steps #form [data-sec="steps"],body.h-s_deal #form [data-sec="deal"],bo
 .vwbar select{height:36px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);padding:0 8px;font:inherit;font-size:13px;max-width:320px}
 body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
 .vwdlg select{width:100%}
+.oc .cct,.cct{border-collapse:collapse;margin-top:8px;font-size:13.5px;width:auto!important;max-width:100%}
+.cct th{font-weight:500;color:var(--muted);font-size:12px;text-align:left;vertical-align:top;padding:4px 18px 4px 0;width:110px;white-space:nowrap}
+.cct td{padding:4px 14px 4px 0;vertical-align:top}
+.cct td.nm{color:var(--ink);width:230px;min-width:230px}
+.cct td.n{font-family:var(--f-mono);font-weight:600;white-space:nowrap;padding-right:0}.cct .nv{display:inline-block;min-width:150px;text-align:right}
+.cct td.f{overflow-wrap:anywhere;padding-right:0}
+.cct tr.tot td{border-top:1px solid var(--line);font-weight:600}
+.cct td.eqv{color:var(--muted)}
+.cct tr.s1>*{border-top:1px solid var(--line);padding-top:8px}
+.cct tbody tr:first-child>*{border-top:0;padding-top:4px}
+@media (max-width:560px){.cct th{width:auto;padding-right:10px;white-space:normal}.cct td.nm{min-width:0}}
 </style>
 
 </head>
@@ -2469,20 +2480,31 @@ function fileLink(o,f){
     :`<a href="#" class="ccf" data-ccdl="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Скачать">${esc(f.name)}</a>`;
 }
 function compactCard(o){
-  const sh=new Set(myView().cshow||CC_KEYS), fs=o.files||[], rows=[];
-  const krw=n=>Math.round(n).toLocaleString("ru-RU")+" KRW";
-  if(sh.has("vessel")&&(o.vessel||"").trim())rows.push(["Судно",`<b>${esc(o.vessel)}</b>`]);
+  const sh=new Set(myView().cshow||CC_KEYS), fs=o.files||[];
+  const amt=(n,c)=>`${Math.round(n).toLocaleString("ru-RU")} ${esc(c)}`;
+  // one table: section | name | amount or file — so amounts sit in one column and files in another
+  const sec=[];  // [title, rows[[name, value, cls]]]
+  if(sh.has("vessel")&&(o.vessel||"").trim())sec.push(["Судно",[[`<b>${esc(o.vessel)}</b>`,"","wide"]]]);
+  const money=[];
   if(sh.has("sup")){const L=sups(o).filter(x=>x.name);
-    if(L.length){const tot=L.reduce((t,x)=>t+(Number(x.amt)||0),0);
-      rows.push(["Поставщики",`<ul class="ccs">${L.map(x=>`<li><span>${esc(x.name)}</span><b>${x.amt?krw(x.amt):"сумма не указана"}</b>${x.paid?` <small class="ok-t">оплачен</small>`:""}</li>`).join("")}${L.length>1&&tot?`<li class="tot"><span>Итого</span><b>${krw(tot)}</b></li>`:""}</ul>`])}}
-  for(const k of CC_DOCS)if(sh.has(k)){const L=fs.filter(f=>kindOf(f.kind)===k);
-    rows.push([KIND[k].replace(/ \(.*\)$/,""),L.length?L.map(f=>`<span class="ok-t">✓</span> ${fileLink(o,f)}`).join("<br>"):`<span class="ccno">✗ нет</span>`])}
-  if(sh.has("docs")){const L=fs.filter(f=>!CC_DOCS.includes(kindOf(f.kind)));
-    if(L.length)rows.push(["Документы",`<ul class="ccd">${L.map(f=>`<li><small>${esc(KIND[f.kind]||"Прочее")}</small>${fileLink(o,f)}</li>`).join("")}</ul>`])}
-  const money=sh.has("money")&&o.amount?`<span class="rt"><span class="amt">${fm(o.amount,o.cur)}${eqText(o)}</span><small class="ccp ${o.pay==="paid"?"ok-t":""}">${o.pay==="paid"?"оплачено":"к оплате"}</small></span>`:"";
+    L.forEach(x=>money.push([esc(x.name)+(x.paid?` <small class="ok-t">оплачен</small>`:""),x.amt?amt(x.amt,"KRW"):`<span class="ccno">сумма не указана</span>`,"n"]));
+    const tot=L.reduce((t,x)=>t+(Number(x.amt)||0),0);
+    if(L.length>1&&tot)money.push(["Итого поставщикам",amt(tot,"KRW"),"n tot"]);
+    if(money.length)sec.push(["Поставщикам",money.splice(0)])}
+  if(sh.has("money")){const t=invTotals(o);
+    if(t.main){const r=[[o.pay==="paid"?`Инвойс <small class="ok-t">оплачено</small>`:`Инвойс <small class="ccp">к оплате</small>`,amt(t.main[1],t.main[0]),"n"]];
+      t.eq.forEach(([k,v])=>r.push(["Эквивалент",amt(v,k),"n eqv"]));sec.push(["Покупатель",r])}}
+  const ship=[];
+  for(const k of CC_DOCS)if(sh.has(k)){const L=fs.filter(f=>kindOf(f.kind)===k), nm=KIND[k].replace(/ \(.*\)$/,"");
+    if(L.length)L.forEach((f,i)=>ship.push([i?"":nm,`<span class="ok-t">✓</span> ${fileLink(o,f)}`,"f"]));else ship.push([nm,`<span class="ccno">✗ нет</span>`,"f"])}
+  if(ship.length)sec.push(["Отгрузка",ship]);
+  if(sh.has("docs")){let prev="";const L=fs.filter(f=>!CC_DOCS.includes(kindOf(f.kind))).sort((a,b)=>(KIND[a.kind]||"").localeCompare(KIND[b.kind]||""));
+    const r=L.map(f=>{const k=KIND[f.kind]||"Прочее",row=[k===prev?"":esc(k),fileLink(o,f),"f"];prev=k;return row});
+    if(r.length)sec.push(["Документы",r])}
+  const body=sec.map(([t,rows])=>rows.map((r,i)=>`<tr class="${i?"":"s1"}"><th scope="row">${i?"":esc(t)}</th>${r[2]==="wide"?`<td colspan="2">${r[0]}</td>`:`<td class="nm">${r[0]}</td><td class="${r[2]}">${/\bn\b/.test(r[2])?`<span class="nv">${r[1]}</span>`:r[1]}</td>`}</tr>`).join("")).join("");
   return `<article class="oc cc" tabindex="0" data-id="${esc(o.id)}">
-    <div class="h"><span class="num">${esc(o.num||"без номера")}</span>${money}</div>
-    ${rows.length?`<dl class="ccb">${rows.map(([l,h])=>`<dt>${esc(l)}</dt><dd>${h}</dd>`).join("")}</dl>`:""}
+    <div class="h"><span class="num">${esc(o.num||"без номера")}</span></div>
+    ${body?`<table class="cct"><tbody>${body}</tbody></table>`:""}
   </article>`;
 }
 {const _card=cardHTML;cardHTML=function(o){return !o.arch&&myView().compact?compactCard(o):_card(o)};}
