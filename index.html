@@ -492,6 +492,23 @@ body.h-s_steps #form [data-sec="steps"],body.h-s_deal #form [data-sec="deal"],bo
 .vwf fieldset{border:1px solid var(--line);border-radius:8px;display:flex;flex-direction:column;gap:6px;padding:8px 12px}
 .vwf legend{font:600 12px var(--f-body);color:var(--accent);text-transform:uppercase;letter-spacing:.05em}
 .vwf footer{display:flex;justify-content:space-between;gap:8px}
+/* short card (personal view) */
+.oc.cc .h{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.oc.cc .h .rt{margin-left:auto;display:flex;align-items:baseline;gap:8px}
+.ccp{font-size:12px;color:var(--warn)}
+.ccb{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;margin:10px 0 0;font-size:13.5px}
+.ccb dt{color:var(--muted);font-size:12px;padding-top:2px}
+.ccb dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.ccs,.ccd{list-style:none;margin:0;padding:0}
+.ccs li{display:flex;gap:10px;justify-content:space-between;max-width:420px;border-bottom:1px dashed var(--line);padding:2px 0}
+.ccs li b{font-family:var(--f-mono);font-weight:600;white-space:nowrap}
+.ccs li.tot{border-bottom:0;font-weight:600}
+.ccd li{padding:2px 0}.ccd small{color:var(--muted);margin-right:8px}
+.ccf{color:var(--accent)}
+.ccno{color:var(--muted)}
+.vwc .vwcl{padding-left:22px}
+@media (max-width:560px){.ccb{grid-template-columns:1fr;gap:2px}.ccb dd{margin-bottom:6px}}
+.ccp.ok-t{color:var(--ok)}.ccs li>span{flex:1}.ccs li small{align-self:center}
 </style>
 
 </head>
@@ -2367,6 +2384,17 @@ const VIEW_ITEMS=[
     ["s_docs","Документы"],
     ["s_notes","Заметки"]]]
 ];
+// short card: the order number plus only what this person works with
+const CC_ITEMS=[
+  ["money","Сумма заказа и эквивалент, оплачено или нет"],
+  ["vessel","Судно (если указано)"],
+  ["sup","Поставщики и суммы заказов у них"],
+  ["exp","Экспортная декларация"],
+  ["expd","Exp. dates"],
+  ["bl","Коносамент"],
+  ["freight","Счёт за отгрузку"],
+  ["docs","Остальные загруженные документы"]];
+const CC_KEYS=CC_ITEMS.map(x=>x[0]), CC_DOCS=["exp","expd","bl","freight"];
 const VIEW_KEYS=VIEW_ITEMS.flatMap(g=>g[1].map(x=>x[0]));
 const meEmail=()=>String(window.TC_USER||"me").toLowerCase();
 const viewId=e=>String(e||"me").toLowerCase().replace(/[^a-z0-9._@+-]/g,"_");
@@ -2383,13 +2411,19 @@ function viewDialog(){
   d.innerHTML=`<form method="dialog" class="vwf"><header><h3 id="vwT">Что показывать</h3><button class="btn ghost" value="x" aria-label="Закрыть">✕</button></header>
     <label class="f"><span>Для кого настройка</span><input id="vwWho" type="email" value="${esc(who==="me"?"":who)}" placeholder="${esc(meEmail()==="me"?"для меня":meEmail()+" (я)")}"><small class="note">Пусто — для вас. Впишите почту сотрудника, чтобы настроить его вид: он увидит доску так при следующем входе.</small></label>
     ${VIEW_ITEMS.map(([g,items])=>`<fieldset><legend>${esc(g)}</legend>${items.map(([k,l])=>`<label class="chk"><input type="checkbox" data-vk="${k}" ${hide.includes(k)?"":"checked"}> ${esc(l)}</label>`).join("")}</fieldset>`).join("")}
+    <fieldset class="vwc"><legend>Короткая карточка заказа</legend>
+      <label class="chk"><input type="checkbox" id="vwCompact" ${v.compact?"checked":""}> <b>Вместо обычной карточки показывать только номер заказа и:</b></label>
+      <div class="vwcl">${CC_ITEMS.map(([k,l])=>`<label class="chk"><input type="checkbox" data-ck="${k}" ${(v.cshow||CC_KEYS).includes(k)?"checked":""}> ${esc(l)}</label>`).join("")}</div>
+    </fieldset>
     <p class="note" id="vwNote" style="margin:0">Это настройка удобства: скрытое просто не показывается, доступ к данным не меняется.</p>
     <footer><button class="btn ghost" type="button" id="vwAll">Показать всё</button><button class="btn primary" type="button" id="vwSave">Сохранить</button></footer></form>`;
   d.querySelector("#vwWho").addEventListener("change",e=>{viewFor=e.target.value.trim().toLowerCase()||null;viewDialog()});
-  d.querySelector("#vwAll").onclick=()=>d.querySelectorAll("[data-vk]").forEach(c=>c.checked=true);
+  d.querySelector("#vwAll").onclick=()=>{d.querySelectorAll("[data-vk],[data-ck]").forEach(c=>c.checked=true);d.querySelector("#vwCompact").checked=false};
   d.querySelector("#vwSave").onclick=async()=>{
     const target=viewFor||meEmail(), hide=[...d.querySelectorAll("[data-vk]")].filter(c=>!c.checked).map(c=>c.dataset.vk);
-    try{await db.collection("views").doc(viewId(target)).set({email:target,hide,updatedAt:new Date().toISOString()});views[viewId(target)]={email:target,hide};applyView();d.close()}
+    const compact=d.querySelector("#vwCompact").checked, cshow=[...d.querySelectorAll("[data-ck]")].filter(c=>c.checked).map(c=>c.dataset.ck);
+    const rec={email:target,hide,compact,cshow};
+    try{await db.collection("views").doc(viewId(target)).set({...rec,updatedAt:new Date().toISOString()});views[viewId(target)]=rec;applyView();render();d.close()}
     catch(e){d.querySelector("#vwNote").textContent="Не получилось сохранить ("+(e&&e.code||"ошибка")+")."}
   };
   if(!d.open)d.showModal();
@@ -2398,8 +2432,34 @@ function viewDialog(){
  const anchor=$("buyersBtn");anchor.parentNode.insertBefore(b,anchor);b.onclick=()=>{viewFor=null;viewDialog()};}
 // views live next to the orders; wait until the database is connected
 (function waitDb(){if(!db){setTimeout(waitDb,400);return}
-  db.collection("views").onSnapshot(snap=>{views={};snap.docs.filter(x=>x.exists).forEach(x=>views[x.id]=x.data());applyView()},()=>{});
+  db.collection("views").onSnapshot(snap=>{views={};snap.docs.filter(x=>x.exists).forEach(x=>views[x.id]=x.data());applyView();render()},()=>{});
 })();
+
+function myView(){return views[viewId(meEmail())]||{}}
+function fileLink(o,f){
+  const v=f.enc==="raw"&&/pdf|image/.test(f.mime||"");
+  return v?`<a href="#" class="ccf" data-view="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Открыть">${esc(f.name)}</a>`
+    :`<a href="#" class="ccf" data-ccdl="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Скачать">${esc(f.name)}</a>`;
+}
+function compactCard(o){
+  const sh=new Set(myView().cshow||CC_KEYS), fs=o.files||[], rows=[];
+  const krw=n=>Math.round(n).toLocaleString("ru-RU")+" KRW";
+  if(sh.has("vessel")&&(o.vessel||"").trim())rows.push(["Судно",`<b>${esc(o.vessel)}</b>`]);
+  if(sh.has("sup")){const L=sups(o).filter(x=>x.name);
+    if(L.length){const tot=L.reduce((t,x)=>t+(Number(x.amt)||0),0);
+      rows.push(["Поставщики",`<ul class="ccs">${L.map(x=>`<li><span>${esc(x.name)}</span><b>${x.amt?krw(x.amt):"сумма не указана"}</b>${x.paid?` <small class="ok-t">оплачен</small>`:""}</li>`).join("")}${L.length>1&&tot?`<li class="tot"><span>Итого</span><b>${krw(tot)}</b></li>`:""}</ul>`])}}
+  for(const k of CC_DOCS)if(sh.has(k)){const L=fs.filter(f=>kindOf(f.kind)===k);
+    rows.push([KIND[k].replace(/ \(.*\)$/,""),L.length?L.map(f=>`<span class="ok-t">✓</span> ${fileLink(o,f)}`).join("<br>"):`<span class="ccno">✗ нет</span>`])}
+  if(sh.has("docs")){const L=fs.filter(f=>!CC_DOCS.includes(kindOf(f.kind)));
+    if(L.length)rows.push(["Документы",`<ul class="ccd">${L.map(f=>`<li><small>${esc(KIND[f.kind]||"Прочее")}</small>${fileLink(o,f)}</li>`).join("")}</ul>`])}
+  const money=sh.has("money")&&o.amount?`<span class="rt"><span class="amt">${fm(o.amount,o.cur)}${eqText(o)}</span><small class="ccp ${o.pay==="paid"?"ok-t":""}">${o.pay==="paid"?"оплачено":"к оплате"}</small></span>`:"";
+  return `<article class="oc cc" tabindex="0" data-id="${esc(o.id)}">
+    <div class="h"><span class="num">${esc(o.num||"без номера")}</span>${money}</div>
+    ${rows.length?`<dl class="ccb">${rows.map(([l,h])=>`<dt>${esc(l)}</dt><dd>${h}</dd>`).join("")}</dl>`:""}
+  </article>`;
+}
+{const _card=cardHTML;cardHTML=function(o){return !o.arch&&myView().compact?compactCard(o):_card(o)};}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-ccdl]");if(b){e.preventDefault();e.stopPropagation();downloadFile(b.dataset.ccdl,b.dataset.oid)}},true);
 
 /* export declaration file name: «M-34 ЭД 49 024 800 KRW (5 913 862 JPY).pdf»
    amount = Commercial invoice total (order amount if no invoice has been read yet), equivalent from the invoice when it has one.
