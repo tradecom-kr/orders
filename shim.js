@@ -123,6 +123,7 @@
     if(!data){ say("У " + email + " нет доступа к доске. Попросите владельца добавить эту почту."); $g("gGoogle").hidden=true; $g("gOr").hidden=true; $g("gPw").hidden=true; $g("gOut").hidden=false; return; }
     started = true;
     gate.remove();
+    window.TC_USER = email;
     showUser(email);
     readyResolve(true);
     if(wantImport) importPanel();

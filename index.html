@@ -476,6 +476,22 @@ textarea{min-height:70px;resize:vertical}
 .psl li.sub.eq{color:var(--ink)!important;font-family:var(--f-mono);font-size:10.5px}
 .oc .amt .eqv{color:inherit}
 #e_amtEq{font:500 12px var(--f-mono);color:var(--muted)}
+/* personal view: hidden parts */
+body.h-stages .oc .pwrap,body.h-stages .oc .pcap{display:none}
+body.h-dates .kds{display:none}
+body.h-money .oc .amt,body.h-money .psl li.money,body.h-money .samt{display:none}
+body.h-sup .psl li.supl,body.h-sup .kcol:first-child .kwho{visibility:hidden}
+body.h-sup .psl li.supl{display:none}
+body.h-vessel .kcol:last-child .kwho{visibility:hidden}
+body.h-alerts .oc .alerts{display:none}
+body.h-cal #vTime,body.h-docs #vDocs{display:none}
+body.h-s_steps #form [data-sec="steps"],body.h-s_deal #form [data-sec="deal"],body.h-s_sup #form [data-sec="sup"],body.h-s_pay #form [data-sec="pay"],body.h-s_sched #form [data-sec="sched"],body.h-s_docs #form [data-sec="docs"],body.h-s_notes #form [data-sec="notes"]{display:none!important}
+.vwdlg{width:min(520px,calc(100vw - 24px));padding:0}
+.vwf{display:flex;flex-direction:column;gap:12px;padding:16px}
+.vwf header{display:flex;justify-content:space-between;align-items:center}.vwf h3{margin:0}
+.vwf fieldset{border:1px solid var(--line);border-radius:8px;display:flex;flex-direction:column;gap:6px;padding:8px 12px}
+.vwf legend{font:600 12px var(--f-body);color:var(--accent);text-transform:uppercase;letter-spacing:.05em}
+.vwf footer{display:flex;justify-content:space-between;gap:8px}
 </style>
 
 </head>
@@ -889,15 +905,15 @@ function stLi(z,a){
   let h=`<li class="${z.done?"ok":""}">${z.done?"✓":"✗"} ${SHORT[z.id]}</li>`;
   if(z.id==="photo"&&linkOK(a.photoLink))h+=`<li class="sub ok"><a href="${esc(a.photoLink.trim())}" target="_blank" rel="noopener" data-ext title="Папка с фото в Google Диске">📁 Google Диск ↗</a></li>`;
   if(z.id==="suppay"){const L=a.supsAll||[], due=L.filter(x=>!x.paid).reduce((t,x)=>t+(x.amt||0),0);
-    h+=L.map(x=>`<li class="sub ${x.paid?"ok":"no"}" title="${esc(x.name+(x.amt?" — "+fm(x.amt,"KRW"):"")+(x.paid?" · оплачен":" · не оплачен"))}">${x.paid?"✓":"✗"} ${esc(x.name)}${x.amt?`<br><span class="samt ${x.paid?"paid":""}">${esc(mln(x.amt))} ₩</span>`:""}</li>`).join("")
-      +(due?`<li class="sub due">К оплате: ${esc(mln(due))} ₩</li>`:"")}
+    h+=L.map(x=>`<li class="sub supl ${x.paid?"ok":"no"}" title="${esc(x.name+(x.amt?" — "+fm(x.amt,"KRW"):"")+(x.paid?" · оплачен":" · не оплачен"))}">${x.paid?"✓":"✗"} ${esc(x.name)}${x.amt?`<br><span class="samt ${x.paid?"paid":""}">${esc(mln(x.amt))} ₩</span>`:""}</li>`).join("")
+      +(due?`<li class="sub due money">К оплате: ${esc(mln(due))} ₩</li>`:"")}
   // payment block: what the buyer still owes
   if(z.id==="paid"&&a.money&&a.money.amount){const m=a.money, left=Math.max(0,m.amount-(m.paid||0));
     const eqs="";
-    h+=(m.pay==="paid"?`<li class="sub ok">Получено: ${esc(mln(m.amount))} ${esc(m.cur)}</li>`
-      :`<li class="sub due">К получению: ${esc(mln(left))} ${esc(m.cur)}</li>`+(m.paid?`<li class="sub ok">Получено: ${esc(mln(m.paid))} ${esc(m.cur)}</li>`:""))+eqs}
+    h+=(m.pay==="paid"?`<li class="sub ok money">Получено: ${esc(mln(m.amount))} ${esc(m.cur)}</li>`
+      :`<li class="sub due money">К получению: ${esc(mln(left))} ${esc(m.cur)}</li>`+(m.paid?`<li class="sub ok money">Получено: ${esc(mln(m.paid))} ${esc(m.cur)}</li>`:""))+eqs}
   if(z.id==="supconf")h+=(a.sups||[]).map(x=>{const ok=x.st==="confirmed"&&x.date;const md=x.date?String(x.date).slice(5,7)+"."+String(x.date).slice(8,10):"";
-    return `<li class="sub ${ok?"ok":"no"}" title="${esc((x.name||"Поставщик")+" — "+(SUPST[x.st]||SUPST.none).toLowerCase()+(x.date?" · "+fd(x.date):""))}">${ok?"✓":"✗"} ${esc(x.name||"Поставщик")}${md?" · "+md:""}</li>`}).join("");
+    return `<li class="sub supl ${ok?"ok":"no"}" title="${esc((x.name||"Поставщик")+" — "+(SUPST[x.st]||SUPST.none).toLowerCase()+(x.date?" · "+fd(x.date):""))}">${ok?"✓":"✗"} ${esc(x.name||"Поставщик")}${md?" · "+md:""}</li>`}).join("");
   if(z.id==="vessel"&&a.vsl){const v=a.vsl,md=d=>String(d).slice(5,7)+"."+String(d).slice(8,10);
     const txt=v.name||v.carrier||(v.etd?"ETD "+md(v.etd):"судно не указано");
     h+=`<li class="sub ${z.done?"ok":"no"}" title="${esc([v.name&&"Судно: "+v.name,v.carrier&&"Линия: "+v.carrier,v.etd&&"ETD "+fd(v.etd),z.done?"расписание утверждено":"не утверждено"].filter(Boolean).join(" · "))}">${z.done?"✓":"✗"} ${esc(txt)}</li>`}
@@ -2306,6 +2322,61 @@ async function backfillEquiv(){
   try{await db.collection("orders").doc(id).update({files});editing.files=files;refreshDerived()}catch(e){}
 }
 {const _oe=openEditor;openEditor=function(){const r=_oe.apply(this,arguments);backfillEquiv();return r};}
+
+/* ---------- personal view: each person picks which parts of the board they see (convenience, not access control) ---------- */
+const VIEW_ITEMS=[
+  ["Обзор",[
+    ["stages","Полоса этапов и пункты под ней"],
+    ["dates","Даты загрузки и выхода судна"],
+    ["money","Суммы и оплаты (сумма заказа, к получению, к оплате)"],
+    ["sup","Поставщики (имена, сроки, суммы)"],
+    ["vessel","Судно"],
+    ["alerts","Предупреждения и «Дальше»"]]],
+  ["Разделы",[
+    ["cal","Календарь"],
+    ["docs","Документы"]]],
+  ["Карточка сделки",[
+    ["s_steps","Ход сделки"],
+    ["s_deal","Сделка"],
+    ["s_sup","Поставщики"],
+    ["s_pay","Оплата"],
+    ["s_sched","График и загрузка"],
+    ["s_docs","Документы"],
+    ["s_notes","Заметки"]]]
+];
+const VIEW_KEYS=VIEW_ITEMS.flatMap(g=>g[1].map(x=>x[0]));
+const meEmail=()=>String(window.TC_USER||"me").toLowerCase();
+const viewId=e=>String(e||"me").toLowerCase().replace(/[^a-z0-9._@+-]/g,"_");
+let views={}, viewFor=null;
+function applyView(){
+  const v=views[viewId(meEmail())]||{}, hide=v.hide||[];
+  VIEW_KEYS.forEach(k=>document.body.classList.toggle("h-"+k,hide.includes(k)));
+  if(hide.includes("cal")&&view==="time"||hide.includes("docs")&&view==="docs"){view="over";render()}
+}
+function viewDialog(){
+  let d=$("viewDlg");
+  if(!d){d=document.createElement("dialog");d.id="viewDlg";d.className="vwdlg";d.setAttribute("aria-labelledby","vwT");document.body.appendChild(d)}
+  const who=viewFor||meEmail(), v=views[viewId(who)]||{}, hide=v.hide||[];
+  d.innerHTML=`<form method="dialog" class="vwf"><header><h3 id="vwT">Что показывать</h3><button class="btn ghost" value="x" aria-label="Закрыть">✕</button></header>
+    <label class="f"><span>Для кого настройка</span><input id="vwWho" type="email" value="${esc(who==="me"?"":who)}" placeholder="${esc(meEmail()==="me"?"для меня":meEmail()+" (я)")}"><small class="note">Пусто — для вас. Впишите почту сотрудника, чтобы настроить его вид: он увидит доску так при следующем входе.</small></label>
+    ${VIEW_ITEMS.map(([g,items])=>`<fieldset><legend>${esc(g)}</legend>${items.map(([k,l])=>`<label class="chk"><input type="checkbox" data-vk="${k}" ${hide.includes(k)?"":"checked"}> ${esc(l)}</label>`).join("")}</fieldset>`).join("")}
+    <p class="note" id="vwNote" style="margin:0">Это настройка удобства: скрытое просто не показывается, доступ к данным не меняется.</p>
+    <footer><button class="btn ghost" type="button" id="vwAll">Показать всё</button><button class="btn primary" type="button" id="vwSave">Сохранить</button></footer></form>`;
+  d.querySelector("#vwWho").addEventListener("change",e=>{viewFor=e.target.value.trim().toLowerCase()||null;viewDialog()});
+  d.querySelector("#vwAll").onclick=()=>d.querySelectorAll("[data-vk]").forEach(c=>c.checked=true);
+  d.querySelector("#vwSave").onclick=async()=>{
+    const target=viewFor||meEmail(), hide=[...d.querySelectorAll("[data-vk]")].filter(c=>!c.checked).map(c=>c.dataset.vk);
+    try{await db.collection("views").doc(viewId(target)).set({email:target,hide,updatedAt:new Date().toISOString()});views[viewId(target)]={email:target,hide};applyView();d.close()}
+    catch(e){d.querySelector("#vwNote").textContent="Не получилось сохранить ("+(e&&e.code||"ошибка")+")."}
+  };
+  if(!d.open)d.showModal();
+}
+{const b=document.createElement("button");b.className="btn";b.type="button";b.id="viewBtn";b.textContent="Вид";b.title="Что показывать на доске";
+ const anchor=$("buyersBtn");anchor.parentNode.insertBefore(b,anchor);b.onclick=()=>{viewFor=null;viewDialog()};}
+// views live next to the orders; wait until the database is connected
+(function waitDb(){if(!db){setTimeout(waitDb,400);return}
+  db.collection("views").onSnapshot(snap=>{views={};snap.docs.filter(x=>x.exists).forEach(x=>views[x.id]=x.data());applyView()},()=>{});
+})();
 
 $("tPrev").onclick=()=>calStep(-1);
 $("tNext").onclick=()=>calStep(1);
