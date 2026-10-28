@@ -525,6 +525,10 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .cct tr.s1>*{border-top:1px solid var(--line);padding-top:8px}
 .cct tbody tr:first-child>*{border-top:0;padding-top:4px}
 @media (max-width:560px){.cct th{width:auto;padding-right:10px;white-space:normal}.cct td.nm{min-width:0}}
+/* График: vessel and supplier lines stand on their own */
+.psl li.vsl,.psl li.supl{white-space:normal;overflow-wrap:anywhere}
+.psl li.vsl.no,.psl li.supl.no{color:var(--danger)}
+.pseg.next .psl li.vsl,.pseg.next .psl li.supl{opacity:1}
 </style>
 
 </head>
@@ -935,7 +939,8 @@ function stageCap(a){
 }
 // supplier lead times: one line per supplier under "Сроки поставщиков", confirmed or not
 function stLi(z,a){
-  let h=`<li class="${z.done?"ok":""}">${z.done?"✓":"✗"} ${SHORT[z.id]}</li>`;
+  // vessel and supplier dates speak for themselves: their lines replace the step name
+  let h=z.id==="vessel"||z.id==="supconf"?"":`<li class="${z.done?"ok":""}">${z.done?"✓":"✗"} ${SHORT[z.id]}</li>`;
   if(z.id==="photo"&&linkOK(a.photoLink))h+=`<li class="sub ok"><a href="${esc(a.photoLink.trim())}" target="_blank" rel="noopener" data-ext title="Папка с фото в Google Диске">📁 Google Диск ↗</a></li>`;
   if(z.id==="suppay"){const L=a.supsAll||[], due=L.filter(x=>!x.paid).reduce((t,x)=>t+(x.amt||0),0);
     h+=L.map(x=>`<li class="sub supl ${x.paid?"ok":"no"}" title="${esc(x.name+(x.amt?" — "+fm(x.amt,"KRW"):"")+(x.paid?" · оплачен":" · не оплачен"))}">${x.paid?"✓":"✗"} ${esc(x.name)}${x.amt?`<br><span class="samt ${x.paid?"paid":""}">${esc(mln(x.amt))} ₩</span>`:""}</li>`).join("")
@@ -946,10 +951,10 @@ function stLi(z,a){
     h+=(m.pay==="paid"?`<li class="sub ok money">Получено: ${esc(mln(m.amount))} ${esc(m.cur)}</li>`
       :`<li class="sub due money">К получению: ${esc(mln(left))} ${esc(m.cur)}</li>`+(m.paid?`<li class="sub ok money">Получено: ${esc(mln(m.paid))} ${esc(m.cur)}</li>`:""))+eqs}
   if(z.id==="supconf")h+=(a.sups||[]).map(x=>{const ok=x.st==="confirmed"&&x.date;const md=x.date?String(x.date).slice(5,7)+"."+String(x.date).slice(8,10):"";
-    return `<li class="sub supl ${ok?"ok":"no"}" title="${esc((x.name||"Поставщик")+" — "+(SUPST[x.st]||SUPST.none).toLowerCase()+(x.date?" · "+fd(x.date):""))}">${ok?"✓":"✗"} ${esc(x.name||"Поставщик")}${md?" · "+md:""}</li>`}).join("");
+    return `<li class="supl ${ok?"ok":"no"}" title="${esc((x.name||"Поставщик")+" — "+(SUPST[x.st]||SUPST.none).toLowerCase()+(x.date?" · "+fd(x.date):""))}">${ok?"✓":"✗"} ${esc(x.name||"Поставщик")}${md?" · "+md:""}</li>`}).join("")+((a.sups||[]).length?"":`<li class="supl no">✗ поставщики не указаны</li>`);
   if(z.id==="vessel"&&a.vsl){const v=a.vsl,md=d=>String(d).slice(5,7)+"."+String(d).slice(8,10);
-    const txt=v.name||v.carrier||(v.etd?"ETD "+md(v.etd):"судно не указано");
-    h+=`<li class="sub ${z.done?"ok":"no"}" title="${esc([v.name&&"Судно: "+v.name,v.carrier&&"Линия: "+v.carrier,v.etd&&"ETD "+fd(v.etd),z.done?"расписание утверждено":"не утверждено"].filter(Boolean).join(" · "))}">${z.done?"✓":"✗"} ${esc(txt)}</li>`}
+    const txt=v.name||"судно не указано";
+    h+=`<li class="vsl ${z.done?"ok":"no"}" title="${esc([v.name&&"Судно: "+v.name,v.carrier&&"Линия: "+v.carrier,v.etd&&"ETD "+fd(v.etd),z.done?"расписание утверждено":"не утверждено"].filter(Boolean).join(" · "))}">${z.done?"✓":"✗"} ${esc(txt)}</li>`}
   return h;
 }
 function phaseCells(a){
