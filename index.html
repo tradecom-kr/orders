@@ -589,6 +589,7 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .psl li.sub.supl .sn{flex:1 1 auto}
 .psl li.sub.supl .samt,.psl li.sub.supl .sdt{margin-left:auto}
 @media (min-width:641px){.pbar>.pseg>.psl>li{padding-right:8px}}
+.fwho{color:var(--muted);font-size:11px}
 </style>
 
 </head>
@@ -1000,6 +1001,9 @@ function stageCap(a){
 // display order only (the process order stays): in «Документы» the invoice comes second, so «Контракт (Ти)» sits level with «Контракт (Ден Е.)» in «Оплата»
 const DISP={docs:["kp","ipl","cs","cs2"]};
 const dispOrder=(ph,sd)=>DISP[ph]?sd.slice().sort((x,y)=>DISP[ph].indexOf(x.id)-DISP[ph].indexOf(y.id)):sd;
+// when and by whom a file was added (the uploader is recorded from 30.10.2026; older files show only the date)
+const fWhen=f=>{if(!f.at)return f.by?esc(f.by):"";const d=new Date(f.at);const p=n=>String(n).padStart(2,"0");
+  return `${p(d.getDate())}.${p(d.getMonth()+1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`+(f.by?` · ${esc(f.by)}`:"")};
 // a line in the stage lists opens its own file(s) in the viewer, not the whole order
 const byNew=L=>L.slice().sort((x,y)=>String(y.at||"").localeCompare(String(x.at||"")));
 function fOpen(o,L){if(!o||!L||!L.length)return "";L=byNew(L);return ` data-view="${esc(L[0].aid)}" data-oid="${esc(o.id)}" data-sibs="${esc(L.map(f=>f.aid).join(","))}"`}
@@ -1245,7 +1249,7 @@ function clRow(d,id){
         if(canWrite)act=`<button class="btn" type="button" data-golink>${lk?"Изменить ссылку":"Вставить ссылку"}</button>`}
       else if(done)hint=reqFiles(d,s.doc).map(f=>fDel===f.aid
         ?`<small class="bad">Удалить «${esc(f.name)}»? <button class="lnk danger" type="button" data-fdelyes="${esc(f.aid)}">Да, удалить</button> <button class="lnk" type="button" data-fcancel>Отмена</button></small>`
-        :`<small>${esc(f.name)}${canWrite?` · ${assets?`<button class="lnk" type="button" data-repl="${esc(f.aid)}">заменить</button> · `:""}<button class="lnk danger" type="button" data-fdel="${esc(f.aid)}">удалить</button>`:""}</small>`).join("");
+        :`<small>${esc(f.name)} <span class="fwho">· ${fWhen(f)}</span>${canWrite?` · ${assets?`<button class="lnk" type="button" data-repl="${esc(f.aid)}">заменить</button> · `:""}<button class="lnk danger" type="button" data-fdel="${esc(f.aid)}">удалить</button>`:""}</small>`).join("");
       // a signed scan and its Word file can sit side by side: one more file of the same kind
       if(done&&s.doc!=="photo"&&canWrite&&assets&&editing.id)act=`<button class="btn" type="button" data-upk="${s.doc}" title="Например, Word-версия рядом с подписанным PDF">${/^cs/.test(s.doc)?"+ Word или PDF":"+ Ещё файл"}</button>`;
       if(!done&&s.doc!=="photo"){
@@ -1930,7 +1934,7 @@ function renderFiles(){
     const canDen=kindOf(f.kind)==="cs"&&!["den","both","den_both","nosig"].includes(f.signer)&&extOf(f.name)==="docx"&&assets&&canWrite;
     const splitBtn=kindOf(f.kind)==="calc"&&/\.xlsx$/i.test(f.name)&&assets&&canWrite?`<button class="btn" type="button" data-split="${esc(f.aid)}" title="Сделать из вкладок КП, заказы поставщикам и инвойсы">Разобрать на документы</button>`:"";
     const denBtn=canDen?`<button class="btn" type="button" data-mkden="${esc(f.aid)}" title="Создать копию с именами и подписью Ден Евгения — для корейского банка">Сделать вариант Ден Е.</button>`:"";
-    return `<div class="frow"><span style="justify-self:start;display:flex;flex-direction:column;align-items:flex-start">${canWrite?`<select class="fkind" data-fkind="${esc(f.aid)}" aria-label="Тип документа «${esc(f.name)}»">${KINDS.map(([k,v])=>`<option value="${k}" ${kindOf(f.kind)===k?"selected":""}>${v}</option>`).join("")}</select>`:`<span class="pill acc">${KIND[f.kind]||"Прочее"}</span>`}${signUI}</span><span class="fn"><span class="ext ${extOf(f.name)}">${extOf(f.name)||"файл"}</span>${esc(f.name)}${f.from==="calc"?`<span class="pill" title="Сделано из вкладки «${esc(f.sheet||"")}» калькуляции">из калькуляции</span>`:""}<small>${fsize(f.size||0)} · ${f.at?fd(f.at.slice(0,10)):""}</small></span><span class="acts">${splitBtn}${denBtn}${kindOf(f.kind)==="cs"&&f.signer!=="nosig"&&extOf(f.name)==="docx"&&assets&&canWrite?`<button class="btn" type="button" data-nosig="${esc(f.aid)}" title="Копия этого контракта в Word без факсимиле подписей и печатей">Без подписей</button>`:""}${fileActs(f,editing.id,true,true)}</span></div>`}).join("")
+    return `<div class="frow"><span style="justify-self:start;display:flex;flex-direction:column;align-items:flex-start">${canWrite?`<select class="fkind" data-fkind="${esc(f.aid)}" aria-label="Тип документа «${esc(f.name)}»">${KINDS.map(([k,v])=>`<option value="${k}" ${kindOf(f.kind)===k?"selected":""}>${v}</option>`).join("")}</select>`:`<span class="pill acc">${KIND[f.kind]||"Прочее"}</span>`}${signUI}</span><span class="fn"><span class="ext ${extOf(f.name)}">${extOf(f.name)||"файл"}</span>${esc(f.name)}${f.from==="calc"?`<span class="pill" title="Сделано из вкладки «${esc(f.sheet||"")}» калькуляции">из калькуляции</span>`:""}<small>${fsize(f.size||0)} · ${fWhen(f)}</small></span><span class="acts">${splitBtn}${denBtn}${kindOf(f.kind)==="cs"&&f.signer!=="nosig"&&extOf(f.name)==="docx"&&assets&&canWrite?`<button class="btn" type="button" data-nosig="${esc(f.aid)}" title="Копия этого контракта в Word без факсимиле подписей и печатей">Без подписей</button>`:""}${fileActs(f,editing.id,true,true)}</span></div>`}).join("")
     :pics.length?"":`<div class="frow"><span class="note" style="grid-column:1/-1">Документов пока нет. Прикрепите калькуляцию, КП, контракт и спецификацию, инвойс и упаковочный и другие файлы по заказу.</span></div>`);
 }
 function toB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]||"");r.onerror=()=>rej(r.error);r.readAsDataURL(file)})}
@@ -1948,7 +1952,7 @@ async function uploadFiles(list){
       if(NATIVE.test(up.type)){r=await assets.upload(up,{type:up.type});enc="raw"}
       else{const b64=await toB64(file);r=await assets.upload(new Blob([b64],{type:"text/plain"}),{type:"text/plain"});enc="b64"}
       const kind=kindSel||guessKind(file.name)||"other";
-      const rec={aid:r.id,name:up.name,kind,size:r.sizeBytes||up.size,mime:up.type||"",enc,at:new Date().toISOString()};
+      const rec={aid:r.id,name:up.name,kind,size:r.sizeBytes||up.size,mime:up.type||"",enc,at:new Date().toISOString(),by:window.TC_USER||""};
       if(kindOf(kind)==="cs"){rec.signer=signSel||guessSigner(file.name)||sigByName[file.name]||"";if(!rec.signer)rec.signer=await signerFromText(file)}
       added.push(rec);
       if(rec.kind==="other"&&!kindSel&&/\.pdf$/i.test(file.name)&&await isExpDecl(file))rec.kind="exp";
@@ -2039,7 +2043,7 @@ async function makeDen(aid,btn){
     if(name===f.name)name=f.name.replace(/\.docx$/i," — Ден Е.docx");
     let b64="";const CH=0x8000;for(let i=0;i<r.bytes.length;i+=CH)b64+=String.fromCharCode.apply(null,r.bytes.subarray(i,i+CH));b64=btoa(b64);
     const up=await assets.upload(new Blob([b64],{type:"text/plain"}),{type:"text/plain"});
-    const rec={aid:up.id,name,kind:"cs",signer:"den",size:r.bytes.length,mime:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",enc:"b64",at:new Date().toISOString(),from:f.aid};
+    const rec={aid:up.id,name,kind:"cs",signer:"den",size:r.bytes.length,mime:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",enc:"b64",at:new Date().toISOString(),by:window.TC_USER||"",from:f.aid};
     const files=[...(editing.files||[]),rec], patch={files,updatedAt:new Date().toISOString()};
     await db.collection("orders").doc(editing.id).update(patch); editing.files=files; renderFiles();refreshDerived();
     $("upNote").textContent=`Готово: «${name}». Заменено имён: ${r.names}.`+(r.sig?" Подпись заменена на подпись Ден Е.":" Факсимиле подписи Ти в файле не было — подпись проверьте вручную.")+" Откройте файл и проверьте перед отправкой в банк.";
@@ -2050,7 +2054,7 @@ async function makeDen(aid,btn){
 const isPic=f=>kindOf(f.kind)==="photo"&&/^image\//.test(f.mime||"")&&f.enc==="raw";
 function picTiles(pics,oid,opt){
   const lim=opt.max||pics.length;
-  return pics.slice(0,lim).map(f=>`<span class="tile"><a href="#" data-view="${esc(f.aid)}" data-oid="${esc(oid)}" title="${esc(f.name)} — открыть"><img src="/_blob/${esc(f.aid)}" alt="${esc(f.name)}" loading="lazy"></a>${opt.del&&canWrite?`<button type="button" class="tx" data-fdel="${esc(f.aid)}" data-oid="${esc(oid)}" aria-label="Удалить фото ${esc(f.name)}">×</button>`:""}</span>`).join("")
+  return pics.slice(0,lim).map(f=>`<span class="tile"><a href="#" data-view="${esc(f.aid)}" data-oid="${esc(oid)}" title="${esc(f.name)} — открыть · ${fWhen(f)}"><img src="/_blob/${esc(f.aid)}" alt="${esc(f.name)}" loading="lazy"></a>${opt.del&&canWrite?`<button type="button" class="tx" data-fdel="${esc(f.aid)}" data-oid="${esc(oid)}" aria-label="Удалить фото ${esc(f.name)}">×</button>`:""}</span>`).join("")
     +(pics.length>lim?`<button type="button" class="tile more" data-open="${esc(oid)}" data-ph="load" title="Открыть все фото">+${pics.length-lim}</button>`:"");
 }
 function picActs(pics,oid){
@@ -2112,7 +2116,7 @@ function renderDocsAll(){
     const tag=kindOf(f.kind)==="cs"&&f.signer&&SIGN[f.signer]?SIGN[f.signer][2]:f.from==="calc"?"из калькуляции":"";
     if(fDel===f.aid)return `<div class="dc del"><span class="dn">Удалить «${esc(f.name)}»?</span><span class="da"><button type="button" class="ib danger" data-fdelyes="${esc(f.aid)}" data-oid="${esc(o.id)}">Да</button><button type="button" class="ib" data-fcancel>Нет</button></span></div>`;
     return `<div class="dc"><span class="ext ${ext}">${ext||"файл"}</span><span class="dw">`
-      +(view?`<a href="#" class="dn" data-view="${esc(f.aid)}" data-oid="${esc(o.id)}" title="${esc(f.name)} — открыть">${esc(f.name)}</a>`:`<button type="button" class="dn lnkb" data-dl="${esc(f.aid)}" data-oid="${esc(o.id)}" title="${esc(f.name)} — скачать">${esc(f.name)}</button>`)
+      +(view?`<a href="#" class="dn" data-view="${esc(f.aid)}" data-oid="${esc(o.id)}" title="${esc(f.name)} — открыть · ${fWhen(f)}">${esc(f.name)}</a>`:`<button type="button" class="dn lnkb" data-dl="${esc(f.aid)}" data-oid="${esc(o.id)}" title="${esc(f.name)} — скачать · ${fWhen(f)}">${esc(f.name)}</button>`)
       +(tag?`<small class="dt">${esc(tag)}</small>`:"")
       +`</span><span class="da"><button type="button" class="ib" data-dl="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Скачать" aria-label="Скачать ${esc(f.name)}">⬇</button>${canWrite?`<button type="button" class="ib danger" data-fdel="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Удалить" aria-label="Удалить ${esc(f.name)}">✕</button>`:""}</span></div>`;
   };
@@ -2375,7 +2379,7 @@ async function autoSplitCalc(srcs){ // srcs: [{rec, bytes}]
         gone.push(...old.map(f => f.aid));
         files = files.filter(f => !old.includes(f));
         files.push({ aid: r.id, name: `${base} ${part.sheet}.xlsx`.replace(/[\\/:*?"<>|]/g, "-"), kind: part.kind, size: part.bytes.length, mime: XLSX_MIME, enc: "b64",
-          at: new Date().toISOString(), from: "calc", src: rec.aid, sheet: part.sheet, ...(part.kind === "ipl" ? invEquiv(part.bytes) : {}) });
+          at: new Date().toISOString(), by: window.TC_USER || "", from: "calc", src: rec.aid, sheet: part.sheet, ...(part.kind === "ipl" ? invEquiv(part.bytes) : {}) });
         made.push(part);
       }catch(e){ note("Не получилось сохранить «" + part.sheet + "» (" + (e && e.code || "ошибка") + ")."); }
     }
@@ -2419,7 +2423,7 @@ async function makeNoSig(aid, btn){
     const name = f.name.replace(/\s*[—–-]?\s*(Ти|Ден)\s*[ВЕE]\.?(?=\.docx$)/i, "").replace(/\.docx$/i, ` — ${who} без подписей.docx`);
     const b64 = await toB64(new Blob([bytes]));
     const up = await assets.upload(new Blob([b64], { type: "text/plain" }), { type: "text/plain" });
-    const rec = { aid: up.id, name, kind: "cs", signer: "nosig", who: who === "Ден Е." ? "den" : "ti", size: bytes.length, mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", enc: "b64", at: new Date().toISOString(), from: f.aid };
+    const rec = { aid: up.id, name, kind: "cs", signer: "nosig", by: window.TC_USER || "", who: who === "Ден Е." ? "den" : "ti", size: bytes.length, mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", enc: "b64", at: new Date().toISOString(), from: f.aid };
     const files = [...(editing.files || []), rec];
     await db.collection("orders").doc(editing.id).update({ files, updatedAt: new Date().toISOString() });
     editing.files = files; renderFiles(); refreshDerived();
