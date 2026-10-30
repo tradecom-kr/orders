@@ -641,6 +641,9 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .dfl.del{display:flex!important}
 @media (max-width:900px){.dfl{grid-template-columns:44px minmax(0,1fr) 118px auto}.dfl .dfi,.dfl .dfb{display:none}}
 @media (max-width:640px){.dfl{grid-template-columns:44px minmax(0,1fr) auto}.dfl .dfd{display:none}}
+.al.info{color:var(--accent)}.al.info i{background:var(--accent-soft);color:var(--accent)}
+.psl li.sub.money.due.sent{color:var(--accent)!important}
+.psl li.sub.money.due.sent::after{content:" ↗";font-weight:400}
 </style>
 
 </head>
@@ -995,7 +998,10 @@ function analyze0(o){
   if(!closed){
     const L=sups(o).filter(x=>x.name||x.date), paid=o.pay==="paid", loaded=stepDone(o,"photo");
     if(missing.length)alerts.push({c:"bad",t:"Не загружены: "+missing.map(r=>REQL[r]).join(", ")});
-    if(o.payDue&&!paid){const d=days(o.payDue);if(d<0){overdue=true;ph[PIDX.pay].issue=true;alerts.push({c:"bad",t:`Оплата от покупателя просрочена (срок ${fds(o.payDue)})`})}else if(d<=3)soon.push(`оплата до ${fds(o.payDue)}`)}
+    // a payment order on the order: the buyer has sent the money — no «overdue», just «waiting for it»
+    const sent=!paid&&(o.files||[]).filter(f=>f.pm).map(f=>f.pm.date||f.pm.done).filter(Boolean).sort().pop();
+    if(o.payDue&&!paid&&!sent){const d=days(o.payDue);if(d<0){overdue=true;ph[PIDX.pay].issue=true;alerts.push({c:"bad",t:`Оплата от покупателя просрочена (срок ${fds(o.payDue)})`})}else if(d<=3)soon.push(`оплата до ${fds(o.payDue)}`)}
+    if(sent)alerts.push({c:"info",t:`Покупатель отправил платёж ${sent} — ждём поступления денег`});
     if(paid&&!stepDone(o,"bank")){ph[PIDX.pay].issue=true;alerts.push({c:"bad",t:"Деньги пришли — подготовьте контракт с подписью Ден Е."})}
     if(!loaded)L.forEach(x=>{if(!x.date)return;const d=days(x.date);
       if(d<0&&x.st!=="confirmed"){overdue=true;ph[PIDX.sched].issue=true;alerts.push({c:"bad",t:`Срок поставщика ${x.name||""} прошёл (${fds(x.date)}) и не подтверждён`})}
@@ -1074,8 +1080,8 @@ function stLi(z,a){
   // payment block: the amount to be paid (from the invoice) and its equivalent, in full; green once paid
   if(z.id==="paid"&&a.money&&(a.money.amount||a.money.tot.main)){const m=a.money, t=m.tot, main=t.main||[m.cur==="₩"?"KRW":m.cur,m.amount];
     const full=(v,c)=>`${Math.round(v).toLocaleString("ru-RU")} ${esc(c)}`, cls=m.pay==="paid"?"ok":"due";
-    const inv=fOpen(a.o,kindFiles(a.o,"ipl"));
-    h+=`<li class="sub money r1 ${cls}"${inv} title="${m.pay==="paid"?"Оплачено":"К оплате"}">${full(main[1],main[0])}</li>`+t.eq.map(([k,v])=>`<li class="sub money eqm"${inv}>${full(v,k)}</li>`).join("")}
+    const inv=fOpen(a.o,kindFiles(a.o,"ipl")), sentD=m.pay!=="paid"&&(a.o&&a.o.files||[]).filter(f=>f.pm).map(f=>f.pm.date||f.pm.done).filter(Boolean).sort().pop();
+    h+=`<li class="sub money r1 ${cls}${sentD?" sent":""}"${inv} title="${m.pay==="paid"?"Оплачено":sentD?"Платёж отправлен "+sentD+", ждём поступления":"К оплате"}">${full(main[1],main[0])}</li>`+t.eq.map(([k,v])=>`<li class="sub money eqm"${inv}>${full(v,k)}</li>`).join("")}
   if(z.id==="supconf")h+=(a.sups||[]).map(x=>{const ok=x.st==="confirmed"&&x.date;const md=x.date?String(x.date).slice(5,7)+"."+String(x.date).slice(8,10):"";
     return `<li class="sub supl sc ${ok?"ok":"no"}"${fOpen(a.o,kindFiles(a.o,"po","calc"))} title="${esc((x.name||"Поставщик")+" — "+(SUPST[x.st]||SUPST.none).toLowerCase()+(x.date?" · "+fd(x.date):""))}"><span class="sn">${esc(x.name||"Поставщик")}</span><span class="sdt">${md||"—"}</span></li>`}).join("")+((a.sups||[]).length?"":`<li class="supl no">поставщики не указаны</li>`);
   if(z.id==="vessel"&&a.vsl){const v=a.vsl,md=d=>String(d).slice(5,7)+"."+String(d).slice(8,10);
@@ -2796,7 +2802,7 @@ normalize=o=>expNames(_normBase(o));
 
 /* ---------- buyer's payment order («Заявление на перевод», bank PDF) → payment on the order ----------
    recognised by its content, whatever the file name; amount, currency, date and contract are read off it,
-   the order gets «Получено» and the payment status, and the file a clear name: «М-34 Оплата 21.10.2026 5 913 862 JPY.pdf» */
+   the order shows «payment sent» (the status «Оплачен» stays manual), and the file a clear name: «М-34 Оплата 21.10.2026 5 913 862 JPY.pdf» */
 const PAY_CUR_WORDS=[[/корейск\S*\s+вон/i,"KRW"],[/японск\S*\s+иен/i,"JPY"],[/доллар\S*\s+США/i,"USD"],[/евро/i,"EUR"],[/китайск\S*\s+юан/i,"CNY"],[/российск\S*\s+рубл/i,"RUB"]];
 const payNum=s=>Number(String(s).replace(/[\s  ]/g,"").replace(",","."))||0;
 async function readPayOrder(file){
@@ -2842,18 +2848,9 @@ async function applyPayments(added){
   const t=invTotals(o), due=Number(o.amount)||(t.main&&t.main[0]===(o.cur||"KRW")?t.main[1]:0);
   const r0=news[0].pm;
   let line=`Платёж покупателя: ${nsp(r0.amt)} ${r0.cur} от ${r0.date||r0.done||"—"}`+(r0.ccur&&r0.ccur!==r0.cur?` (${nsp(r0.camt)} ${r0.ccur} по контракту)`:"")+".";
-  if(paid>0){
-    const pay=due&&paid>=due*0.995?"paid":"partial";
-    try{
-      await db.collection("orders").doc(o.id).update({paid,pay,updatedAt:new Date().toISOString()});
-      editing.paid=paid;editing.pay=pay;
-      if($("e_paid"))$("e_paid").value=Number(paid).toLocaleString("ru-RU");
-      if($("e_pay"))$("e_pay").value=pay;
-      refreshDerived();
-      line+=pay==="paid"?" Заказ отмечен оплаченным.":` Получено ${nsp(paid)} ${o.cur||"KRW"} из ${due?nsp(due):"—"}, статус «Частично».`;
-    }catch(e){line+=" Отметить оплату не получилось ("+(e&&e.code||"ошибка")+"), поставьте её вручную."}
-  }else if(!pays.length)line+=" Оплата в этом заказе не отмечена.";
-  else line+=" Сумму в валюте заказа определить не удалось — поставьте «Получено» вручную.";
+  // a payment order only says the buyer has sent the money; «Оплачен» is set by hand once it has arrived
+  if(pays.length)line+=` Это заявление на перевод: деньги отправлены, но ещё не пришли. Когда поступят — поставьте в заказе статус «Оплачен»${paid?` (по контракту ${nsp(paid)} ${o.cur||"KRW"})`:""}.`;
+  else line+=" В этом заказе платёж не учтён.";
   upSticky={t:Date.now(),txt:[line,...msgs].join(" ")};$("upNote").textContent=upSticky.txt;
 }
 // the order re-renders when the saved change comes back; keep the payment message on screen for a while
