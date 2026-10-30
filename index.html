@@ -632,6 +632,15 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .dfl.del{color:var(--danger)}
 @media (max-width:640px){.dct th{width:auto;display:block;border-top:1px solid var(--line);padding-bottom:0}.dct td{display:block;border-top:0}.dct tr{display:block}.dfl{flex-wrap:wrap}.dfl .da{width:100%;justify-content:flex-end}}
 #foldAll,#xlsBtn{display:none!important}
+/* «Документы»: name | date | note | who | buttons — each in its own column, level with the name */
+.dfl{display:grid!important;grid-template-columns:44px minmax(0,1fr) 118px 170px 70px auto;column-gap:10px;align-items:baseline}
+.dfl .ext{justify-self:start}
+.dfl .dfd,.dfl .dfi,.dfl .dfb{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dfl .dfd{font-family:var(--f-mono);font-size:11.5px}
+.dfl .da{align-self:center}
+.dfl.del{display:flex!important}
+@media (max-width:900px){.dfl{grid-template-columns:44px minmax(0,1fr) 118px auto}.dfl .dfi,.dfl .dfb{display:none}}
+@media (max-width:640px){.dfl{grid-template-columns:44px minmax(0,1fr) auto}.dfl .dfd{display:none}}
 </style>
 
 </head>
@@ -2717,9 +2726,8 @@ renderDocsAll=function(){
     const kindSel=canWrite?`<select class="dks" data-dkind="${esc(f.aid)}" data-oid="${esc(o.id)}" aria-label="Тип «${esc(f.name)}»" title="Сменить тип">${KINDS.map(([k,v])=>`<option value="${k}" ${kindOf(f.kind)===k?"selected":""}>${esc(v)}</option>`).join("")}</select>`:"";
     return `<div class="dfl"><span class="ext ${ext}">${ext||"файл"}</span><span class="dfn">`
       +(view?`<a href="#" data-view="${esc(f.aid)}" data-oid="${esc(o.id)}" data-sibs="${esc((o.files||[]).filter(x=>kindOf(x.kind)===kindOf(f.kind)).map(x=>x.aid).join(","))}">${esc(f.name)}</a>`:`<button type="button" class="lnkb" data-dl="${esc(f.aid)}" data-oid="${esc(o.id)}">${esc(f.name)}</button>`)
-      +`<small>${fWhen(f)}${tag?" · "+esc(tag):""}</small>`
       +(odd?`<small class="warn-t">⚠ по названию похоже на «${esc(KIND[g]||g)}» — проверьте тип в заказе</small>`:"")
-      +`</span><span class="da"><button type="button" class="ib" data-dl="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Скачать" aria-label="Скачать ${esc(f.name)}">⬇</button>${canWrite?`<button type="button" class="ib danger" data-fdel="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Удалить" aria-label="Удалить ${esc(f.name)}">✕</button>`:""}</span></div>`;
+      +`</span><span class="dfd">${fWhen({at:f.at})}</span><span class="dfi">${esc(tag)}</span><span class="dfb" title="${esc(f.by||"")}">${esc(f.by?String(f.by).split("@")[0]:"")}</span><span class="da"><button type="button" class="ib" data-dl="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Скачать" aria-label="Скачать ${esc(f.name)}">⬇</button>${canWrite?`<button type="button" class="ib danger" data-fdel="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Удалить" aria-label="Удалить ${esc(f.name)}">✕</button>`:""}</span></div>`;
   };
   const blocks=rowsO.map(o=>{
     const fs=o.files||[], pics=fs.filter(isPic), docs=fs.filter(f=>!isPic(f));
