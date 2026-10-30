@@ -607,6 +607,30 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 #fileList .frow>span:first-child .fsign{max-width:210px}
 .fbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 2px;font-size:13px}
 .fbar[hidden]{display:none}
+/* «Документы» as cards */
+#docsAll{display:flex;flex-direction:column;gap:12px}
+.dcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r,12px);padding:12px 16px}
+.dcard header{display:flex;align-items:baseline;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.dcard header .num{font:700 17px var(--f-display);cursor:pointer}.dcard header .num:hover{color:var(--accent)}
+.dcard header .who{color:var(--muted);font-size:13px}
+.dcard header .cnt{margin-left:auto;color:var(--muted);font-size:12px}
+.dct{border-collapse:collapse;width:100%;font-size:13.5px}
+.dct th{width:200px;text-align:left;font-weight:500;color:var(--ink);vertical-align:top;padding:7px 14px 7px 0;border-top:1px solid var(--line);font-size:13px}
+.dct td{padding:5px 0;border-top:1px solid var(--line);vertical-align:top}
+.dct tr:first-child>*{border-top:0}
+.dct tr.none th{color:var(--muted);opacity:.6;font-weight:400}
+.dct .dnone{color:var(--muted);opacity:.6;font-size:12.5px;line-height:28px}
+.dfl{display:flex;align-items:flex-start;gap:8px;padding:2px 0}
+.dfl+.dfl{border-top:1px dashed var(--line);padding-top:5px;margin-top:3px}
+.dfl .dfn{flex:1;min-width:0;overflow-wrap:anywhere;line-height:1.35}
+.dfl .dfn a,.dfl .dfn .lnkb{color:var(--accent);text-decoration:none;font:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:left}
+.dfl .dfn a:hover,.dfl .dfn .lnkb:hover{text-decoration:underline}
+.dfl .dfn small{display:block;color:var(--muted);font-size:11.5px}
+.dfl .dfn small.warn-t{color:var(--warn)}
+.dfl .da{display:flex;gap:4px;align-items:center;flex:none}
+.dfl .dks{font-size:11.5px;padding:2px 4px;max-width:150px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--muted)}
+.dfl.del{color:var(--danger)}
+@media (max-width:640px){.dct th{width:auto;display:block;border-top:1px solid var(--line);padding-bottom:0}.dct td{display:block;border-top:0}.dct tr{display:block}.dfl{flex-wrap:wrap}.dfl .da{width:100%;justify-content:flex-end}}
 </style>
 
 </head>
@@ -2671,6 +2695,61 @@ function showOnline(){
     const sel=$("fOrder");if(sel&&id){sel.dataset.want=id;try{localStorage.setItem("docOrder",id)}catch(e){}}render();window.scrollTo(0,0)};
   const _rf2=renderFiles;renderFiles=function(){const r=_rf2.apply(this,arguments);paint();return r};
  }}
+
+/* ---------- «Документы» laid out like the short card: one block per order, document type on the left, its files on the right ---------- */
+renderDocsAll=function(){
+  const sel=$("fKind"),cur=sel.value;
+  sel.innerHTML=`<option value="">Все типы документов</option>`+KINDS.map(([k,v])=>`<option value="${k}">${v}</option>`).join("");sel.value=cur;
+  const all=visible({all:true}); fillOrderPick(all);
+  const oid=$("fOrder")?$("fOrder").value:"", one=oid?all.find(o=>o.id===oid):null;
+  const by=$("dSort").value||"num";
+  const lastAt=o=>(o.files||[]).map(f=>String(f.at||"")).sort().pop()||"";
+  const rowsO=(one?[one]:all).slice().sort(by==="num"?(a,b)=>onumOf(b)-onumOf(a)||String(b.num||"").localeCompare(String(a.num||"")):(a,b)=>lastAt(b).localeCompare(lastAt(a)));
+  const kIdx=k=>{const i=KINDS.findIndex(x=>x[0]===k);return i<0?99:i};
+  const sigOrder=k=>["ti","both","den","den_both","nosig",""].indexOf(k||"");
+  let nFiles=0;
+  const fileRow=(o,f)=>{
+    const ext=extOf(f.name), view=f.enc==="raw"&&/pdf|image/.test(f.mime||"")||/^(docx|xlsx|xls|xlsm|csv)$/.test(ext);
+    if(fDel===f.aid)return `<div class="dfl del"><span>Удалить «${esc(f.name)}»?</span><span class="da"><button type="button" class="ib danger" data-fdelyes="${esc(f.aid)}" data-oid="${esc(o.id)}">Да</button><button type="button" class="ib" data-fcancel>Нет</button></span></div>`;
+    const tag=kindOf(f.kind)==="cs"&&f.signer&&SIGN[f.signer]?SIGN[f.signer][2]:f.from==="calc"?"из калькуляции":"";
+    const g=guessKind(f.orig||f.name), odd=g&&g!==kindOf(f.kind)&&f.from!=="calc"&&!f.pm&&!(g==="calc"&&kindOf(f.kind)==="kp"&&/offer/i.test(f.name));
+    const kindSel=canWrite?`<select class="dks" data-dkind="${esc(f.aid)}" data-oid="${esc(o.id)}" aria-label="Тип «${esc(f.name)}»" title="Сменить тип">${KINDS.map(([k,v])=>`<option value="${k}" ${kindOf(f.kind)===k?"selected":""}>${esc(v)}</option>`).join("")}</select>`:"";
+    return `<div class="dfl"><span class="ext ${ext}">${ext||"файл"}</span><span class="dfn">`
+      +(view?`<a href="#" data-view="${esc(f.aid)}" data-oid="${esc(o.id)}" data-sibs="${esc((o.files||[]).filter(x=>kindOf(x.kind)===kindOf(f.kind)).map(x=>x.aid).join(","))}">${esc(f.name)}</a>`:`<button type="button" class="lnkb" data-dl="${esc(f.aid)}" data-oid="${esc(o.id)}">${esc(f.name)}</button>`)
+      +`<small>${fWhen(f)}${tag?" · "+esc(tag):""}</small>`
+      +(odd?`<small class="warn-t">⚠ по названию похоже на «${esc(KIND[g]||g)}» — проверьте тип</small>`:"")
+      +`</span><span class="da">${kindSel}<button type="button" class="ib" data-dl="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Скачать" aria-label="Скачать ${esc(f.name)}">⬇</button>${canWrite?`<button type="button" class="ib danger" data-fdel="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Удалить" aria-label="Удалить ${esc(f.name)}">✕</button>`:""}</span></div>`;
+  };
+  const blocks=rowsO.map(o=>{
+    const fs=o.files||[], pics=fs.filter(isPic), docs=fs.filter(f=>!isPic(f));
+    const kinds=new Set(docs.map(f=>kindOf(f.kind)));
+    if(pics.length||linkOK(o.photoLink))kinds.add("photo");
+    if(!o.arch)["kp","cs","ipl","exp","photo","expd","bl","freight"].forEach(k=>kinds.add(k));
+    let list=[...kinds].sort((a,b)=>kIdx(a)-kIdx(b));
+    if(cur)list=list.filter(k=>k===cur);
+    if(cur&&!docs.some(f=>kindOf(f.kind)===cur)&&!(cur==="photo"&&(pics.length||linkOK(o.photoLink))))return "";
+    const rows=list.map(k=>{
+      let h="";
+      const L=docs.filter(f=>kindOf(f.kind)===k).sort((a,b)=>k==="cs"?sigOrder(a.signer)-sigOrder(b.signer):String(b.at||"").localeCompare(String(a.at||"")));
+      nFiles+=L.length;h+=L.map(f=>fileRow(o,f)).join("");
+      if(k==="photo"){
+        if(linkOK(o.photoLink))h+=`<div class="dfl"><a href="${esc(o.photoLink.trim())}" target="_blank" rel="noopener" data-ext>📁 Google Диск ↗</a></div>`;
+        if(pics.length){nFiles+=pics.length;h+=`<div class="dfl"><span class="dfn">Фото: ${pics.length}</span><span class="da"><button type="button" class="ib" data-dlpics="${esc(o.id)}" title="Скачать все фото (.zip)">⬇</button></span></div>`}
+      }
+      return `<tr class="${h?"":"none"}"><th scope="row">${esc(k==="photo"?"Фотоотчёт":(KIND[k]||"Прочее").replace(/ \(.*\)$/,""))}</th><td>${h||`<span class="dnone">нет</span>`}</td></tr>`;
+    }).join("");
+    return `<article class="dcard"><header><span class="num" data-open="${esc(o.id)}" title="Открыть заказ">${esc(o.num||"без номера")}</span><span class="who">${esc(o.buyer||"")}</span>${o.arch?`<small class="note">архив</small>`:""}<span class="cnt">${docs.length+pics.length} файл.</span></header><table class="dct"><tbody>${rows}</tbody></table></article>`;
+  }).join("");
+  $("docsCount").textContent=nFiles?`Файлов: ${nFiles}`:"";
+  $("docsAll").innerHTML=blocks||`<div class="frow"><span class="note" style="grid-column:1/-1">${rowsO.length?"Нет документов под этот фильтр.":"Заказов пока нет."}</span></div>`;
+};
+// change a file's type right here
+$("docsAll").addEventListener("change",async e=>{
+  const s=e.target.closest("select[data-dkind]");if(!s)return;
+  const o=orders.find(x=>x.id===s.dataset.oid);if(!o)return;
+  const files=(o.files||[]).map(f=>{if(f.aid!==s.dataset.dkind)return f;const n={...f,kind:s.value};if(s.value==="cs"&&!n.signer)n.signer=guessSigner(f.name)||"ti";if(s.value!=="cs")delete n.signer;return n});
+  try{await db.collection("orders").doc(o.id).update({files,updatedAt:new Date().toISOString()})}catch(err){showStatus("Не получилось сменить тип ("+(err&&err.code||"ошибка")+").",true)}
+});
 
 /* export declaration file name: «M-34 ЭД 49 024 800 KRW (5 913 862 JPY).pdf»
    amount = Commercial invoice total (order amount if no invoice has been read yet), equivalent from the invoice when it has one.
