@@ -1957,6 +1957,7 @@ async function uploadFiles(list){
       const rec={aid:r.id,name:up.name,kind,size:r.sizeBytes||up.size,mime:up.type||"",enc,at:new Date().toISOString(),by:window.TC_USER||""};
       if(kindOf(kind)==="cs"){rec.signer=signSel||guessSigner(file.name)||sigByName[file.name]||"";if(!rec.signer)rec.signer=await signerFromText(file)}
       added.push(rec);
+      if((rec.kind==="other"||rec.kind==="pay")&&(!kindSel||kindSel==="pay")&&/\.pdf$/i.test(file.name)){const pm=await readPayOrder(file);if(pm){rec.kind="pay";rec.pm=pm;rec.orig=rec.name;rec.name=payName(editing,pm,rec.name)}}
       if(rec.kind==="other"&&!kindSel&&/\.pdf$/i.test(file.name)&&await isExpDecl(file))rec.kind="exp";
       if(kindOf(rec.kind)==="exp")expList.push(file);
       if(kindOf(rec.kind)==="ipl"&&/\.xlsx?$/i.test(file.name))Object.assign(rec,invEquiv(new Uint8Array(await file.arrayBuffer())));
@@ -1973,7 +1974,8 @@ async function uploadFiles(list){
       if(repl&&assets)assets.delete(repl.aid).catch(()=>{});
       if(expList.length){const l=[];for(const f of expList)l.push({bytes:new Uint8Array(await f.arrayBuffer()),name:f.name});applyExpNo(l,false)}
       autofillFiles(await Promise.all([...list].map(async f=>({bytes:new Uint8Array(await f.arrayBuffer()),name:f.name}))),true);
-      if(calcList.length)await autoSplitCalc(calcList)}
+      if(calcList.length)await autoSplitCalc(calcList);
+      await applyPayments(added)}
   catch(e){$("upNote").textContent="Файлы загружены, но не привязались к заказу ("+(e&&e.code||"ошибка")+"). Попробуйте ещё раз."}
   $("upFile").value="";
 }
@@ -2671,6 +2673,72 @@ function expNames(o){
   return o;
 }
 normalize=o=>expNames(_normBase(o));
+
+/* ---------- buyer's payment order («Заявление на перевод», bank PDF) → payment on the order ----------
+   recognised by its content, whatever the file name; amount, currency, date and contract are read off it,
+   the order gets «Получено» and the payment status, and the file a clear name: «М-34 Оплата 21.10.2026 5 913 862 JPY.pdf» */
+const PAY_CUR_WORDS=[[/корейск\S*\s+вон/i,"KRW"],[/японск\S*\s+иен/i,"JPY"],[/доллар\S*\s+США/i,"USD"],[/евро/i,"EUR"],[/китайск\S*\s+юан/i,"CNY"],[/российск\S*\s+рубл/i,"RUB"]];
+const payNum=s=>Number(String(s).replace(/[\s  ]/g,"").replace(",","."))||0;
+async function readPayOrder(file){
+  let t;try{t=String(await fileText(new Uint8Array(await file.arrayBuffer()),file.name)||"")}catch(e){return null}
+  t=t.replace(/[  ]/g," ");
+  if(!/ЗАЯВЛЕНИЕ\s+НА\s+ПЕРЕВОД|ПЛАТ[ЕЁ]ЖНОЕ\s+ПОРУЧЕНИЕ|PAYMENT\s+ORDER|APPLICATION\s+FOR\s+(?:TRANSFER|REMITTANCE)/i.test(t))return null;
+  const pm={};
+  let m=t.match(/(?:ЗАЯВЛЕНИЕ\s+НА\s+ПЕРЕВОД|ПЛАТ[ЕЁ]ЖНОЕ\s+ПОРУЧЕНИЕ)\s+N\s*(\d+)\s+от\s+(\d{2}\.\d{2}\.\d{4})/i);
+  if(m){pm.no=m[1];pm.date=m[2]}
+  m=t.match(/32[АA]\s+([A-Z]{3})\s+(\d{1,3}(?: \d{3})*(?:[.,]\d{1,2})?)/)||t.match(/Код валюты\s+([A-Z]{3})[\s\S]{0,40}?Сумма цифрами\s+(?:32[АA]\s+)?(\d{1,3}(?: \d{3})*(?:[.,]\d{1,2})?)/);
+  if(m){pm.cur=m[1];pm.amt=payNum(m[2])}
+  m=t.match(/Сумма в валюте контракта\s+(\d{1,3}(?: \d{3})*(?:[.,]\d{1,2})?)\s+([^\s]+\s+[^\s]+)/i);
+  if(m){const c=PAY_CUR_WORDS.find(([re])=>re.test(m[2]));if(c){pm.ccur=c[1];pm.camt=payNum(m[1])}}
+  m=t.match(/ИСПОЛНЕНО\s+(\d{2}\.\d{2}\.\d{4})/);if(m)pm.done=m[1];
+  m=t.match(/CONTRACT\s+(?:N[O°]?\.?\s*)?([MМ])\s*-?\s*(\d+)/i)||t.match(/контракт\S*\s+(?:N\s*)?([MМ])\s*-?\s*(\d+)/i);if(m)pm.contract="M-"+m[2];
+  m=t.match(/INVOICE\s+([A-Z]{2,}\s*\d+\/\d+)/i);if(m)pm.invoice=m[1];
+  return pm.amt?pm:null;
+}
+const ordNo=s=>(String(s||"").match(/(\d+)\s*$/)||[])[1]||"";
+// what a payment is worth in the order currency: the contract-currency line, the amount itself, or its share of the invoice equivalent
+function payInOrderCur(o,pm){
+  const cur=o.cur||"KRW";
+  if(pm.ccur===cur&&pm.camt)return pm.camt;
+  if(pm.cur===cur)return pm.amt;
+  const t=invTotals(o), eq=Object.fromEntries(t.eq);
+  if(t.main&&t.main[0]===cur&&eq[pm.cur])return Math.round(pm.amt/eq[pm.cur]*t.main[1]);
+  return 0;
+}
+function payName(o,pm,orig){
+  const ext=(String(orig).match(/\.[A-Za-z0-9]{1,5}$/)||[".pdf"])[0].toLowerCase();
+  return `${(o.num||"").trim()} Оплата ${pm.date||pm.done||""} ${nsp(pm.amt)} ${pm.cur}${ext}`.replace(/\s+/g," ").replace(/[\\/:*?"<>|]/g,"-");
+}
+// after an upload: payments found → «Получено» and the status on the order
+async function applyPayments(added){
+  const news=(added||[]).filter(r=>r.pm);
+  if(!news.length||!editing||!editing.id)return;
+  const o=editing, msgs=[];
+  for(const r of news){
+    if(r.pm.contract&&ordNo(o.num)&&ordNo(r.pm.contract)!==ordNo(o.num))msgs.push(`Внимание: в платеже указан контракт ${r.pm.contract}, а заказ — ${o.num}. Проверьте, тот ли это заказ.`);
+  }
+  const pays=(o.files||[]).filter(f=>f.pm&&!(f.pm.contract&&ordNo(o.num)&&ordNo(f.pm.contract)!==ordNo(o.num)));
+  const paid=pays.reduce((s,f)=>s+payInOrderCur(o,f.pm),0);
+  const t=invTotals(o), due=Number(o.amount)||(t.main&&t.main[0]===(o.cur||"KRW")?t.main[1]:0);
+  const r0=news[0].pm;
+  let line=`Платёж покупателя: ${nsp(r0.amt)} ${r0.cur} от ${r0.date||r0.done||"—"}`+(r0.ccur&&r0.ccur!==r0.cur?` (${nsp(r0.camt)} ${r0.ccur} по контракту)`:"")+".";
+  if(paid>0){
+    const pay=due&&paid>=due*0.995?"paid":"partial";
+    try{
+      await db.collection("orders").doc(o.id).update({paid,pay,updatedAt:new Date().toISOString()});
+      editing.paid=paid;editing.pay=pay;
+      if($("e_paid"))$("e_paid").value=Number(paid).toLocaleString("ru-RU");
+      if($("e_pay"))$("e_pay").value=pay;
+      refreshDerived();
+      line+=pay==="paid"?" Заказ отмечен оплаченным.":` Получено ${nsp(paid)} ${o.cur||"KRW"} из ${due?nsp(due):"—"}, статус «Частично».`;
+    }catch(e){line+=" Отметить оплату не получилось ("+(e&&e.code||"ошибка")+"), поставьте её вручную."}
+  }else if(!pays.length)line+=" Оплата в этом заказе не отмечена.";
+  else line+=" Сумму в валюте заказа определить не удалось — поставьте «Получено» вручную.";
+  upSticky={t:Date.now(),txt:[line,...msgs].join(" ")};$("upNote").textContent=upSticky.txt;
+}
+// the order re-renders when the saved change comes back; keep the payment message on screen for a while
+let upSticky=null;
+{const _rf=renderFiles;renderFiles=function(){const r=_rf.apply(this,arguments);if(upSticky&&Date.now()-upSticky.t<20000&&$("upNote"))$("upNote").textContent=upSticky.txt;return r};}
 
 $("tPrev").onclick=()=>calStep(-1);
 $("tNext").onclick=()=>calStep(1);
