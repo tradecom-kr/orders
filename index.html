@@ -605,6 +605,8 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 @media (max-width:640px){#fileList .frow{grid-template-columns:minmax(0,1fr);grid-template-areas:"fn" "ty" "ac"}#fileList .frow>.fn small{display:block;margin-left:0}}
 #fileList .fkind{max-width:230px}
 #fileList .frow>span:first-child .fsign{max-width:210px}
+.fbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 2px;font-size:13px}
+.fbar[hidden]{display:none}
 </style>
 
 </head>
@@ -2652,6 +2654,23 @@ function showOnline(){
   el.title=on.length?"Сейчас на доске: "+on.join(", "):"";
   el.innerHTML=on.length?`<i aria-hidden="true"></i>Сейчас: ${on.map(e=>esc(e.split("@")[0])).join(", ")}`:"";
 }
+
+/* the order's full file list is folded away: the same files are in «Документы»; it opens on demand for the file tools
+   (type, signature, Den variant, without signatures, split the calculation) */
+{const fl=$("fileList");
+ if(fl){
+  const bar=document.createElement("div");bar.className="fbar";
+  bar.innerHTML=`<button type="button" class="lnk" id="flToggle" aria-expanded="false" aria-controls="fileList"></button><span class="note">·</span><button type="button" class="lnk" id="flDocs">Открыть в «Документах» →</button>`;
+  fl.parentNode.insertBefore(bar,fl);
+  let open=false;try{open=localStorage.getItem("tc_flOpen")==="1"}catch(e){}
+  const paint=()=>{const n=(editing&&editing.files||[]).length;fl.hidden=!open;
+    $("flToggle").textContent=(open?"Скрыть файлы заказа ▴":`Все файлы заказа (${n}) ▾`);$("flToggle").setAttribute("aria-expanded",String(open));
+    bar.hidden=!n};
+  $("flToggle").onclick=()=>{open=!open;try{localStorage.setItem("tc_flOpen",open?"1":"0")}catch(e){}paint()};
+  $("flDocs").onclick=()=>{const id=editing&&editing.id;$("dlg").close();view="docs";save("view",view);
+    const sel=$("fOrder");if(sel&&id){sel.dataset.want=id;try{localStorage.setItem("docOrder",id)}catch(e){}}render();window.scrollTo(0,0)};
+  const _rf2=renderFiles;renderFiles=function(){const r=_rf2.apply(this,arguments);paint();return r};
+ }}
 
 /* export declaration file name: «M-34 ЭД 49 024 800 KRW (5 913 862 JPY).pdf»
    amount = Commercial invoice total (order amount if no invoice has been read yet), equivalent from the invoice when it has one.
