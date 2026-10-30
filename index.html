@@ -644,6 +644,15 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .al.info{color:var(--accent)}.al.info i{background:var(--accent-soft);color:var(--accent)}
 .psl li.sub.money.due.sent{color:var(--accent)!important}
 .psl li.sub.money.due.sent::after{content:" ↗";font-weight:400}
+/* supplier payment cell: «оплачен» or a part payment */
+.sups{grid-template-columns:minmax(90px,1.2fr) minmax(80px,1fr) 108px 128px 128px 150px 28px!important}
+.spay{display:flex;flex-direction:column;gap:3px}
+.spay .s_pamt{font-size:12px;padding:3px 6px}
+.psl li.sub.supl.part{color:var(--warn)!important}
+.psl li.sub.supl .samt small{font-size:10px;opacity:.8}
+@media (max-width:640px){.sups{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}}
+.spay .s_pamt::placeholder{font-size:11px}
+.spay .s_pamt::placeholder{font-size:11px}
 </style>
 
 </head>
@@ -929,6 +938,16 @@ const sups0=o=>Array.isArray(o.suppliers)?o.suppliers:((o.sup||o.supDate)?[{name
 const sups=o=>sups0(o).map(x=>x.amt!=null&&x.amt!==""?x:{...x,amt:amtFromWhat(x.what)});
 // what is still owed to suppliers on one deal
 const supDue=o=>sups(o).filter(x=>x.name&&!x.paid);
+// part payments to a supplier: «оплачено» as an amount or a percentage of the supplier amount; paid in full counts as «оплачен»
+const supLeft=x=>x.paid?0:Math.max(0,(Number(x.amt)||0)-(Number(x.paidAmt)||0));
+const supPart=x=>!x.paid&&Number(x.paidAmt)>0;
+function supPaidPart(r){
+  const el=r.querySelector(".s_pamt"); if(!el)return {};
+  const v=String(el.value||"").trim(), amt=num(r.querySelector(".s_amt").value)||0;
+  let p=/%/.test(v)?Math.round(amt*(Number(v.replace(/[^\d.,]/g,"").replace(",","."))||0)/100):(num(v)||0);
+  if(!p)return {paidAmt:null,paidAt:""};
+  return {paidAmt:p,paidAt:el.dataset.at||isoToday(),...(amt&&p>=amt?{paid:true}:{})};
+}
 const supMax=list=>list.map(x=>x.date).filter(Boolean).sort().pop()||"";
 const supAll=list=>list.length>0&&list.every(x=>x.st==="confirmed"&&x.date);
 function reqFiles(o,r){const fs=o.files||[];
@@ -1072,11 +1091,13 @@ function stLi(z,a){
   let h=z.id==="vessel"||z.id==="supconf"||(z.id==="paid"&&a.money&&(a.money.amount||a.money.tot.main))||(z.id==="suppay"&&(a.supsAll||[]).length)?"":`<li class="${z.done?"ok":""}"${fOpen(a.o,stepFiles(a.o,z.id))}>${SHORT[z.id]}</li>`;
   if(z.id==="photo"&&linkOK(a.photoLink))h+=`<li class="sub ok"><a href="${esc(a.photoLink.trim())}" target="_blank" rel="noopener" data-ext title="Папка с фото в Google Диске">📁 Google Диск ↗</a></li>`;
   // suppliers: what is still to pay on top (level with the buyer's amount), then each supplier — red unpaid, green paid
-  if(z.id==="suppay"){const L=a.supsAll||[], due=L.filter(x=>!x.paid).reduce((t,x)=>t+(x.amt||0),0), all=L.reduce((t,x)=>t+(x.amt||0),0);
+  if(z.id==="suppay"){const L=a.supsAll||[], due=L.reduce((t,x)=>t+supLeft(x),0), all=L.reduce((t,x)=>t+(x.amt||0),0);
     const full=v=>Math.round(v).toLocaleString("ru-RU")+" KRW";
     const cf=fOpen(a.o,kindFiles(a.o,"calc","po"));
     if(L.length)h+=(all?`<li class="sub money r1 ${due?"due":"ok"}"${cf} title="${due?"К оплате поставщикам":"Поставщикам оплачено"}">${full(due||all)}</li>`:`<li class="sub money">—</li>`)
-      +L.map(x=>`<li class="sub supl sp ${x.paid?"ok":"no"}"${cf} title="${esc(x.name+(x.amt?" — "+full(x.amt):"")+(x.paid?" · оплачен":" · не оплачен"))}"><span class="sn">${esc(x.name)}</span>${x.amt?`<span class="samt ${x.paid?"paid":""}">${full(x.amt).replace(" KRW","")}</span>`:""}</li>`).join("")}
+      +L.map(x=>{const pt=supPart(x), md=d=>d?" "+String(d).slice(8,10)+"."+String(d).slice(5,7):"";
+        const tip=x.name+(x.amt?" — "+full(x.amt):"")+(x.paid?" · оплачен":pt?` · оплачено${md(x.paidAt)} ${full(x.paidAmt)}${x.amt?" ("+Math.round(x.paidAmt/x.amt*100)+"%)":""}, осталось ${full(supLeft(x))}`:" · не оплачен");
+        return `<li class="sub supl sp ${x.paid?"ok":pt?"part":"no"}"${cf} title="${esc(tip)}"><span class="sn">${esc(x.name)}</span>${x.amt?`<span class="samt ${x.paid?"paid":""}">${pt&&x.amt?`<small>${Math.round(x.paidAmt/x.amt*100)}%</small> `:""}${full(pt?supLeft(x):x.amt).replace(" KRW","")}</span>`:""}</li>`}).join("")}
   // payment block: the amount to be paid (from the invoice) and its equivalent, in full; green once paid
   if(z.id==="paid"&&a.money&&(a.money.amount||a.money.tot.main)){const m=a.money, t=m.tot, main=t.main||[m.cur==="₩"?"KRW":m.cur,m.amount];
     const full=(v,c)=>`${Math.round(v).toLocaleString("ru-RU")} ${esc(c)}`, cls=m.pay==="paid"?"ok":"due";
@@ -1843,7 +1864,7 @@ function supRow(x,i){const ro=canWrite?"":"disabled";return `<div class="sups" d
   <input class="s_amt" inputmode="numeric" value="${x.amt!=null&&x.amt!==""?Number(x.amt).toLocaleString("ru-RU"):""}" placeholder="—" aria-label="Сумма поставщику, KRW" ${ro}>
   <input class="s_date" type="date" value="${esc(x.date||"")}" aria-label="Поставка к" ${ro}>
   <select class="s_st" aria-label="Статус срока" ${ro}>${Object.entries(SUPST).map(([k,v])=>`<option value="${k}" ${x.st===k?"selected":""}>${v}</option>`).join("")}</select>
-  <label class="chk" style="color:var(--ink)"><input type="checkbox" class="s_paid" ${x.paid?"checked":""} ${ro}> оплачен</label>
+  <span class="spay"><label class="chk" style="color:var(--ink)"><input type="checkbox" class="s_paid" ${x.paid?"checked":""} ${ro}> оплачен</label><input class="s_pamt" inputmode="decimal" value="${!x.paid&&Number(x.paidAmt)?Number(x.paidAmt).toLocaleString("ru-RU"):""}" data-at="${esc(x.paidAt||"")}" placeholder="частично: сумма / %" title="Оплачено частично: сумма в KRW или процент, например 50%" aria-label="Оплачено частично" ${ro}></span>
   ${canWrite?`<button type="button" class="x" data-rm="${i}" aria-label="Убрать поставщика">✕</button>`:"<span></span>"}</div>`}
 function renderSups(list){
   if(!list.length)list=[{name:"",what:"",date:"",st:"none"}];
@@ -1852,10 +1873,10 @@ function renderSups(list){
   $("supNames").innerHTML=[...names].sort().map(n=>`<option value="${esc(n)}">`).join("");
   supSum();
 }
-function readSups(){return [...$("supList").querySelectorAll(".sups[data-i]")].map(r=>({name:r.querySelector(".s_name").value.trim(),what:r.querySelector(".s_what").value.trim(),date:r.querySelector(".s_date").value,amt:num(r.querySelector(".s_amt").value),st:r.querySelector(".s_st").value,paid:r.querySelector(".s_paid").checked}))}
+function readSups(){return [...$("supList").querySelectorAll(".sups[data-i]")].map(r=>({name:r.querySelector(".s_name").value.trim(),what:r.querySelector(".s_what").value.trim(),date:r.querySelector(".s_date").value,amt:num(r.querySelector(".s_amt").value),st:r.querySelector(".s_st").value,paid:r.querySelector(".s_paid").checked,...supPaidPart(r)}))}
 function supSum(){
   const L=readSups().filter(x=>x.name||x.date), m=supMax(L), ok=L.filter(x=>x.st==="confirmed"&&x.date).length;
-  const tot=L.reduce((s,x)=>s+(x.amt||0),0), due=L.filter(x=>!x.paid).reduce((s,x)=>s+(x.amt||0),0);
+  const tot=L.reduce((s,x)=>s+(x.amt||0),0), due=L.reduce((s,x)=>s+supLeft(x),0);
   $("supSum").textContent=L.length?`Весь товар будет к ${m?fd(m):"—"} (по последнему поставщику) · подтверждено ${ok} из ${L.length}`+(tot?` · поставщикам всего ${fm(tot,"KRW")}, к оплате ${fm(due,"KRW")}`:""):"";
 }
 $("supAdd").onclick=()=>{const L=readSups();L.push({name:"",what:"",date:"",st:"none"});renderSups(L);sched();const rs=$("supList").querySelectorAll(".s_name");rs[rs.length-1].focus()};
@@ -2666,7 +2687,7 @@ function compactCard(o){
       t.eq.forEach(([k,v])=>r.push(["Эквивалент",amt(v,k),"n eqv"]));sec.push(["Покупатель",r])}}
   const money=[];
   if(sh.has("sup")){const L=sups(o).filter(x=>x.name);
-    L.forEach(x=>money.push([esc(x.name)+(x.paid?` <small class="ok-t">оплачен</small>`:""),x.amt?amt(x.amt,"KRW"):`<span class="ccno">сумма не указана</span>`,"n"]));
+    L.forEach(x=>money.push([esc(x.name)+(x.paid?` <small class="ok-t">оплачен</small>`:supPart(x)?` <small class="ccp">оплачено ${x.amt?Math.round(x.paidAmt/x.amt*100)+"%":amt(x.paidAmt,"KRW")}, осталось ${amt(supLeft(x),"KRW")}</small>`:""),x.amt?amt(x.amt,"KRW"):`<span class="ccno">сумма не указана</span>`,"n"]));
     const tot=L.reduce((t,x)=>t+(Number(x.amt)||0),0);
     if(L.length>1&&tot)money.push(["Итого поставщикам",amt(tot,"KRW"),"n tot"]);
     if(money.length)sec.push(["Поставщикам",money.splice(0)])}
@@ -2767,6 +2788,9 @@ $("docsAll").addEventListener("change",async e=>{
   const files=(o.files||[]).map(f=>{if(f.aid!==s.dataset.dkind)return f;const n={...f,kind:s.value};if(s.value==="cs"&&!n.signer)n.signer=guessSigner(f.name)||"ti";if(s.value!=="cs")delete n.signer;return n});
   try{await db.collection("orders").doc(o.id).update({files,updatedAt:new Date().toISOString()})}catch(err){showStatus("Не получилось сменить тип ("+(err&&err.code||"ошибка")+").",true)}
 });
+
+// the date of a part payment is the day it was typed in
+$("supList").addEventListener("input",e=>{if(e.target.classList&&e.target.classList.contains("s_pamt"))e.target.dataset.at=isoToday()});
 
 /* export declaration file name: «M-34 ЭД 49 024 800 KRW (5 913 862 JPY).pdf»
    amount = Commercial invoice total (order amount if no invoice has been read yet), equivalent from the invoice when it has one.
