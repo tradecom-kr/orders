@@ -592,6 +592,19 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .fwho{color:var(--muted);font-size:11px}
 .online{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .online i{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none;box-shadow:0 0 0 3px var(--ok-soft)}
+/* file list in the order: the name gets the full width on its own line; type, signature and buttons sit below it */
+#fileList .frow{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"fn fn" "ty ac";gap:6px 10px;align-items:center;padding:10px 12px}
+#fileList .frow>span:first-child{grid-area:ty;flex-direction:row!important;flex-wrap:wrap;align-items:center!important;gap:6px}
+#fileList .frow>span:first-child .fsign{margin-top:0!important;max-width:260px}
+#fileList .frow>.fn{grid-area:fn;overflow-wrap:normal;word-break:normal;font-weight:500}
+#fileList .frow>.fn small{display:inline;margin-left:8px;font-size:11.5px}
+#fileList .frow>.fn .ext{margin-right:6px}
+#fileList .frow>.acts{grid-area:ac;gap:4px}
+#fileList .frow>.acts .btn{padding:4px 9px;font-size:12px}
+#fileList .frow .confirm{grid-column:1/-1}
+@media (max-width:640px){#fileList .frow{grid-template-columns:minmax(0,1fr);grid-template-areas:"fn" "ty" "ac"}#fileList .frow>.fn small{display:block;margin-left:0}}
+#fileList .fkind{max-width:230px}
+#fileList .frow>span:first-child .fsign{max-width:210px}
 </style>
 
 </head>
