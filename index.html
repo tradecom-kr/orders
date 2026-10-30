@@ -590,6 +590,8 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .psl li.sub.supl .samt,.psl li.sub.supl .sdt{margin-left:auto}
 @media (min-width:641px){.pbar>.pseg>.psl>li{padding-right:8px}}
 .fwho{color:var(--muted);font-size:11px}
+.online{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.online i{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none;box-shadow:0 0 0 3px var(--ok-soft)}
 </style>
 
 </head>
@@ -2581,8 +2583,11 @@ function viewDialog(){
 // views and the list of people live next to the orders; wait until the database is connected
 (function waitDb(){if(!db){setTimeout(waitDb,400);return}
   const me=meEmail();
-  if(me.includes("@"))db.collection("users").doc(viewId(me)).set({email:me,seen:new Date().toISOString()}).catch(()=>{});
-  db.collection("users").onSnapshot(snap=>{users={};snap.docs.filter(x=>x.exists).forEach(x=>users[x.id]=x.data());fillViewSel()},()=>{});
+  // presence: while the board is open and visible, each person marks themselves every minute
+  const beat=()=>{if(me.includes("@")&&document.visibilityState!=="hidden")Promise.resolve(db.collection("users").doc(viewId(me)).set({email:me,seen:new Date().toISOString()})).catch(()=>{})};
+  beat();setInterval(beat,60000);document.addEventListener("visibilitychange",beat);
+  db.collection("users").onSnapshot(snap=>{users={};snap.docs.filter(x=>x.exists).forEach(x=>users[x.id]=x.data());fillViewSel();showOnline()},()=>{});
+  setInterval(showOnline,30000);
   db.collection("views").onSnapshot(snap=>{views={};snap.docs.filter(x=>x.exists).forEach(x=>views[x.id]=x.data());fillViewSel();applyView();render()},()=>{});
 })();
 
@@ -2621,6 +2626,17 @@ function compactCard(o){
 }
 {const _card=cardHTML;cardHTML=function(o){return !o.arch&&myView().compact?compactCard(o):_card(o)};}
 document.addEventListener("click",e=>{const b=e.target.closest("[data-ccdl]");if(b){e.preventDefault();e.stopPropagation();downloadFile(b.dataset.ccdl,b.dataset.oid)}},true);
+
+// who has the board open right now (seen in the last 2.5 minutes), next to the view switch
+function showOnline(){
+  let el=$("online");
+  if(!el){const bar=document.querySelector(".vwbar");if(!bar)return;el=document.createElement("span");el.id="online";el.className="online";bar.parentNode.insertBefore(el,bar)}
+  const me=meEmail(), now=Date.now();
+  const on=Object.values(users).filter(u=>u&&u.email&&String(u.email).toLowerCase()!==me&&u.seen&&now-new Date(u.seen).getTime()<150000).map(u=>String(u.email).toLowerCase()).sort();
+  el.hidden=!on.length;
+  el.title=on.length?"Сейчас на доске: "+on.join(", "):"";
+  el.innerHTML=on.length?`<i aria-hidden="true"></i>Сейчас: ${on.map(e=>esc(e.split("@")[0])).join(", ")}`:"";
+}
 
 /* export declaration file name: «M-34 ЭД 49 024 800 KRW (5 913 862 JPY).pdf»
    amount = Commercial invoice total (order amount if no invoice has been read yet), equivalent from the invoice when it has one.
