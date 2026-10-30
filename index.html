@@ -2010,14 +2010,14 @@ async function uploadFiles(list){
   if(!added.length)return;
   const files=[...(editing.files||[]).filter(f=>!repl||f.aid!==repl.aid),...added];
   try{await db.collection("orders").doc(editing.id).update({files,updatedAt:new Date().toISOString()});editing.files=files;renderFiles();refreshDerived();
-      $("upNote").textContent=(repl?`Заменено: «${repl.name}» → `:"Загружено: ")+added.map(a=>a.name).join(", ");
+      $("upNote").textContent=(repl?`Заменено: «${repl.name}» → `:"Загружено: ")+added.map(a=>a.name+" → "+(KIND[a.kind]||"Прочее")).join(", ");upSticky={t:Date.now(),txt:$("upNote").textContent};
       if(repl&&assets)assets.delete(repl.aid).catch(()=>{});
       if(expList.length){const l=[];for(const f of expList)l.push({bytes:new Uint8Array(await f.arrayBuffer()),name:f.name});applyExpNo(l,false)}
       autofillFiles(await Promise.all([...list].map(async f=>({bytes:new Uint8Array(await f.arrayBuffer()),name:f.name}))),true);
       if(calcList.length)await autoSplitCalc(calcList);
       await applyPayments(added)}
   catch(e){$("upNote").textContent="Файлы загружены, но не привязались к заказу ("+(e&&e.code||"ошибка")+"). Попробуйте ещё раз."}
-  $("upFile").value="";
+  $("upFile").value="";if($("upKind")){$("upKind").value="";if($("upSigner"))$("upSigner").hidden=true}
 }
 async function downloadFile(aid,oid){
   const o=orders.find(x=>x.id===oid)||editing, f=(o&&o.files||[]).find(x=>x.aid===aid);
@@ -2718,8 +2718,8 @@ renderDocsAll=function(){
     return `<div class="dfl"><span class="ext ${ext}">${ext||"файл"}</span><span class="dfn">`
       +(view?`<a href="#" data-view="${esc(f.aid)}" data-oid="${esc(o.id)}" data-sibs="${esc((o.files||[]).filter(x=>kindOf(x.kind)===kindOf(f.kind)).map(x=>x.aid).join(","))}">${esc(f.name)}</a>`:`<button type="button" class="lnkb" data-dl="${esc(f.aid)}" data-oid="${esc(o.id)}">${esc(f.name)}</button>`)
       +`<small>${fWhen(f)}${tag?" · "+esc(tag):""}</small>`
-      +(odd?`<small class="warn-t">⚠ по названию похоже на «${esc(KIND[g]||g)}» — проверьте тип</small>`:"")
-      +`</span><span class="da">${kindSel}<button type="button" class="ib" data-dl="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Скачать" aria-label="Скачать ${esc(f.name)}">⬇</button>${canWrite?`<button type="button" class="ib danger" data-fdel="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Удалить" aria-label="Удалить ${esc(f.name)}">✕</button>`:""}</span></div>`;
+      +(odd?`<small class="warn-t">⚠ по названию похоже на «${esc(KIND[g]||g)}» — проверьте тип в заказе</small>`:"")
+      +`</span><span class="da"><button type="button" class="ib" data-dl="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Скачать" aria-label="Скачать ${esc(f.name)}">⬇</button>${canWrite?`<button type="button" class="ib danger" data-fdel="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Удалить" aria-label="Удалить ${esc(f.name)}">✕</button>`:""}</span></div>`;
   };
   const blocks=rowsO.map(o=>{
     const fs=o.files||[], pics=fs.filter(isPic), docs=fs.filter(f=>!isPic(f));
