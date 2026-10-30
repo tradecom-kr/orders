@@ -1167,7 +1167,9 @@ function renderOverview(){
   // newest deal on top: by deal date, then by creation time, then by number
   // a deal without a contract date counts from the day it was created; Latin M and Cyrillic М compare by the digits
   const key=o=>String(o.date||o.createdAt||"").slice(0,10), nn=o=>parseInt(String(o.num||"").replace(/\D+/g," ").trim().split(" ").pop())||0;
-  const vis=visible().sort((x,y)=>key(y).localeCompare(key(x))||nn(y)-nn(x)||String(y.createdAt||"").localeCompare(String(x.createdAt||"")));
+  // live deals: the one added to the board last is on top, whatever its contract date; the archive follows, newest deal date first
+  const added=o=>String(o.createdAt||o.date||"");
+  const vis=visible().sort((x,y)=>(!!x.arch-!!y.arch)||(x.arch?key(y).localeCompare(key(x)):added(y).localeCompare(added(x)))||nn(y)-nn(x));
   foldBtnText();
   $("ovl").innerHTML=vis.map(cardHTML).join("")||(orders.length?`<div class="status">Нет заказов под этот фильтр.</div>`:"");
 }
