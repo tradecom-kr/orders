@@ -1069,7 +1069,7 @@ document.addEventListener("click",e=>{
 });
 // equivalent from the commercial invoices, next to the order amount: «≈ 9 702 430 JPY»
 // the invoice's own figure in the other currency — «Total Invoice Value» or «Equivalent Value», exactly as written there
-const eqOf=o=>(o.files||[]).filter(f=>kindOf(f.kind)==="ipl"&&(f.eq||f.inv)).reduce((t,f)=>{for(const[k,v]of Object.entries({...(f.inv||{}),...(f.eq||{})}))if(v&&k!==(o.cur||"KRW"))t[k]=(t[k]||0)+v;return t},{});
+const eqOf=o=>{const t=invTotals(o),c=o.cur||"KRW",r={};if(t.main&&t.main[0]!==c)r[t.main[0]]=t.main[1];t.eq.forEach(([k,v])=>{if(k!==c)r[k]=v});return r};
 const eqText=o=>Object.entries(eqOf(o)).map(([k,v])=>` / <span class="eqv" title="Сумма из Commercial invoice">${Math.round(v).toLocaleString("ru-RU")} ${esc(k)}</span>`).join("");
 function keyDates(o,loaded){
   const port=stepDone(o,"port"), dcls=(d,done)=>!d||done?"":days(d)<0?"bad":days(d)<=3?"warn":"";
@@ -2365,13 +2365,16 @@ async function isCalcBook(bytes){
 async function autoSplitCalc(srcs){ // srcs: [{rec, bytes}]
   if(!editing || !editing.id || !assets) return;
   const note = t => { $("upNote").textContent = t; };
-  let files = [...(editing.files || [])], made = [], gone = [];
+  let files = [...(editing.files || [])], made = [], gone = []; const skipped = [];
+  // a document already uploaded as its own file wins: the calculation does not add a second copy of it
+  const ownKinds = new Set(files.filter(f => f.from !== "calc").map(f => kindOf(f.kind)));
   for(const { rec, bytes } of srcs){
     let parts;
     try{ note("Разбираю калькуляцию на документы…"); parts = await splitCalcBook(bytes); }
     catch(e){ note("Не получилось разобрать калькуляцию (" + (e && e.message || "ошибка") + ")."); continue; }
     const base = String(editing.num || rec.name.replace(/\.[^.]+$/, "")).trim();
     for(const part of parts){
+      if(ownKinds.has(part.kind)){ skipped.push(part); continue; }
       try{
         const b64 = await toB64(new Blob([part.bytes], { type: XLSX_MIME }));
         const r = await assets.upload(new Blob([b64], { type: "text/plain" }), { type: "text/plain" });
@@ -2384,14 +2387,15 @@ async function autoSplitCalc(srcs){ // srcs: [{rec, bytes}]
       }catch(e){ note("Не получилось сохранить «" + part.sheet + "» (" + (e && e.code || "ошибка") + ")."); }
     }
   }
-  if(!made.length) return;
+  const skipTxt = skipped.length ? " Не добавлено, потому что уже загружено отдельным файлом: " + [...new Set(skipped.map(p => KIND[p.kind] || p.kind))].join(", ") + "." : "";
+  if(!made.length){ if(skipTxt) note(skipTxt.trim()); return; }
   try{
     await db.collection("orders").doc(editing.id).update({ files, updatedAt: new Date().toISOString() });
     editing.files = files; renderFiles(); refreshDerived();
     gone.forEach(id => assets.delete(id).catch(() => {}));
     const cnt = k => made.filter(p => p.kind === k).length;
     note("Из калькуляции добавлено: " + [cnt("kp") && "КП", cnt("po") && `заказ поставщику ×${cnt("po")}`, cnt("ipl") && `инвойс и упаковочный ×${cnt("ipl")}`].filter(Boolean).join(", ")
-      + ". Любой из них можно удалить или заменить своим файлом.");
+      + ". Любой из них можно удалить или заменить своим файлом." + skipTxt);
   }catch(e){ note("Документы из калькуляции не привязались к заказу (" + (e && e.code || "ошибка") + ")."); }
 }
 // a calculation already on the board can be split again from its row
@@ -2625,7 +2629,9 @@ const _normBase=normalize;
 const nsp=n=>Math.round(n).toLocaleString("ru-RU").replace(/\s/g," ");
 function invTotals(o){
   const inv={},eq={};
-  for(const f of (o.files||[]))if(kindOf(f.kind)==="ipl"){
+  // an invoice uploaded as its own file replaces the one cut out of the calculation, so the two are not added up
+  const ipl=(o.files||[]).filter(f=>kindOf(f.kind)==="ipl"), own=ipl.filter(f=>f.from!=="calc"&&(Object.keys(f.inv||{}).length||Object.keys(f.eq||{}).length));
+  for(const f of (own.length?own:ipl)){
     for(const[k,v]of Object.entries(f.inv||{}))if(v)inv[k]=(inv[k]||0)+v;
     for(const[k,v]of Object.entries(f.eq||{}))if(v)eq[k]=(eq[k]||0)+v}
   const cur=o.cur||"KRW";
