@@ -1978,7 +1978,7 @@ function guessKind(name){const n=String(name).toLowerCase();
   if(w(/запрос[\s_-]*на[\s_-]*оплат|지급[\s_]*요청|payment[\s_-]*request/))return "payreq";
   if(w(/калькул|calc|расч[её]т|(^|[^a-z])rasch/))return "calc";
   if(w(/коммерческ|предложени|offer|(^|[^а-яёa-z])кп([^а-яёa-z]|$)/))return "kp";
-  if(w(/спец|spec|контракт|contract|договор/))return "cs";
+  if(w(/спец|spec|контракт|contract|договор|соглашени|addend|supplementary|amendment|계약/))return "cs";
   if(w(/invoice|инвойс|packing|упак/))return "ipl";
   if(w(/발주|purchase|(^|[^a-z])po([^a-z]|$)/))return "po";
   if(w(/exp\.?[\s_-]*dates?|expir|best[\s_-]*before|срок[а-я]*[\s_-]*годн|유통기한/))return "expd";
@@ -2761,7 +2761,7 @@ renderDocsAll=function(){
   const fileRow=(o,f)=>{
     const ext=extOf(f.name), view=f.enc==="raw"&&/pdf|image/.test(f.mime||"")||/^(docx|xlsx|xls|xlsm|csv)$/.test(ext);
     if(fDel===f.aid)return `<div class="dfl del"><span>Удалить «${esc(f.name)}»?</span><span class="da"><button type="button" class="ib danger" data-fdelyes="${esc(f.aid)}" data-oid="${esc(o.id)}">Да</button><button type="button" class="ib" data-fcancel>Нет</button></span></div>`;
-    const tag=kindOf(f.kind)==="cs"&&f.signer&&SIGN[f.signer]?SIGN[f.signer][2]:f.from==="calc"?"из калькуляции":"";
+    const tag=kindOf(f.kind)==="cs"?[csPart(f.orig||f.name),f.signer&&SIGN[f.signer]?SIGN[f.signer][2]:""].filter(Boolean).join(" · "):f.from==="calc"?"из калькуляции":"";
     const g=guessKind(f.orig||f.name), odd=g&&g!==kindOf(f.kind)&&f.from!=="calc"&&!f.pm&&!(g==="calc"&&kindOf(f.kind)==="kp"&&/offer/i.test(f.name));
     const kindSel=canWrite?`<select class="dks" data-dkind="${esc(f.aid)}" data-oid="${esc(o.id)}" aria-label="Тип «${esc(f.name)}»" title="Сменить тип">${KINDS.map(([k,v])=>`<option value="${k}" ${kindOf(f.kind)===k?"selected":""}>${esc(v)}</option>`).join("")}</select>`:"";
     return `<div class="dfl"><span class="ext ${ext}">${ext||"файл"}</span><span class="dfn">`
@@ -2779,7 +2779,7 @@ renderDocsAll=function(){
     if(cur&&!docs.some(f=>kindOf(f.kind)===cur)&&!(cur==="photo"&&(pics.length||linkOK(o.photoLink))))return "";
     const rows=list.map(k=>{
       let h="";
-      const L=docs.filter(f=>kindOf(f.kind)===k).sort((a,b)=>k==="cs"?sigOrder(a.signer)-sigOrder(b.signer):String(b.at||"").localeCompare(String(a.at||"")));
+      const L=docs.filter(f=>kindOf(f.kind)===k).sort((a,b)=>k==="cs"?CS_PARTS.indexOf(csPart(a.orig||a.name))-CS_PARTS.indexOf(csPart(b.orig||b.name))||sigOrder(a.signer)-sigOrder(b.signer):String(b.at||"").localeCompare(String(a.at||"")));
       nFiles+=L.length;h+=L.map(f=>fileRow(o,f)).join("");
       if(k==="photo"){
         if(linkOK(o.photoLink))h+=`<div class="dfl"><a href="${esc(o.photoLink.trim())}" target="_blank" rel="noopener" data-ext>📁 Google Диск ↗</a></div>`;
@@ -2802,6 +2802,13 @@ $("docsAll").addEventListener("change",async e=>{
 
 // the date of a part payment is the day it was typed in
 $("supList").addEventListener("input",e=>{if(e.target.classList&&e.target.classList.contains("s_pamt"))e.target.dataset.at=isoToday()});
+
+// «Контракт и спецификация» may come as separate papers: contract, supplementary agreement, specification — told apart by the file name
+const CS_PARTS=["Контракт и спецификация","Контракт","Доп. соглашение","Спецификация",""];
+function csPart(name){const n=String(name||"").toLowerCase();
+  if(/доп[\s._-]*(соглаш|согл)|дополнительн\S*\s+соглаш|addend|supplement|amendment|추가\s*약정|부속\s*합의/.test(n))return "Доп. соглашение";
+  const c=/контракт|договор|contract|계약/.test(n), sp=/спецификац|(^|[^a-z])spec|명세/.test(n);
+  return c&&sp?"Контракт и спецификация":c?"Контракт":sp?"Спецификация":"";}
 
 /* export declaration file name: «M-34 ЭД 49 024 800 KRW (5 913 862 JPY).pdf»
    amount = Commercial invoice total (order amount if no invoice has been read yet), equivalent from the invoice when it has one.
