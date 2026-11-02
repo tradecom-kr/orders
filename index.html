@@ -1979,7 +1979,7 @@ function guessKind(name){const n=String(name).toLowerCase();
   if(w(/калькул|calc|расч[её]т|(^|[^a-z])rasch/))return "calc";
   if(w(/коммерческ|предложени|offer|(^|[^а-яёa-z])кп([^а-яёa-z]|$)/))return "kp";
   if(w(/спец|spec|контракт|contract|договор|соглашени|addend|supplementary|amendment|계약/))return "cs";
-  if(w(/invoice|инвойс|packing|упак/))return "ipl";
+  if(w(/invoice|инвойс|packing|упак|проформ|pro[\s_-]*forma|인보이스|송장/))return "ipl";
   if(w(/발주|purchase|(^|[^a-z])po([^a-z]|$)/))return "po";
   if(w(/exp\.?[\s_-]*dates?|expir|best[\s_-]*before|срок[а-я]*[\s_-]*годн|유통기한/))return "expd";
   if(w(/export|экспорт|수출|면장/))return "exp";
@@ -2761,7 +2761,8 @@ renderDocsAll=function(){
   const fileRow=(o,f)=>{
     const ext=extOf(f.name), view=f.enc==="raw"&&/pdf|image/.test(f.mime||"")||/^(docx|xlsx|xls|xlsm|csv)$/.test(ext);
     if(fDel===f.aid)return `<div class="dfl del"><span>Удалить «${esc(f.name)}»?</span><span class="da"><button type="button" class="ib danger" data-fdelyes="${esc(f.aid)}" data-oid="${esc(o.id)}">Да</button><button type="button" class="ib" data-fcancel>Нет</button></span></div>`;
-    const tag=kindOf(f.kind)==="cs"?[csPart(f.orig||f.name),f.signer&&SIGN[f.signer]?SIGN[f.signer][2]:""].filter(Boolean).join(" · "):f.from==="calc"?"из калькуляции":"";
+    const tag=kindOf(f.kind)==="cs"?[csPart(f.orig||f.name),f.signer&&SIGN[f.signer]?SIGN[f.signer][2]:""].filter(Boolean).join(" · ")
+      :kindOf(f.kind)==="ipl"?[iplPart(f.orig||f.name),f.from==="calc"?"из калькуляции":""].filter(Boolean).join(" · "):f.from==="calc"?"из калькуляции":"";
     const g=guessKind(f.orig||f.name), odd=g&&g!==kindOf(f.kind)&&f.from!=="calc"&&!f.pm&&!(g==="calc"&&kindOf(f.kind)==="kp"&&/offer/i.test(f.name));
     const kindSel=canWrite?`<select class="dks" data-dkind="${esc(f.aid)}" data-oid="${esc(o.id)}" aria-label="Тип «${esc(f.name)}»" title="Сменить тип">${KINDS.map(([k,v])=>`<option value="${k}" ${kindOf(f.kind)===k?"selected":""}>${esc(v)}</option>`).join("")}</select>`:"";
     return `<div class="dfl"><span class="ext ${ext}">${ext||"файл"}</span><span class="dfn">`
@@ -2779,7 +2780,7 @@ renderDocsAll=function(){
     if(cur&&!docs.some(f=>kindOf(f.kind)===cur)&&!(cur==="photo"&&(pics.length||linkOK(o.photoLink))))return "";
     const rows=list.map(k=>{
       let h="";
-      const L=docs.filter(f=>kindOf(f.kind)===k).sort((a,b)=>k==="cs"?CS_PARTS.indexOf(csPart(a.orig||a.name))-CS_PARTS.indexOf(csPart(b.orig||b.name))||sigOrder(a.signer)-sigOrder(b.signer):String(b.at||"").localeCompare(String(a.at||"")));
+      const L=docs.filter(f=>kindOf(f.kind)===k).sort((a,b)=>k==="cs"?CS_PARTS.indexOf(csPart(a.orig||a.name))-CS_PARTS.indexOf(csPart(b.orig||b.name))||sigOrder(a.signer)-sigOrder(b.signer):k==="ipl"?IPL_PARTS.indexOf(iplPart(a.orig||a.name))-IPL_PARTS.indexOf(iplPart(b.orig||b.name))||String(b.at||"").localeCompare(String(a.at||"")):String(b.at||"").localeCompare(String(a.at||"")));
       nFiles+=L.length;h+=L.map(f=>fileRow(o,f)).join("");
       if(k==="photo"){
         if(linkOK(o.photoLink))h+=`<div class="dfl"><a href="${esc(o.photoLink.trim())}" target="_blank" rel="noopener" data-ext>📁 Google Диск ↗</a></div>`;
@@ -2815,11 +2816,19 @@ function csPart(name){const n=String(name||"").toLowerCase();
    Worked out every time an order is read, so it follows the invoice and also covers declarations uploaded earlier. */
 const _normBase=normalize;
 const nsp=n=>Math.round(n).toLocaleString("ru-RU").replace(/\s/g," ");
+// «Инвойс и упаковочный лист» may come as separate papers too: told apart by the file name
+const IPL_PARTS=["Инвойс и упаковочный лист","Инвойс","Упаковочный лист","Проформа-инвойс",""];
+function iplPart(name){const n=String(name||"").toLowerCase();
+  if(/pro[\s_-]*forma|проформ|견적\s*송장/.test(n))return "Проформа-инвойс";
+  const i=/invoice|инвойс|счёт-фактур|счет-фактур|인보이스|송장/.test(n), p=/packing|упаков|паккинг|포장/.test(n);
+  return i&&p?"Инвойс и упаковочный лист":i?"Инвойс":p?"Упаковочный лист":"";}
 function invTotals(o){
   const inv={},eq={};
   // an invoice uploaded as its own file replaces the one cut out of the calculation, so the two are not added up
   const ipl=(o.files||[]).filter(f=>kindOf(f.kind)==="ipl"), own=ipl.filter(f=>f.from!=="calc"&&(Object.keys(f.inv||{}).length||Object.keys(f.eq||{}).length));
-  for(const f of (own.length?own:ipl)){
+  // a proforma is replaced by the commercial invoice once that one is read
+  let use=own.length?own:ipl;const fin=use.filter(f=>iplPart(f.orig||f.name)!=="Проформа-инвойс"&&(Object.keys(f.inv||{}).length||Object.keys(f.eq||{}).length));if(fin.length)use=fin;
+  for(const f of use){
     for(const[k,v]of Object.entries(f.inv||{}))if(v)inv[k]=(inv[k]||0)+v;
     for(const[k,v]of Object.entries(f.eq||{}))if(v)eq[k]=(eq[k]||0)+v}
   const cur=o.cur||"KRW";
