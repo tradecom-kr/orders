@@ -865,7 +865,7 @@ const PHASES=[
   {id:"docs",  t:"Документы",   steps:["kp","cs","cs2","ipl"]},
   {id:"sched", t:"График",      steps:["vessel","supconf"]},
   {id:"pay",   t:"Оплата",      steps:["paid","bank"]},
-  {id:"suppay",t:"Поставщики",  steps:["suppay","payreq"]},
+  {id:"suppay",t:"Поставщики",  steps:["suppay"]},
   {id:"load",  t:"Загрузка",    steps:["place","exp","photo","expd"]},
   {id:"port",  t:"Порт",        steps:["port","bl","freight","broker"]},
   {id:"closed",t:"Успех",       steps:["closed"]}
@@ -1098,7 +1098,9 @@ function stLi(z,a){
     if(L.length)h+=(all?`<li class="sub money r1 ${due?"due":"ok"}"${cf} title="${due?"К оплате поставщикам":"Поставщикам оплачено"}">${full(due||all)}</li>`:`<li class="sub money">—</li>`)
       +L.map(x=>{const pt=supPart(x), md=d=>d?" "+String(d).slice(8,10)+"."+String(d).slice(5,7):"";
         const tip=x.name+(x.amt?" — "+full(x.amt):"")+(x.paid?" · оплачен":pt?` · оплачено${md(x.paidAt)} ${full(x.paidAmt)}${x.amt?" ("+Math.round(x.paidAmt/x.amt*100)+"%)":""}, осталось ${full(supLeft(x))}`:" · не оплачен");
-        return `<li class="sub supl sp ${x.paid?"ok":pt?"part":"no"}"${cf} title="${esc(tip)}"><span class="sn">${esc(x.name)}</span>${x.amt?`<span class="samt ${x.paid?"paid":""}">${pt&&x.amt?`<small>${Math.round(x.paidAmt/x.amt*100)}%</small> `:""}${full(pt?supLeft(x):x.amt).replace(" KRW","")}</span>`:""}</li>`}).join("")}
+        return `<li class="sub supl sp ${x.paid?"ok":pt?"part":"no"}"${cf} title="${esc(tip)}"><span class="sn">${esc(x.name)}</span>${x.amt?`<span class="samt ${x.paid?"paid":""}">${pt&&x.amt?`<small>${Math.round(x.paidAmt/x.amt*100)}%</small> `:""}${full(pt?supLeft(x):x.amt).replace(" KRW","")}</span>`:""}</li>`}).join("")
+    // the payment request is used on some orders only: a line when it is there, nothing (and no to-do) when it is not
+    {const pr=kindFiles(a.o,"payreq");if(pr.length)h+=`<li class="ok"${fOpen(a.o,pr)}>Запрос на оплату</li>`}}
   // payment block: the amount to be paid (from the invoice) and its equivalent, in full; green once paid
   if(z.id==="paid"&&a.money&&(a.money.amount||a.money.tot.main)){const m=a.money, t=m.tot, main=t.main||[m.cur==="₩"?"KRW":m.cur,m.amount];
     const full=(v,c)=>`${Math.round(v).toLocaleString("ru-RU")} ${esc(c)}`, cls=m.pay==="paid"?"ok":"due";
