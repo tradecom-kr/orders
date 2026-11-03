@@ -1152,7 +1152,7 @@ function stLi(z,a){
     {const pr=kindFiles(a.o,"payreq");if(pr.length)h+=`<li class="ok"${fOpen(a.o,pr)}>Запрос на оплату</li>`}}
   // payment block: the amount to be paid (from the invoice) and its equivalent, in full; green once paid
   if(z.id==="paid"&&a.money&&(a.money.amount||a.money.tot.main)){const m=a.money, t=m.tot, main=t.main||[m.cur==="₩"?"KRW":m.cur,m.amount];
-    const full=(v,c)=>`${Math.round(v).toLocaleString("ru-RU")} ${esc(c)}`, cls=m.pay==="paid"?"ok":"due";
+    const full=(v,c)=>`${amtOf(a.o,v,c)} ${esc(c)}`, cls=m.pay==="paid"?"ok":"due";
     const inv=fOpen(a.o,kindFiles(a.o,"ipl")), sentD=m.pay!=="paid"&&(a.o&&a.o.files||[]).filter(f=>f.pm).map(f=>f.pm.date||f.pm.done).filter(Boolean).sort().pop();
     h+=`<li class="sub money r1 ${cls}${sentD?" sent":""}"${inv} title="${m.pay==="paid"?"Оплачено":sentD?"Платёж отправлен "+sentD+", ждём поступления":"К оплате"}">${full(main[1],main[0])}</li>`+t.eq.map(([k,v])=>`<li class="sub money eqm"${inv}>${full(v,k)}</li>`).join("")}
   if(z.id==="supconf")h+=(a.sups||[]).map(x=>{const ok=x.st==="confirmed"&&x.date;const md=x.date?String(x.date).slice(5,7)+"."+String(x.date).slice(8,10):"";
@@ -1200,7 +1200,7 @@ document.addEventListener("click",e=>{
 // equivalent from the commercial invoices, next to the order amount: «≈ 9 702 430 JPY»
 // the invoice's own figure in the other currency — «Total Invoice Value» or «Equivalent Value», exactly as written there
 const eqOf=o=>{const t=invTotals(o),c=o.cur||"KRW",r={};if(t.main&&t.main[0]!==c)r[t.main[0]]=t.main[1];t.eq.forEach(([k,v])=>{if(k!==c)r[k]=v});return r};
-const eqText=o=>Object.entries(eqOf(o)).map(([k,v])=>` / <span class="eqv" title="Сумма из Commercial invoice">${Math.round(v).toLocaleString("ru-RU")} ${esc(k)}</span>`).join("");
+const eqText=o=>Object.entries(eqOf(o)).map(([k,v])=>` / <span class="eqv" title="Сумма из Commercial invoice">${amtOf(o,v,k)} ${esc(k)}</span>`).join("");
 function keyDates(o,loaded){
   const port=stepDone(o,"port"), dcls=(d,done)=>!d||done?"":days(d)<0?"bad":days(d)<=3?"warn":"";
   const box=(l,d,done,sub)=>`<div class="kdb ${dcls(d,done)} ${done?"ok":""}"><span class="kl">${l}</span><b>${d?String(d).slice(5,7)+"."+String(d).slice(8,10):"—"}${done?" ✓":""}</b></div>`;
@@ -2591,8 +2591,11 @@ async function makeNoSig(aid, btn){
 $("fileList").addEventListener("click", e => { const b = e.target.closest("[data-nosig]"); if(b) makeNoSig(b.dataset.nosig, b); });
 
 /* invoice totals: «Total Invoice Value (KRW)» and «Equivalent Value (JPY)» are read off the invoice sheets */
+// how many decimals the invoice itself shows for a number (from its formatted text, else from the value)
+function decOfCell(v){const w=String(v.w||"").trim();let m=w.match(/\.(\d+)\s*$/);if(m)return m[1].length;m=w.match(/,(\d{1,2})\s*$/);if(m)return m[1].length;
+  if(w)return 0;const s=String(Math.round(v.v*100)/100);return s.includes(".")?s.split(".")[1].length:0}
 function invEquiv(bytes){
-  const out={inv:{},eq:{},eqChecked:true};
+  const out={inv:{},eq:{},dec:{},eqChecked:true};
   try{
     const wb=XLSX.read(bytes,{type:"array"});
     const names=wb.SheetNames.length>1?wb.SheetNames.filter(n=>/INVOICE|ИНВОЙС/i.test(n)):wb.SheetNames;
@@ -2602,7 +2605,7 @@ function invEquiv(bytes){
       for(let r=R.s.r;r<=R.e.r;r++)for(let c=R.s.c;c<=R.e.c;c++){
         const cell=ws[XLSX.utils.encode_cell({r,c})]; if(!cell||typeof cell.v!=="string")continue;
         const m=cell.v.match(/(Equivalent|Total\s+Invoice)\s+Value\s*\(\s*([A-Z]{3})\s*\)/i); if(!m)continue;
-        for(let k=c+1;k<=Math.min(R.e.c,c+8);k++){const v=ws[XLSX.utils.encode_cell({r,c:k})]; if(v&&typeof v.v==="number"){const bag=/^Equiv/i.test(m[1])?out.eq:out.inv; bag[m[2].toUpperCase()]=(bag[m[2].toUpperCase()]||0)+v.v; break}}
+        for(let k=c+1;k<=Math.min(R.e.c,c+8);k++){const v=ws[XLSX.utils.encode_cell({r,c:k})]; if(v&&typeof v.v==="number"){const bag=/^Equiv/i.test(m[1])?out.eq:out.inv; bag[m[2].toUpperCase()]=(bag[m[2].toUpperCase()]||0)+v.v; const cu=m[2].toUpperCase(); out.dec[cu]=Math.max(out.dec[cu]||0,decOfCell(v)); break}}
       }
     }
   }catch(e){}
@@ -2611,7 +2614,7 @@ function invEquiv(bytes){
 // invoices uploaded before this existed get their totals read once, when the order is opened
 async function backfillEquiv(){
   if(!editing||!editing.id||!assets||!canWrite||!window.XLSX)return;
-  const todo=(editing.files||[]).filter(f=>kindOf(f.kind)==="ipl"&&/\.xlsx?$/i.test(f.name)&&!f.eqChecked);
+  const todo=(editing.files||[]).filter(f=>kindOf(f.kind)==="ipl"&&/\.xlsx?$/i.test(f.name)&&!(f.eqChecked&&f.dec));
   if(!todo.length)return;
   const id=editing.id, got={};
   for(const f of todo){try{got[f.aid]=invEquiv(await blobBytes(f))}catch(e){}}
@@ -2626,7 +2629,7 @@ async function backfillAllEquiv(){
   if(_eqBusy||!db||!assets||!canWrite||!window.XLSX)return;_eqBusy=true;
   try{
     for(const o of orders.slice()){
-      const todo=(o.files||[]).filter(f=>kindOf(f.kind)==="ipl"&&/\.xlsx?$/i.test(f.orig||f.name)&&!f.eqChecked&&!_eqTried.has(f.aid));
+      const todo=(o.files||[]).filter(f=>kindOf(f.kind)==="ipl"&&/\.xlsx?$/i.test(f.orig||f.name)&&!(f.eqChecked&&f.dec)&&!_eqTried.has(f.aid));
       if(!todo.length)continue;
       const got={};
       for(const f of todo){_eqTried.add(f.aid);try{got[f.aid]=invEquiv(await blobBytes(f))}catch(e){}}
@@ -2749,7 +2752,7 @@ function fileLink(o,f){
 }
 function compactCard(o){
   const sh=new Set(ccShow(myView())), fs=o.files||[];
-  const amt=(n,c)=>`${Math.round(n).toLocaleString("ru-RU")} ${esc(c)}`;
+  const amt=(n,c)=>`${amtOf(o,n,c)} ${esc(c)}`;
   // one table: section | name | amount or file — so amounts sit in one column and files in another
   const sec=[];  // [title, rows[[name, value, cls]]]
   if(sh.has("vessel")&&(o.vessel||"").trim())sec.push(["Судно",[[`<b>${esc(o.vessel)}</b>`,"","wide"]]]);
@@ -2886,7 +2889,10 @@ $("e_type").addEventListener("change",()=>{markImp();refreshDerived()});
    amount = Commercial invoice total (order amount if no invoice has been read yet), equivalent from the invoice when it has one.
    Worked out every time an order is read, so it follows the invoice and also covers declarations uploaded earlier. */
 const _normBase=normalize;
-const nsp=n=>Math.round(n).toLocaleString("ru-RU").replace(/\s/g," ");
+// amounts as the invoice shows them: its own number of decimals (2 when an older record has a fraction), no float noise
+const decGuess=v=>Math.abs(v-Math.round(v))>0.004?2:0;
+const nsp=(n,d)=>{d=d==null?decGuess(n):d;return Number(n).toLocaleString("ru-RU",{minimumFractionDigits:d,maximumFractionDigits:d}).replace(/\s/g," ")};
+const amtOf=(o,v,c)=>{const d=(invTotals(o).dec||{})[c];return nsp(v,d==null?decGuess(v):d)};
 // «Инвойс и упаковочный лист» may come as separate papers too: told apart by the file name
 const IPL_PARTS=["Инвойс и упаковочный лист","Инвойс","Упаковочный лист","Проформа-инвойс",""];
 function iplPart(name){const n=String(name||"").toLowerCase();
@@ -2894,19 +2900,20 @@ function iplPart(name){const n=String(name||"").toLowerCase();
   const i=/invoice|инвойс|счёт-фактур|счет-фактур|인보이스|송장/.test(n), p=/packing|упаков|паккинг|포장/.test(n);
   return i&&p?"Инвойс и упаковочный лист":i?"Инвойс":p?"Упаковочный лист":"";}
 function invTotals(o){
-  const inv={},eq={};
+  const inv={},eq={},dec={};
   // an invoice uploaded as its own file replaces the one cut out of the calculation, so the two are not added up
   const ipl=(o.files||[]).filter(f=>kindOf(f.kind)==="ipl"), own=ipl.filter(f=>f.from!=="calc"&&(Object.keys(f.inv||{}).length||Object.keys(f.eq||{}).length));
   // a proforma is replaced by the commercial invoice once that one is read
   let use=own.length?own:ipl;const fin=use.filter(f=>iplPart(f.orig||f.name)!=="Проформа-инвойс"&&(Object.keys(f.inv||{}).length||Object.keys(f.eq||{}).length));if(fin.length)use=fin;
   for(const f of use){
     for(const[k,v]of Object.entries(f.inv||{}))if(v)inv[k]=(inv[k]||0)+v;
-    for(const[k,v]of Object.entries(f.eq||{}))if(v)eq[k]=(eq[k]||0)+v}
+    for(const[k,v]of Object.entries(f.eq||{}))if(v)eq[k]=(eq[k]||0)+v;
+    for(const[k,d]of Object.entries(f.dec||{}))dec[k]=Math.max(dec[k]||0,d)}
   const cur=o.cur||"KRW";
   let main=inv[cur]!=null?[cur,inv[cur]]:Object.entries(inv)[0];
   if(!main&&Number(o.amount))main=[cur,Number(o.amount)];
   const others={...inv,...eq};if(main)delete others[main[0]];
-  return {main,eq:Object.entries(others)};
+  return {main,eq:Object.entries(others),dec};
 }
 function expNames(o){
   for(const f of (o.files||[]))if(f.orig&&kindOf(f.kind)!=="exp"){f.name=f.orig;delete f.orig}
@@ -2914,7 +2921,7 @@ function expNames(o){
   if(!ex.length)return o;
   const t=invTotals(o);
   let base=(o.num||"").trim()+" ЭД";
-  if(t.main)base+=` ${nsp(t.main[1])} ${t.main[0]}`+t.eq.map(([k,v])=>` (${nsp(v)} ${k})`).join("");
+  if(t.main)base+=` ${nsp(t.main[1],t.dec[t.main[0]])} ${t.main[0]}`+t.eq.map(([k,v])=>` (${nsp(v,t.dec[k])} ${k})`).join("");
   ex.forEach((f,i)=>{
     f.orig=f.orig||f.name;
     const m=String(f.orig).match(/\.[A-Za-z0-9]{1,5}$/);
