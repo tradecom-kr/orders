@@ -679,6 +679,15 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .pseg.part .pl{color:var(--accent);opacity:.8}
 .pseg.gap .tr{box-shadow:inset 0 0 0 1px var(--warn)}
 .pseg.gap .pl{color:var(--warn)}
+/* stage bar as arrows: each stage is a chevron pointing the way the deal goes (→ export, ← import) */
+.pbar .pseg .tr{height:14px;border-radius:0!important;box-shadow:none!important;background:var(--soft);
+  clip-path:polygon(0 0,calc(100% - 8px) 0,100% 50%,calc(100% - 8px) 100%,0 100%,8px 50%)}
+.pbar .pseg:first-child .tr{clip-path:polygon(0 0,calc(100% - 8px) 0,100% 50%,calc(100% - 8px) 100%,0 100%)}
+.oc.imp .pbar .pseg .tr,#dlg.imp #dPh .pbar .pseg .tr{clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 50%,100% 100%,8px 100%,0 50%)}
+.oc.imp .pbar .pseg:first-child .tr,#dlg.imp #dPh .pbar .pseg:first-child .tr{clip-path:polygon(8px 0,100% 0,100% 100%,8px 100%,0 50%)}
+.pbar{column-gap:1px!important}
+.pseg.gap .tr{background:color-mix(in srgb,var(--warn) 22%,var(--soft))!important}
+.pseg.now.issue .tr{background:color-mix(in srgb,var(--danger) 18%,var(--soft))!important}
 </style>
 
 </head>
@@ -2898,7 +2907,7 @@ $("e_type").addEventListener("change",()=>{markImp();refreshDerived()});
 
 /* ---------- import runs the other way: stages from right to left, its own colour, a direction tag ---------- */
 {const _c2=cardHTML;cardHTML=function(o){let h=_c2(o);
-  if(isImp(o))h=h.replace('class="oc ','class="oc imp ').replace('<span class="num">',`<span class="dirtag imp" title="Импорт в Корею: процесс идёт справа налево">← Импорт</span><span class="num">`);
+  if(isImp(o))h=h.replace('class="oc ','class="oc imp ');
   return h};}
 
 /* export declaration file name: «M-34 ЭД 49 024 800 KRW (5 913 862 JPY).pdf»
