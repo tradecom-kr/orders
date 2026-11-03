@@ -654,6 +654,22 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .spay .s_pamt::placeholder{font-size:11px}
 .spay .s_pamt::placeholder{font-size:11px}
 #dlg.imp [data-sec="pay"],#dlg.imp [data-sec="sup"]{display:none!important}
+/* import: mirrored process — Заказ on the right, Успех on the left, fill from the right */
+.oc.imp,#dlg.imp{--imp:#6b4fa0}
+.oc.imp .pbar,#dlg.imp #dPh .pbar{direction:rtl;--accent:var(--imp)}
+.oc.imp .pbar>.pseg,#dlg.imp #dPh .pbar>.pseg{direction:ltr}
+.oc.imp .pseg .tr,#dlg.imp #dPh .pseg .tr{direction:rtl}
+.oc.imp .pseg:first-child .tr,#dlg.imp #dPh .pseg:first-child .tr{border-radius:0 6px 6px 0}
+.oc.imp .pseg:last-child .tr,#dlg.imp #dPh .pseg:last-child .tr{border-radius:6px 0 0 6px}
+.oc.imp .pseg .pl,.oc.imp .psl,#dlg.imp #dPh .pseg .pl,#dlg.imp #dPh .psl{text-align:right}
+.oc.imp .pseg.now .fl,#dlg.imp #dPh .pseg.now .fl{background:repeating-linear-gradient(45deg,var(--imp) 0 6px,color-mix(in srgb,var(--imp) 75%,var(--panel)) 6px 12px)}
+.oc.imp .kds{flex-direction:row-reverse}
+.oc.imp .kar{display:inline-block;transform:scaleX(-1)}
+.oc.imp{border-left:3px solid var(--imp)}
+.dirtag{font:600 11px var(--f-body);letter-spacing:.03em;padding:2px 8px;border-radius:999px;margin-right:8px;align-self:center}
+.dirtag.imp{color:var(--imp,#6b4fa0);background:color-mix(in srgb,#6b4fa0 12%,transparent)}
+.oc.imp .pbar,#dlg.imp #dPh .pbar{grid-template-columns:repeat(7,minmax(0,1fr))}
+.oc.imp .pdates{display:flex;justify-content:flex-end}
 </style>
 
 </head>
@@ -2845,6 +2861,11 @@ function csPart(name){const n=String(name||"").toLowerCase();
 function markImp(){const d=$("dlg");if(d)d.classList.toggle("imp",$("e_type")&&$("e_type").value==="imp")}
 $("e_type").addEventListener("change",()=>{markImp();refreshDerived()});
 {const _oe=openEditor;openEditor=function(){const r=_oe.apply(this,arguments);markImp();return r};}
+
+/* ---------- import runs the other way: stages from right to left, its own colour, a direction tag ---------- */
+{const _c2=cardHTML;cardHTML=function(o){let h=_c2(o);
+  if(isImp(o))h=h.replace('class="oc ','class="oc imp ').replace('<span class="num">',`<span class="dirtag imp" title="Импорт в Корею: процесс идёт справа налево">← Импорт</span><span class="num">`);
+  return h};}
 
 /* export declaration file name: «M-34 ЭД 49 024 800 KRW (5 913 862 JPY).pdf»
    amount = Commercial invoice total (order amount if no invoice has been read yet), equivalent from the invoice when it has one.
