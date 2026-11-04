@@ -688,6 +688,9 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .pbar{column-gap:1px!important}
 .pseg.gap .tr{background:color-mix(in srgb,var(--warn) 22%,var(--soft))!important}
 .pseg.now.issue .tr{background:color-mix(in srgb,var(--danger) 18%,var(--soft))!important}
+.vshare{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--line);font-size:13px;background:var(--accent-soft)}
+.vshare input{flex:1;min-width:200px;font:12px var(--f-mono);padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
+.vshare[hidden]{display:none}
 </style>
 
 </head>
@@ -2421,6 +2424,26 @@ $("fileList").addEventListener("change",async e=>{
   try{await db.collection("orders").doc(editing.id).update({files,updatedAt:new Date().toISOString()});editing.files=files;renderFiles();refreshDerived();$("upNote").textContent="Тип документа изменён."}
   catch(err){$("upNote").textContent="Не получилось сменить тип ("+(err&&err.code||"ошибка")+")."}
 });
+
+// «Ссылка»: a link to this one file to send to someone who has no access to the board; it expires after 7 days
+{const dl=$("vDl");
+ if(dl){const b=document.createElement("button");b.type="button";b.className="btn";b.id="vShare";b.textContent="Ссылка";b.title="Ссылка на этот файл для отправки (действует 7 дней, вход не нужен)";
+  dl.parentNode.insertBefore(b,dl);
+  const box=document.createElement("div");box.id="vShareBox";box.className="vshare";box.hidden=true;$("vBody").parentNode.insertBefore(box,$("vBody"));
+  b.onclick=async()=>{
+    const aid=dl.dataset.dl, oid=dl.dataset.oid, f=findFile(aid,oid);if(!f)return;
+    if(!window.TC_shareLink){box.hidden=false;box.textContent="Ссылки работают только на сайте доски.";return}
+    box.hidden=false;box.textContent="Готовлю ссылку…";
+    try{const url=await window.TC_shareLink(aid,f.name,7);
+      let copied=false;try{await navigator.clipboard.writeText(url);copied=true}catch(e){}
+      box.innerHTML=`<span>${copied?"Ссылка скопирована — вставьте её в письмо или мессенджер.":"Скопируйте ссылку:"} Действует 7 дней, вход на доску не нужен.</span><input readonly value="${esc(url)}" aria-label="Ссылка на файл"><button type="button" class="btn" id="vShareCopy">Копировать</button>`;
+      const inp=box.querySelector("input");inp.onclick=()=>inp.select();
+      box.querySelector("#vShareCopy").onclick=async()=>{inp.select();try{await navigator.clipboard.writeText(url)}catch(e){document.execCommand("copy")}box.querySelector("span").textContent="Ссылка скопирована. Действует 7 дней, вход на доску не нужен."};
+    }catch(e){box.textContent="Не получилось сделать ссылку ("+(e&&e.code||e&&e.message||"ошибка")+")."}
+  };
+  // a new file in the viewer hides the old link
+  const _vf=viewFile;viewFile=function(){box.hidden=true;box.innerHTML="";return _vf.apply(this,arguments)};
+ }}
 
 /* ---------- calculation workbook → separate documents (КП, 구매발주서, Commercial invoice) ----------
    Each target tab becomes its own .xlsx with the original layout, logo, print area and page setup.

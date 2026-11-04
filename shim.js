@@ -202,6 +202,10 @@
     }
   };
   // the board reads stored files with fetch("/_blob/<id>") and <img src="/_blob/<id>">
+  // a link to one file for someone without access to the board (an accountant, say): works for `days` days, then expires
+  window.TC_shareLink = async (id, name, days) => {
+    const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(id, Math.round((days || 7) * 86400), name ? { download: name } : undefined);
+    if(error) throw err(error); return data.signedUrl; };
   const nativeFetch = window.fetch.bind(window);
   window.fetch = function(u, o){
     const s = typeof u === "string" ? u : (u && u.url) || "";
