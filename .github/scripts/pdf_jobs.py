@@ -42,6 +42,18 @@ def order(oid):
     return rows[0]["data"] if rows else None
 
 
+def missing_fonts(blob):
+    """Latin/Cyrillic fonts the document uses that are not installed (Korean fonts fall back to Noto CJK)."""
+    import io, re, zipfile
+    z = zipfile.ZipFile(io.BytesIO(blob))
+    # fonts on the text itself (body, headers, footers), not every font a style sheet happens to list
+    xml = "".join(z.read(n).decode("utf8", "ignore") for n in z.namelist() if re.match(r"word/(document|header\d*|footer\d*)\.xml$", n))
+    used = set(re.findall(r'w:(?:ascii|hAnsi)="([^"]+)"', xml)) - {"", "Symbol", "Wingdings"}
+    have = subprocess.run(["fc-list", ":", "family"], capture_output=True, text=True).stdout.lower()
+    have = {x.strip() for line in have.splitlines() for x in line.split(",")}
+    return sorted(f for f in used if not f.startswith("+") and f.lower() not in have)
+
+
 def convert(job_id, job):
     o = order(job["oid"])
     if not o:
@@ -52,6 +64,9 @@ def convert(job_id, job):
     blob = call("GET", f"/storage/v1/object/{BUCKET}/{f['aid']}", raw=True)
     if f.get("enc") == "b64":
         blob = base64.b64decode(blob.decode().strip())
+    missing = missing_fonts(blob)
+    if missing:  # no font substitution: without the original font the PDF is not made
+        raise RuntimeError("нет шрифта: " + ", ".join(missing) + " — загрузите его файлы в Supabase → Storage → files → _fonts")
     with tempfile.TemporaryDirectory() as d:
         src = os.path.join(d, "in.docx")
         open(src, "wb").write(blob)
@@ -71,6 +86,28 @@ def convert(job_id, job):
     print("готово:", name)
 
 
+def fonts():
+    """The contract fonts (Arial Narrow, 맑은 고딕 …) are not free to publish, so they live in the private storage
+    folder «_fonts/» and are installed here before converting; LibreOffice then lays the text out in the original font."""
+    try:
+        items = call("POST", f"/storage/v1/object/list/{BUCKET}", {"prefix": "_fonts/", "limit": 1000})
+    except Exception as e:
+        print("папка _fonts недоступна:", e)
+        return 0
+    d = os.path.expanduser("~/.fonts")
+    os.makedirs(d, exist_ok=True)
+    n = 0
+    for it in items or []:
+        name = it.get("name") or ""
+        if not name.lower().endswith((".ttf", ".otf", ".ttc")):
+            continue
+        open(os.path.join(d, name), "wb").write(call("GET", f"/storage/v1/object/{BUCKET}/_fonts/{urllib.parse.quote(name)}", raw=True))
+        n += 1
+    subprocess.run(["fc-cache", "-f"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print("шрифтов установлено:", n)
+    return n
+
+
 def main():
     if not KEY:
         sys.exit("SUPABASE_SERVICE_KEY не задан в секретах репозитория")
@@ -79,6 +116,8 @@ def main():
         open(os.environ.get("GITHUB_OUTPUT", os.devnull), "a").write(f"jobs={len(q)}\n")
         print("в очереди:", len(q))
         return
+    if q:
+        fonts()
     for r in q:
         try:
             merge("pdfjobs", r["id"], {"status": "working"})
