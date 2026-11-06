@@ -691,6 +691,17 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .vshare{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--line);font-size:13px;background:var(--accent-soft)}
 .vshare input{flex:1;min-width:200px;font:12px var(--f-mono);padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
 .vshare[hidden]{display:none}
+/* file-type icons: a small page with a folded corner, coloured by type (PDF red, Word blue, Excel green, photo violet) */
+.ext{--fc:#7a8691;position:relative;display:inline-flex!important;align-items:flex-end;justify-content:center;flex:none;width:24px;height:28px;padding:0 0 4px!important;margin-right:8px;
+  border-radius:3px!important;background:var(--fc)!important;color:#fff!important;font:700 7.5px/1 var(--f-mono)!important;letter-spacing:0;text-transform:uppercase;vertical-align:middle;
+  clip-path:polygon(0 0,66% 0,100% 26%,100% 100%,0 100%)}
+.ext::after{content:"";position:absolute;top:0;right:0;width:34%;height:26%;background:rgba(255,255,255,.5);clip-path:polygon(0 0,100% 100%,0 100%)}
+.ext.pdf{--fc:#d1372e}.ext.doc,.ext.docx,.ext.rtf{--fc:#2b5fb4}.ext.xls,.ext.xlsx,.ext.xlsm,.ext.csv{--fc:#1f7a46}
+.ext.jpg,.ext.jpeg,.ext.png,.ext.heic,.ext.webp,.ext.gif{--fc:#7d4bb0}.ext.zip,.ext.rar,.ext.7z{--fc:#a07a1c}
+.ccf .ext{width:18px;height:21px;font-size:6px!important;padding-bottom:3px!important;margin-right:6px}
+.dfl{grid-template-columns:30px minmax(0,1fr) 118px 170px 70px auto!important}
+@media (max-width:900px){.dfl{grid-template-columns:30px minmax(0,1fr) 118px auto!important}}
+@media (max-width:640px){.dfl{grid-template-columns:30px minmax(0,1fr) auto!important}}
 </style>
 
 </head>
@@ -2690,38 +2701,6 @@ async function backfillAllEquiv(){
 setInterval(()=>{if(orders.length)backfillAllEquiv()},4000);
 
 
-/* ---------- Word → PDF: the «PDF» button queues the file; GitHub converts it with LibreOffice within a few minutes
-   and the PDF appears next to the Word file in the same order ---------- */
-let pdfJobs={};
-function pdfState(aid){const j=Object.values(pdfJobs).filter(x=>x&&x.aid===aid).sort((a,b)=>String(b.at).localeCompare(String(a.at)))[0];return j||null}
-function paintPdfButtons(){
-  if(!editing||!canWrite)return;
-  $("fileList").querySelectorAll(".frow").forEach(row=>{const d=row.querySelector("[data-dl]");if(!d)return;
-    const f=(editing.files||[]).find(x=>x.aid===d.dataset.dl);if(!f||!/\.docx$/i.test(f.name))return;
-    let b=row.querySelector("[data-topdf]");
-    if(!b){b=document.createElement("button");b.type="button";b.className="btn";b.dataset.topdf=f.aid;d.parentNode.insertBefore(b,d)}
-    const j=pdfState(f.aid), has=(editing.files||[]).some(x=>x.from===f.aid&&/pdf/.test(x.mime||""));
-    // a job nobody has picked up for 30 minutes is not left hanging: the button can be pressed again
-    const waiting=j&&(j.status==="queued"||j.status==="working"), stale=waiting&&Date.now()-new Date(j.at).getTime()>30*60000, busy=waiting&&!stale;
-    b.disabled=!!busy;
-    b.textContent=busy?"PDF готовится…":has?"PDF ✓":stale?"PDF — нет ответа":j&&j.status==="error"?"PDF — ошибка":"PDF";
-    b.title=stale?"Задание ждёт больше 30 минут: проверьте ключ SUPABASE_SERVICE_KEY в GitHub и раздел Actions. Нажмите, чтобы поставить снова":busy?"Файл в очереди на PDF — появится здесь через несколько минут":has?"PDF уже есть рядом; нажмите, чтобы сделать заново":j&&j.status==="error"?"Не получилось: "+(j.error||"")+" — нажмите, чтобы попробовать снова":"Сделать PDF из этого Word-файла (через несколько минут появится рядом)";
-  });
-}
-{const _rf3=renderFiles;renderFiles=function(){const r=_rf3.apply(this,arguments);paintPdfButtons();return r};}
-$("fileList").addEventListener("click",async e=>{const b=e.target.closest("[data-topdf]");if(!b||b.disabled)return;
-  const f=(editing.files||[]).find(x=>x.aid===b.dataset.topdf);if(!f||!editing.id)return;
-  const id="j"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-  const job={oid:editing.id,aid:f.aid,name:f.name,num:editing.num||"",by:window.TC_USER||"",at:new Date().toISOString(),status:"queued"};
-  b.disabled=true;
-  try{await db.collection("pdfjobs").doc(id).set(job);pdfJobs[id]=job;paintPdfButtons();
-    const t=`«${f.name}» поставлен в очередь на PDF. Готовый PDF появится рядом в этом заказе примерно через 5–10 минут — окно можно закрыть.`;
-    $("upNote").textContent=t;upSticky={t:Date.now(),txt:t};
-  }catch(err){b.disabled=false;$("upNote").textContent="Не получилось поставить в очередь ("+(err&&err.code||"ошибка")+")."}
-});
-(function waitPdfDb(){if(!db){setTimeout(waitPdfDb,500);return}
-  db.collection("pdfjobs").onSnapshot(snap=>{pdfJobs={};snap.docs.filter(x=>x.exists).forEach(x=>pdfJobs[x.id]=x.data());paintPdfButtons()},()=>{});
-})();
 
 /* ---------- personal view: each person picks which parts of the board they see (convenience, not access control) ---------- */
 const VIEW_ITEMS=[
@@ -2827,10 +2806,11 @@ function viewDialog(){
   db.collection("views").onSnapshot(snap=>{views={};snap.docs.filter(x=>x.exists).forEach(x=>views[x.id]=x.data());fillViewSel();applyView();render()},()=>{});
 })();
 
+const extIcon=f=>{const e=extOf(f.name);return `<span class="ext ${esc(e)}" aria-hidden="true">${esc(e||"файл")}</span>`};
 function fileLink(o,f){
   const v=f.enc==="raw"&&/pdf|image/.test(f.mime||"");
-  return v?`<a href="#" class="ccf" data-view="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Открыть">${esc(f.name)}</a>`
-    :`<a href="#" class="ccf" data-ccdl="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Скачать">${esc(f.name)}</a>`;
+  return v?`<a href="#" class="ccf" data-view="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Открыть">${extIcon(f)}${esc(f.name)}</a>`
+    :`<a href="#" class="ccf" data-ccdl="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Скачать">${extIcon(f)}${esc(f.name)}</a>`;
 }
 function compactCard(o){
   const sh=new Set(ccShow(myView())), fs=o.files||[];
