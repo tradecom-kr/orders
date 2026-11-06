@@ -2690,6 +2690,38 @@ async function backfillAllEquiv(){
 setInterval(()=>{if(orders.length)backfillAllEquiv()},4000);
 
 
+/* ---------- Word → PDF: the «PDF» button queues the file; GitHub converts it with LibreOffice within a few minutes
+   and the PDF appears next to the Word file in the same order ---------- */
+let pdfJobs={};
+function pdfState(aid){const j=Object.values(pdfJobs).filter(x=>x&&x.aid===aid).sort((a,b)=>String(b.at).localeCompare(String(a.at)))[0];return j||null}
+function paintPdfButtons(){
+  if(!editing||!canWrite)return;
+  $("fileList").querySelectorAll(".frow").forEach(row=>{const d=row.querySelector("[data-dl]");if(!d)return;
+    const f=(editing.files||[]).find(x=>x.aid===d.dataset.dl);if(!f||!/\.docx$/i.test(f.name))return;
+    let b=row.querySelector("[data-topdf]");
+    if(!b){b=document.createElement("button");b.type="button";b.className="btn";b.dataset.topdf=f.aid;d.parentNode.insertBefore(b,d)}
+    const j=pdfState(f.aid), has=(editing.files||[]).some(x=>x.from===f.aid&&/pdf/.test(x.mime||""));
+    const busy=j&&(j.status==="queued"||j.status==="working");
+    b.disabled=!!busy;
+    b.textContent=busy?"PDF готовится…":has?"PDF ✓":j&&j.status==="error"?"PDF — ошибка":"PDF";
+    b.title=busy?"Файл в очереди на PDF — появится здесь через несколько минут":has?"PDF уже есть рядом; нажмите, чтобы сделать заново":j&&j.status==="error"?"Не получилось: "+(j.error||"")+" — нажмите, чтобы попробовать снова":"Сделать PDF из этого Word-файла (через несколько минут появится рядом)";
+  });
+}
+{const _rf3=renderFiles;renderFiles=function(){const r=_rf3.apply(this,arguments);paintPdfButtons();return r};}
+$("fileList").addEventListener("click",async e=>{const b=e.target.closest("[data-topdf]");if(!b||b.disabled)return;
+  const f=(editing.files||[]).find(x=>x.aid===b.dataset.topdf);if(!f||!editing.id)return;
+  const id="j"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  const job={oid:editing.id,aid:f.aid,name:f.name,num:editing.num||"",by:window.TC_USER||"",at:new Date().toISOString(),status:"queued"};
+  b.disabled=true;
+  try{await db.collection("pdfjobs").doc(id).set(job);pdfJobs[id]=job;paintPdfButtons();
+    const t=`«${f.name}» поставлен в очередь на PDF. Готовый PDF появится рядом в этом заказе примерно через 5–10 минут — окно можно закрыть.`;
+    $("upNote").textContent=t;upSticky={t:Date.now(),txt:t};
+  }catch(err){b.disabled=false;$("upNote").textContent="Не получилось поставить в очередь ("+(err&&err.code||"ошибка")+")."}
+});
+(function waitPdfDb(){if(!db){setTimeout(waitPdfDb,500);return}
+  db.collection("pdfjobs").onSnapshot(snap=>{pdfJobs={};snap.docs.filter(x=>x.exists).forEach(x=>pdfJobs[x.id]=x.data());paintPdfButtons()},()=>{});
+})();
+
 /* ---------- personal view: each person picks which parts of the board they see (convenience, not access control) ---------- */
 const VIEW_ITEMS=[
   ["Обзор",[
