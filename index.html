@@ -2701,10 +2701,11 @@ function paintPdfButtons(){
     let b=row.querySelector("[data-topdf]");
     if(!b){b=document.createElement("button");b.type="button";b.className="btn";b.dataset.topdf=f.aid;d.parentNode.insertBefore(b,d)}
     const j=pdfState(f.aid), has=(editing.files||[]).some(x=>x.from===f.aid&&/pdf/.test(x.mime||""));
-    const busy=j&&(j.status==="queued"||j.status==="working");
+    // a job nobody has picked up for 30 minutes is not left hanging: the button can be pressed again
+    const waiting=j&&(j.status==="queued"||j.status==="working"), stale=waiting&&Date.now()-new Date(j.at).getTime()>30*60000, busy=waiting&&!stale;
     b.disabled=!!busy;
-    b.textContent=busy?"PDF готовится…":has?"PDF ✓":j&&j.status==="error"?"PDF — ошибка":"PDF";
-    b.title=busy?"Файл в очереди на PDF — появится здесь через несколько минут":has?"PDF уже есть рядом; нажмите, чтобы сделать заново":j&&j.status==="error"?"Не получилось: "+(j.error||"")+" — нажмите, чтобы попробовать снова":"Сделать PDF из этого Word-файла (через несколько минут появится рядом)";
+    b.textContent=busy?"PDF готовится…":has?"PDF ✓":stale?"PDF — нет ответа":j&&j.status==="error"?"PDF — ошибка":"PDF";
+    b.title=stale?"Задание ждёт больше 30 минут: проверьте ключ SUPABASE_SERVICE_KEY в GitHub и раздел Actions. Нажмите, чтобы поставить снова":busy?"Файл в очереди на PDF — появится здесь через несколько минут":has?"PDF уже есть рядом; нажмите, чтобы сделать заново":j&&j.status==="error"?"Не получилось: "+(j.error||"")+" — нажмите, чтобы попробовать снова":"Сделать PDF из этого Word-файла (через несколько минут появится рядом)";
   });
 }
 {const _rf3=renderFiles;renderFiles=function(){const r=_rf3.apply(this,arguments);paintPdfButtons();return r};}
