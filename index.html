@@ -2147,7 +2147,7 @@ async function uploadFiles(list){
   if(!added.length)return;
   const files=[...(editing.files||[]).filter(f=>!repl||f.aid!==repl.aid),...added];
   try{await db.collection("orders").doc(editing.id).update({files,updatedAt:new Date().toISOString()});editing.files=files;renderFiles();refreshDerived();
-      $("upNote").textContent=(repl?`Заменено: «${repl.name}» → `:"Загружено: ")+added.map(a=>a.name+" → "+(KIND[a.kind]||"Прочее")).join(", ");upSticky={t:Date.now(),txt:$("upNote").textContent};
+      $("upNote").textContent=(repl?`Заменено: «${repl.name}» → `:"Загружено: ")+added.map(a=>a.name+" → "+(KIND[a.kind]||"Прочее")).join(", ")+otherOrderWarn(added);upSticky={t:Date.now(),txt:$("upNote").textContent};
       if(repl&&assets)assets.delete(repl.aid).catch(()=>{});
       if(expList.length){const l=[];for(const f of expList)l.push({bytes:new Uint8Array(await f.arrayBuffer()),name:f.name});applyExpNo(l,false)}
       autofillFiles(await Promise.all([...list].map(async f=>({bytes:new Uint8Array(await f.arrayBuffer()),name:f.name}))),true);
@@ -2689,6 +2689,7 @@ async function backfillAllEquiv(){
 }
 setInterval(()=>{if(orders.length)backfillAllEquiv()},4000);
 
+
 /* ---------- personal view: each person picks which parts of the board they see (convenience, not access control) ---------- */
 const VIEW_ITEMS=[
   ["Обзор",[
@@ -2932,6 +2933,18 @@ $("e_type").addEventListener("change",()=>{markImp();refreshDerived()});
 {const _c2=cardHTML;cardHTML=function(o){let h=_c2(o);
   if(isImp(o))h=h.replace('class="oc ','class="oc imp ');
   return h};}
+
+// a file whose name carries another order's number («CIPL DT01_0910…» uploaded into М-35): say so right after the upload
+const numKey=s=>String(s||"").toLowerCase().replace(/м/g,"m").replace(/[^a-z0-9а-я]/g,"");
+function otherOrderWarn(added){
+  if(!editing)return "";
+  const mine=numKey(editing.num), out=[];
+  for(const r of added||[]){const n=numKey(r.orig||r.name);
+    const hit=orders.filter(o=>o.id!==editing.id&&!o.arch).map(o=>({o,k:numKey(o.num)})).filter(x=>x.k.length>=3&&x.k!==mine&&n.includes(x.k)&&!(mine&&n.includes(mine)))
+      .sort((a,b)=>b.k.length-a.k.length)[0];
+    if(hit)out.push(`«${r.name}» похоже на документ заказа ${hit.o.num}`)}
+  return out.length?` ⚠ ${out.join("; ")} — а загружено в ${editing.num||"этот заказ"}. Если ошиблись, удалите файл здесь и загрузите в нужный заказ.`:"";
+}
 
 /* export declaration file name: «M-34 ЭД 49 024 800 KRW (5 913 862 JPY).pdf»
    amount = Commercial invoice total (order amount if no invoice has been read yet), equivalent from the invoice when it has one.
