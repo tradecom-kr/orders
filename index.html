@@ -1108,7 +1108,7 @@ function analyze0(o){
     const sent=!paid&&(o.files||[]).filter(f=>f.pm).map(f=>f.pm.date||f.pm.done).filter(Boolean).sort().pop();
     if(!imp&&o.payDue&&!paid&&!sent){const d=days(o.payDue);if(d<0){overdue=true;iss("pay");alerts.push({c:"bad",t:`Оплата от покупателя просрочена (срок ${fds(o.payDue)})`})}else if(d<=3)soon.push(`оплата до ${fds(o.payDue)}`)}
     if(sent)alerts.push({c:"info",t:`Покупатель отправил платёж ${sent} — ждём поступления денег`});
-    if(!imp&&paid&&!stepDone(o,"bank")){iss("pay");alerts.push({c:"bad",t:"Деньги пришли — подготовьте контракт с подписью Ден Е."})}
+    if(!imp&&paid&&!stepDone(o,"bank")){iss("pay");alerts.push({c:"bad",t:"Стоит статус «Оплачен» — подготовьте контракт с подписью Ден Е."})}
     if(!loaded&&!imp)L.forEach(x=>{if(!x.date)return;const d=days(x.date);
       if(d<0&&x.st!=="confirmed"){overdue=true;iss("sched");alerts.push({c:"bad",t:`Срок поставщика ${x.name||""} прошёл (${fds(x.date)}) и не подтверждён`})}
       else if(d>=0&&d<=3)soon.push(`товар ${x.name||"от поставщика"} ${fds(x.date)}`)});
@@ -1159,7 +1159,7 @@ function phDate(x){
 }
 function stageCap(a){const PHASES=phasesOf(a.o);
   const n=PHASES.length, cur=a.closed?n:Math.min(a.cur,n), x=a.ph[cur]||{done:0,total:1};
-  const issue=a.overdue||a.alerts.some(z=>z.t.startsWith("Деньги пришли"));
+  const issue=a.overdue||a.alerts.some(z=>z.t.startsWith("Стоит статус «Оплачен»"));
   return a.closed?`<b class="win">🎉 Сделка успешно завершена</b>`:`Стадия <b>${cur+1} из ${n}: ${PHASES[cur].t}</b> · сделано ${x.done} из ${x.total}${issue?` · <span class="bad">есть проблемы</span>`:""}`;
 }
 // display order only (the process order stays): in «Документы» the invoice comes second, so «Контракт (Ти)» sits level with «Контракт (Ден Е.)» in «Оплата»
@@ -1203,7 +1203,7 @@ function stLi(z,a){
 function phaseCells(a){const PHASES=phasesOf(a.o);
   const n=PHASES.length, cur=a.closed?n:Math.min(a.cur,n), x={...(a.ph[cur]||{done:0,total:1})};
   // red only for real trouble (overdue dates, money in but no bank contract), not for the current stage's own to-dos
-  x.issue=a.overdue||a.alerts.some(z=>z.t.startsWith("Деньги пришли"));
+  x.issue=a.overdue||a.alerts.some(z=>z.t.startsWith("Стоит статус «Оплачен»"));
   // the lists of all blocks share one row grid, so row N of every block lines up
   const lists=PHASES.map((p,i)=>dispOrder(p.id,a.ph[i].sd).map(z=>stLi(z,a)).join("")), rows=Math.max(1,...lists.map(h=>(h.match(/<li[\s>]/g)||[]).length));
   const segs=PHASES.map((p,i)=>{
