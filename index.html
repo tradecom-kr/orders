@@ -702,6 +702,9 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .dfl{grid-template-columns:30px minmax(0,1fr) 118px 170px 70px auto!important}
 @media (max-width:900px){.dfl{grid-template-columns:30px minmax(0,1fr) 118px auto!important}}
 @media (max-width:640px){.dfl{grid-template-columns:30px minmax(0,1fr) auto!important}}
+.kico{width:20px;height:20px;vertical-align:-5px;margin-right:6px;flex:none}
+.kdb .kl{display:inline-flex;align-items:center}
+.ev .kico,.uitem .kico{width:13px;height:13px;vertical-align:-2px;margin-right:3px}
 </style>
 
 </head>
@@ -1239,15 +1242,18 @@ document.addEventListener("click",e=>{
 // the invoice's own figure in the other currency — «Total Invoice Value» or «Equivalent Value», exactly as written there
 const eqOf=o=>{const t=invTotals(o),c=o.cur||"KRW",r={};if(t.main&&t.main[0]!==c)r[t.main[0]]=t.main[1];t.eq.forEach(([k,v])=>{if(k!==c)r[k]=v});return r};
 const eqText=o=>Object.entries(eqOf(o)).map(([k,v])=>` / <span class="eqv" title="Сумма из Commercial invoice">${amtOf(o,v,k)} ${esc(k)}</span>`).join("");
+// pictograms: a shipping container for loading, a ferry for the ship leaving
+const ICO_BOX='<svg class="kico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6.5 8.5v7M10 8.5v7M13.5 8.5v7M17 8.5v7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+const ICO_SHIP='<svg class="kico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14.5h18l-2.6 4.2a1.5 1.5 0 0 1-1.3.8H6.9a1.5 1.5 0 0 1-1.3-.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M6 14.5V10h12v4.5M8.5 10V7h7v3M10.5 7V4.5h3V7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.5 12.2h1.2M11.4 12.2h1.2M14.3 12.2h1.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
 function keyDates(o,loaded){
   const port=stepDone(o,"port"), dcls=(d,done)=>!d||done?"":days(d)<0?"bad":days(d)<=3?"warn":"";
-  const box=(l,d,done,sub)=>`<div class="kdb ${dcls(d,done)} ${done?"ok":""}"><span class="kl">${l}</span><b>${d?String(d).slice(5,7)+"."+String(d).slice(8,10):"—"}${done?" ✓":""}</b></div>`;
+  const box=(l,d,done,ico)=>`<div class="kdb ${dcls(d,done)} ${done?"ok":""}"><span class="kl">${ico||""}${l}</span><b>${d?String(d).slice(5,7)+"."+String(d).slice(8,10):"—"}${done?" ✓":""}</b></div>`;
   const rel=d=>{const n=days(d);return n===0?"сегодня":n>0?"через "+n+" дн.":n<0?Math.abs(n)+" дн. назад":""};
   // who loads (suppliers) above the loading date, which ship above the departure date
   const short=n=>String(n).replace(/\([^)]*\)/g,"").replace(/주식회사|영어조합법인|농업회사법인|\(주\)|\(유\)|co\.?,?\s*ltd\.?|llc/ig,"").trim()||String(n);
   const supN=sups(o).map(x=>x.name).filter(Boolean), sup=supN.map(short).join(", "), ship=o.vessel||o.carrier||"";
   const col=(top,full,boxHtml)=>`<div class="kcol"><span class="kwho ${top?"":"none"}" title="${esc(full||"")}">${esc(top||"—")}</span>${boxHtml}</div>`;
-  return `<div class="kds">${col(sup,supN.join(", "),box("Загрузка",o.loadAt,loaded,""))}<span class="kar" aria-hidden="true">→</span>${col(ship,[o.vessel,o.carrier].filter(Boolean).join(" · "),box("Выход судна",o.etd,port,""))}</div>`;
+  return `<div class="kds">${col(sup,supN.join(", "),box("Загрузка",o.loadAt,loaded,ICO_BOX))}<span class="kar" aria-hidden="true">→</span>${col(ship,[o.vessel,o.carrier].filter(Boolean).join(" · "),box("Выход судна",o.etd,port,ICO_SHIP))}</div>`;
 }
 function archCard(o){
   const fs=o.files||[], kinds=[...new Set(fs.map(f=>kindOf(f.kind)))];
@@ -1295,8 +1301,8 @@ function calEvents(vis){
     if(paid&&!stepDone(o,"bank"))ev.push({d:(o.steps&&o.steps.paid)||o.payDue||isoToday(),o,t:"Контракт Ден Е. — подготовить",c:"ev-late",why:"деньги пришли — подготовить контракт с подписью Ден Е."});
     sups(o).forEach(x=>{if(!x.date)return;const n=days(x.date);
       ev.push({d:x.date,o,t:"Товар: "+(x.name||"поставщик")+(x.st==="confirmed"?" ✓":" (не подтв.)"),c:"ev-sup "+(loaded?"ev-done":(n<0&&x.st!=="confirmed"?"ev-late":"")),why:x.st==="confirmed"?"срок подтверждён":"срок не подтверждён"})});
-    if(o.loadAt)ev.push({d:o.loadAt,o,t:"Загрузка"+(o.loadTime?" "+o.loadTime:"")+(o.loadPlace?" · "+o.loadPlace:""),c:loaded?"ev-done":cls(o.loadAt),why:loaded?"загружено":"загрузка контейнера"});
-    if(o.etd)ev.push({d:o.etd,o,t:"ETD — выход судна",c:stepDone(o,"port")?"ev-done":cls(o.etd),why:"выход судна"});
+    if(o.loadAt)ev.push({d:o.loadAt,o,ico:ICO_BOX,t:"Загрузка"+(o.loadTime?" "+o.loadTime:"")+(o.loadPlace?" · "+o.loadPlace:""),c:loaded?"ev-done":cls(o.loadAt),why:loaded?"загружено":"загрузка контейнера"});
+    if(o.etd)ev.push({d:o.etd,o,ico:ICO_SHIP,t:"ETD — выход судна",c:stepDone(o,"port")?"ev-done":cls(o.etd),why:"выход судна"});
     if(o.eta)ev.push({d:o.eta,o,t:"ETA — прибытие",c:stepDone(o,"broker")?"ev-done":cls(o.eta),why:"прибытие судна"});
   });
   const ids=new Set(vis.map(o=>o.id)), fb=$("fBuyer").value, q=$("q").value.trim().toLowerCase();
@@ -1314,7 +1320,7 @@ function calEvents(vis){
 function renderUpcoming(vis){
   const items=calEvents(vis).filter(e=>!/ev-done|ev-x/.test(e.c)&&days(e.d)<=14).sort((a,b)=>a.d.localeCompare(b.d));
   const shown=items.slice(0,12);
-  $("upcoming").innerHTML=`<h2>Ближайшие сроки · 14 дней</h2>`+(shown.map(e=>{const n=days(e.d);return `<div class="uitem" ${e.my?`data-ev="${esc(e.my.id)}"`:`data-id="${esc(e.o.id)}"`} tabindex="0"><span class="d ${n<0?"bad":n<=3?"warn":""}">${fd(e.d)}</span><span class="w">${e.o.num?`<b>${esc(e.o.num)}</b> · `:""}${esc(e.t)}</span><span class="note">${n<0?`просрочено ${-n} дн.`:n===0?"сегодня":`через ${n} дн.`}</span></div>`}).join("")
+  $("upcoming").innerHTML=`<h2>Ближайшие сроки · 14 дней</h2>`+(shown.map(e=>{const n=days(e.d);return `<div class="uitem" ${e.my?`data-ev="${esc(e.my.id)}"`:`data-id="${esc(e.o.id)}"`} tabindex="0"><span class="d ${n<0?"bad":n<=3?"warn":""}">${fd(e.d)}</span><span class="w">${e.ico||""}${e.o.num?`<b>${esc(e.o.num)}</b> · `:""}${esc(e.t)}</span><span class="note">${n<0?`просрочено ${-n} дн.`:n===0?"сегодня":`через ${n} дн.`}</span></div>`}).join("")
     ||`<span class="note">На ближайшие две недели сроков нет. Даты берутся из заказов: оплата, поставщики, загрузка, ETD и ETA.</span>`)
     +(items.length>shown.length?`<span class="note">и ещё ${items.length-shown.length}</span>`:"");
 }
@@ -1829,7 +1835,7 @@ function renderTimeline(){
   [["sYear","year"],["sQ3","q3"],["sMonth","month"],["sWeek","week"],["sDay","day"]].forEach(([b,v])=>$(b).setAttribute("aria-pressed",calScale===v));
   const byDay={};calEvents(vis).forEach(e=>{(byDay[e.d]=byDay[e.d]||[]).push(e)});
   calByDay=byDay;
-  const tIso=isoToday(), chip=calChip=e=>`<button type="button" class="ev ${e.c}" ${e.my?`data-ev="${esc(e.my.id)}"`:`data-id="${esc(e.o.id)}"`} title="${e.o.num?esc(e.o.num)+" · ":""}${esc(e.t)} · ${fd(e.d)} — ${e.why}">${e.o.num?`<b>${esc(e.o.num)}</b> · `:""}${esc(e.t)}</button>`;
+  const tIso=isoToday(), chip=calChip=e=>`<button type="button" class="ev ${e.c}" ${e.my?`data-ev="${esc(e.my.id)}"`:`data-id="${esc(e.o.id)}"`} title="${e.o.num?esc(e.o.num)+" · ":""}${esc(e.t)} · ${fd(e.d)} — ${e.why}">${e.ico||""}${e.o.num?`<b>${esc(e.o.num)}</b> · `:""}${esc(e.t)}</button>`;
   const cell=(d,out,limit)=>{const k=iso(d),list=byDay[k]||[],open=!limit||calOpen.has(k),shown=open?list:list.slice(0,limit);
     return `<div class="day ${out?"out":""} ${dayCls(d)} ${k===tIso?"today":""}" data-date="${k}" ${KR_HOL[k]?`title="${KR_HOL[k]}"`:""}><span class="dn">${calScale==="month"?d.getDate():(t=>t.charAt(0).toUpperCase()+t.slice(1))(d.toLocaleDateString("ru-RU",{weekday:"short",day:"numeric",month:"short"}))}</span>${KR_HOL[k]&&!out?`<span class="hn">${KR_HOL[k]}</span>`:""}${shown.map(chip).join("")}${!open&&list.length>limit?`<button type="button" class="more" data-day="${k}">ещё ${list.length-limit}</button>`:""}${canWrite?`<button type="button" class="addd" data-addd="${k}" aria-label="Добавить событие на ${fd(k)}">+ событие</button>`:""}</div>`};
   let h="", days=[];
