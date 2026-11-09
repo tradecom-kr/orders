@@ -705,6 +705,7 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .kico{width:20px;height:20px;vertical-align:-5px;margin-right:6px;flex:none}
 .kdb .kl{display:inline-flex;align-items:center}
 .ev .kico,.uitem .kico{width:13px;height:13px;vertical-align:-2px;margin-right:3px}
+.bbank{margin-top:4px;font-size:12.5px}.bbank input{font-size:12px;padding:3px 6px;width:210px;max-width:100%}
 </style>
 
 </head>
@@ -1955,7 +1956,7 @@ $("bList").addEventListener("click",async e=>{
   if(t.dataset.bsave){
     const b=buyers.find(x=>x.id===t.dataset.bsave);const name=$("beName").value.trim();if(!b||!name)return;
     try{
-      await db.collection("buyers").doc(b.id).set({name,city:$("beCity").value.trim(),createdAt:b.createdAt||new Date().toISOString()});
+      await db.collection("buyers").doc(b.id).update({name,city:$("beCity").value.trim()});
       if(name!==b.name){ // carry the rename onto existing orders, one write per order
         for(const o of orders.filter(o=>o.buyer===b.name)){const body={...o,buyer:name};delete body.id;await db.collection("orders").doc(o.id).set(body)}
       }
@@ -2010,10 +2011,10 @@ function makeDenVariant(env){
     const ts=Array.from(p.getElementsByTagNameNS(W,"t"));
     if(!ts.length)return 0;
     let n=0;
-    for(const [from,to] of PAIRS){
+    for(const [from,to,ci] of PAIRS.concat(env.extraPairs||[])){
       for(;;){
         const full=ts.map(t=>t.textContent).join("");
-        const at=full.indexOf(from); if(at<0)break;
+        const at=ci?full.toLowerCase().indexOf(from.toLowerCase()):full.indexOf(from); if(at<0)break;
         let pos=0, left=from.length, placed=false;
         for(const t of ts){
           const txt=t.textContent, s=pos, e=pos+txt.length; pos=e;
@@ -2233,7 +2234,7 @@ async function makeDen(aid,btn){
   btn.disabled=true; $("upNote").textContent="Делаю вариант с подписью Ден Е.…";
   try{
     const sigBin=atob(SIG_DEN_B64),sigBytes=new Uint8Array(sigBin.length);for(let i=0;i<sigBin.length;i++)sigBytes[i]=sigBin.charCodeAt(i);
-    const run=makeDenVariant({JSZip:window.JSZip,DOMParser:window.DOMParser,XMLSerializer:window.XMLSerializer,sigDenBytes:sigBytes});
+    const run=makeDenVariant({JSZip:window.JSZip,DOMParser:window.DOMParser,XMLSerializer:window.XMLSerializer,sigDenBytes:sigBytes,extraPairs:bankPairs(editing)});
     const r=await run(await blobBytes(f));
     if(!r.names&&!r.sig){$("upNote").textContent="В файле не нашлось ни имени, ни подписи Ти Валерия — вариант не создан.";btn.disabled=false;return}
     let name=f.name.replace(/Ти[ _.-]*В(алерий)?\.?|Ti[ _.-]*V(alerii)?\.?/i,"Ден Е.");
@@ -2244,7 +2245,7 @@ async function makeDen(aid,btn){
     const rec={aid:up.id,name,kind:"cs",signer:"den",size:r.bytes.length,mime:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",enc:"b64",at:new Date().toISOString(),by:window.TC_USER||"",from:f.aid};
     const files=[...(editing.files||[]),rec], patch={files,updatedAt:new Date().toISOString()};
     await db.collection("orders").doc(editing.id).update(patch); editing.files=files; renderFiles();refreshDerived();
-    $("upNote").textContent=`Готово: «${name}». Заменено имён: ${r.names}.`+(r.sig?" Подпись заменена на подпись Ден Е.":" Факсимиле подписи Ти в файле не было — подпись проверьте вручную.")+" Откройте файл и проверьте перед отправкой в банк.";
+    $("upNote").textContent=`Готово: «${name}». Заменено имён: ${r.names}.`+bankNote(editing)+(r.sig?" Подпись заменена на подпись Ден Е.":" Факсимиле подписи Ти в файле не было — подпись проверьте вручную.")+" Откройте файл и проверьте перед отправкой в банк.";
   }catch(e){$("upNote").textContent="Не получилось сделать вариант ("+(e&&e.code||e&&e.message||"ошибка")+").";btn.disabled=false}
 }
 /* all documents view */
@@ -2964,6 +2965,43 @@ function otherOrderWarn(added){
     if(hit)out.push(`«${r.name}» похоже на документ заказа ${hit.o.num}`)}
   return out.length?` ⚠ ${out.join("; ")} — а загружено в ${editing.num||"этот заказ"}. Если ошиблись, удалите файл здесь и загрузите в нужный заказ.`:"";
 }
+
+/* ---------- the buyer's name for the bank: in the Den E. (bank) documents the buyer is written as in its SWIFT transfer ---------- */
+// Woori Bank, 09.11.2026: the remitter is «GK Dvijenie», so bank documents must say the same instead of «Gruppa Companiy Dvijenie» LLC
+const BANK_DEFAULT=[{re:/движени|dvijen|dvizhen/i,from:"Gruppa Companiy Dvijenie",to:"GK Dvijenie"}];
+function bankName(o){
+  const b=(typeof buyers!=="undefined"?buyers:[]).find(x=>x.name===o.buyer)||{};
+  if(b.bankTo)return {from:b.bankFrom||"",to:b.bankTo};
+  const d=BANK_DEFAULT.find(x=>x.re.test(o.buyer||"")||x.re.test(b.name||""));
+  return d?{from:d.from,to:d.to}:null;
+}
+function bankPairs(o){
+  const n=o&&bankName(o);if(!n||!n.from||!n.to)return [];
+  const F=n.from.trim(), T=n.to.trim();
+  // every way the English name is written in the contract, longest first, letters case-insensitive
+  return [`«${F}» LLC`,`"${F}" LLC`,`“${F}” LLC`,`${F} LLC`,`LLC «${F}»`,`LLC "${F}"`,`«${F}»`,`"${F}"`,F].map(x=>[x,T,true]);
+}
+const bankNote=o=>{const n=o&&bankName(o);return n&&n.to?` Покупатель для банка записан как «${n.to}».`:""};
+// buyers list: the bank name, shown and edited per buyer
+{const _rb=renderBuyers;renderBuyers=function(){const r=_rb.apply(this,arguments);
+  if(!$("bdlg").open)return r;
+  $("bList").querySelectorAll("[data-bedit]").forEach(btn=>{
+    const b=buyers.find(x=>x.id===btn.dataset.bedit);if(!b)return;const row=btn.closest(".srow"), info=row&&row.querySelector("span");
+    if(!info||info.querySelector(".bbank"))return;
+    const n=bankName({buyer:b.name})||{};
+    const d=document.createElement("div");d.className="bbank";
+    d.innerHTML=bankEdit===b.id
+      ?`<span class="note">Для банка (как в SWIFT):</span> <input id="bbFrom" value="${esc(n.from||"")}" placeholder="как в контракте, напр. Gruppa Companiy Dvijenie"> → <input id="bbTo" value="${esc(n.to||"")}" placeholder="как в переводе, напр. GK Dvijenie"> <button type="button" class="btn" data-bbsave="${esc(b.id)}">Сохранить</button> <button type="button" class="btn ghost" data-bbcancel>Отмена</button>`
+      :`<span class="note">Для банка: ${n.to?`«${esc(n.from)}» → <b>«${esc(n.to)}»</b>`:"как в контракте"}</span>${canWrite?` <button type="button" class="lnk" data-bbedit="${esc(b.id)}">изменить</button>`:""}`;
+    info.appendChild(d);
+  });
+  return r};}
+let bankEdit=null;
+$("bList").addEventListener("click",async e=>{const t=e.target.closest("button");if(!t)return;
+  if(t.dataset.bbedit){bankEdit=t.dataset.bbedit;renderBuyers();return}
+  if("bbcancel" in t.dataset){bankEdit=null;renderBuyers();return}
+  if(t.dataset.bbsave){try{await db.collection("buyers").doc(t.dataset.bbsave).update({bankFrom:$("bbFrom").value.trim(),bankTo:$("bbTo").value.trim()});bankEdit=null;$("bNote").textContent="Сохранено: имя покупателя для банка."}catch(err){$("bNote").textContent="Не получилось сохранить ("+(err&&err.code||"ошибка")+")."}}
+});
 
 /* export declaration file name: «M-34 ЭД 49 024 800 KRW (5 913 862 JPY).pdf»
    amount = Commercial invoice total (order amount if no invoice has been read yet), equivalent from the invoice when it has one.
