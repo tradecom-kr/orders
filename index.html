@@ -1015,7 +1015,15 @@ const kindOf=k=>(k==="contract"||k==="spec")?"cs":(k==="invoice"||k==="pl")?"ipl
 // supplier amount: typed in, or taken from the calculation summary «…, 19 152 000 KRW»
 const amtFromWhat=w=>{const m=String(w||"").match(/(\d[\d\s\u00a0\u202f]*\d)\s*KRW/i);return m?Number(m[1].replace(/\D/g,""))||null:null};
 const sups0=o=>Array.isArray(o.suppliers)?o.suppliers:((o.sup||o.supDate)?[{name:o.sup||"",date:o.supDate||"",st:o.supSt||"none",what:""}]:[]);
-const sups=o=>sups0(o).map(x=>x.amt!=null&&x.amt!==""?x:{...x,amt:amtFromWhat(x.what)});
+// supplier amount: typed in, else from «что поставляет», else the total of that supplier's 구매발주서 on the order
+const poKey=s=>String(s||"").toLowerCase().replace(/\([^)]*\)|주식회사|영어조합법인|농업회사법인|\(주\)|\(유\)|co\.?,?\s*ltd\.?|inc\.?|llc|[\s.,]/g,"");
+function poAmt(o,x,all){
+  const pos=(o.files||[]).filter(f=>kindOf(f.kind)==="po"&&f.poTotal);if(!pos.length)return null;
+  const k=poKey(x.name), mine=pos.filter(f=>{const p=poKey(f.poName);return k&&p&&(p.includes(k)||k.includes(p))});
+  const use=mine.length?mine:(all.filter(y=>y.name).length===1&&pos.every(f=>!f.poName||true)?pos:[]);
+  return use.length?use.reduce((t,f)=>t+f.poTotal,0):null;
+}
+const sups=o=>{const L=sups0(o);return L.map(x=>{if(x.amt!=null&&x.amt!=="")return x;const w=amtFromWhat(x.what);if(w)return {...x,amt:w};const p=poAmt(o,x,L);return p?{...x,amt:p,amtFrom:"po"}:x})};
 // what is still owed to suppliers on one deal
 const supDue=o=>sups(o).filter(x=>x.name&&!x.paid);
 // part payments to a supplier: «оплачено» as an amount or a percentage of the supplier amount; paid in full counts as «оплачен»
@@ -2696,9 +2704,11 @@ async function backfillAllEquiv(){
   try{
     for(const o of orders.slice()){
       const todo=(o.files||[]).filter(f=>kindOf(f.kind)==="ipl"&&/\.xlsx?$/i.test(f.orig||f.name)&&!(f.eqChecked&&f.dec)&&!_eqTried.has(f.aid));
-      if(!todo.length)continue;
+      const todoPo=(o.files||[]).filter(f=>kindOf(f.kind)==="po"&&/\.xlsx?$/i.test(f.orig||f.name)&&!f.poChecked&&!_eqTried.has(f.aid));
+      if(!todo.length&&!todoPo.length)continue;
       const got={};
       for(const f of todo){_eqTried.add(f.aid);try{got[f.aid]=invEquiv(await blobBytes(f))}catch(e){}}
+      for(const f of todoPo){_eqTried.add(f.aid);try{got[f.aid]=readPO(await blobBytes(f))}catch(e){}}
       const cur=orders.find(x=>x.id===o.id);if(!cur||!Object.keys(got).length)continue;
       const files=(cur.files||[]).map(f=>got[f.aid]?{...f,...got[f.aid]}:f);
       try{await db.collection("orders").doc(o.id).update({files})}catch(e){}
@@ -2708,6 +2718,20 @@ async function backfillAllEquiv(){
 setInterval(()=>{if(orders.length)backfillAllEquiv()},4000);
 
 
+
+// the supplier order (구매발주서): who supplies and the total («합계금액»), so the supplier amount needs no typing
+function readPO(bytes){
+  const wb=XLSX.read(bytes,{type:"array"}), out={poChecked:true};
+  for(const n of wb.SheetNames){const ws=wb.Sheets[n], rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+    for(const r of rows){
+      const i=r.findIndex(v=>typeof v==="string"&&/^\s*상\s*호\s*$/.test(v));
+      if(i>=0&&out.poName==null){const v=r.slice(i+1).find(x=>x!=null&&String(x).trim());if(v)out.poName=String(v).trim()}
+      const j=r.findIndex(v=>typeof v==="string"&&/합\s*계\s*금\s*액|total\s+amount|итого\s+к\s+оплате/i.test(v));
+      if(j>=0&&out.poTotal==null){const v=r.slice(j+1).find(x=>typeof x==="number"&&x>0);if(v)out.poTotal=v}
+    }
+    if(out.poTotal!=null)break;}
+  return out;
+}
 
 /* ---------- personal view: each person picks which parts of the board they see (convenience, not access control) ---------- */
 const VIEW_ITEMS=[
