@@ -1274,8 +1274,9 @@ const eqText=o=>Object.entries(eqOf(o)).map(([k,v])=>` / <span class="eqv" title
 const ICO_BOX='<svg class="kico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6.5 8.5v7M10 8.5v7M13.5 8.5v7M17 8.5v7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
 const ICO_SHIP='<svg class="kico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14.5h18l-2.6 4.2a1.5 1.5 0 0 1-1.3.8H6.9a1.5 1.5 0 0 1-1.3-.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M6 14.5V10h12v4.5M8.5 10V7h7v3M10.5 7V4.5h3V7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.5 12.2h1.2M11.4 12.2h1.2M14.3 12.2h1.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
 // container tracking on the line's own site: the link opens it, and the container (or B/L) number is copied to paste there
-const TRACK=[{re:/ck\s*line|ckline|천경/i,name:"CK Line",url:"https://es.ckline.co.kr/?cmd=TRK"}];
-const trackOf=o=>{const c=String(o&&o.carrier||"")+" "+String(o&&o.vessel||"");return TRACK.find(t=>t.re.test(c))||null};
+// the line is known from «Линия» or from the container / B/L number prefix (CKLU…, CKCO… are CK Line)
+const TRACK=[{re:/ck\s*line|ckline|천경/i,no:/^\s*CK(LU|CO|LS)/i,name:"CK Line",url:"https://es.ckline.co.kr/?cmd=TRK"}];
+const trackOf=o=>{const c=String(o&&o.carrier||"")+" "+String(o&&o.vessel||"");return TRACK.find(t=>t.re.test(c)||(t.no&&(t.no.test(o&&o.cont||"")||t.no.test(o&&o.bl||""))))||null};
 const trackNo=o=>String(o&&(o.cont||o.bl)||"").trim();
 function trackA(o,cls){const t=trackOf(o);if(!t)return "";const n=trackNo(o);
   return `<a class="trk ${cls||""}" href="${t.url}" target="_blank" rel="noopener" data-trkno="${esc(n)}" title="Отследить на сайте ${esc(t.name)}${n?" — номер "+esc(n)+" скопируется, вставьте его в поиск":""}">📍 Отследить${n?" "+esc(n):""} ↗</a>`}
