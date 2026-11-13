@@ -707,8 +707,12 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .ev .kico,.uitem .kico{width:13px;height:13px;vertical-align:-2px;margin-right:3px}
 .bbank{margin-top:4px;font-size:12.5px}.bbank input{font-size:12px;padding:3px 6px;width:210px;max-width:100%}
 /* container tracking link */
-.trk{display:inline-block;margin-top:5px;font-size:12px;color:var(--accent);text-decoration:none;white-space:nowrap}
-.trk:hover{text-decoration:underline}.trk.in{margin-top:0;margin-left:6px}
+.trkw{display:flex;flex-direction:column;align-items:flex-start;gap:3px;margin-top:6px}
+.trkw.in{display:inline-flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 0 6px;vertical-align:middle}
+.trk{font-size:12px;color:var(--accent);text-decoration:none;white-space:nowrap}.trk:hover{text-decoration:underline}
+.trkno{font:11.5px var(--f-body);color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:2px 7px;cursor:pointer;white-space:nowrap}
+.trkno b{font-family:var(--f-mono);font-weight:600}.trkno:hover{border-color:var(--accent)}.trkno.done{color:var(--ok);border-color:var(--ok)}
+.trkno.none{cursor:help;color:var(--muted);border-style:dashed}
 #e_trk:empty{display:none}#e_trk{margin-top:4px}
 /* 세금계산서 badge next to each supplier amount: green when uploaded, grey when not */
 .stx{flex:none;display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:4px;font:700 9.5px/1 var(--f-body);margin-right:5px;vertical-align:-2px;
@@ -1277,10 +1281,17 @@ const ICO_SHIP='<svg class="kico" viewBox="0 0 24 24" aria-hidden="true"><path d
 // the line is known from «Линия» or from the container / B/L number prefix (CKLU…, CKCO… are CK Line)
 const TRACK=[{re:/ck\s*line|ckline|천경/i,no:/^\s*CK(LU|CO|LS)/i,name:"CK Line",url:"https://es.ckline.co.kr/?cmd=TRK"}];
 const trackOf=o=>{const c=String(o&&o.carrier||"")+" "+String(o&&o.vessel||"");return TRACK.find(t=>t.re.test(c)||(t.no&&(t.no.test(o&&o.cont||"")||t.no.test(o&&o.bl||""))))||null};
-const trackNo=o=>String(o&&(o.cont||o.bl)||"").trim();
-function trackA(o,cls){const t=trackOf(o);if(!t)return "";const n=trackNo(o);
-  return `<a class="trk ${cls||""}" href="${t.url}" target="_blank" rel="noopener" data-trkno="${esc(n)}" title="Отследить на сайте ${esc(t.name)}${n?" — номер "+esc(n)+" скопируется, вставьте его в поиск":""}">📍 Отследить${n?" "+esc(n):""} ↗</a>`}
+const clean=v=>String(v||"").replace(/[\/,;]+\s*$/,"").trim();
+const trackNo=o=>clean(o&&(o.bl||o.cont));
+// the link, plus the B/L and container numbers as buttons that copy themselves (the line's site wants the number typed in)
+function trackA(o,cls){const t=trackOf(o);if(!t)return "";const bl=clean(o&&o.bl), ct=clean(o&&o.cont);
+  const cp=(lbl,v)=>`<button type="button" class="trkno" data-copy="${esc(v)}" title="Скопировать ${lbl} ${esc(v)}">${lbl} <b>${esc(v)}</b> ⧉</button>`;
+  return `<span class="trkw ${cls||""}"><a class="trk" href="${t.url}" target="_blank" rel="noopener" data-trkno="${esc(bl||ct)}" title="Открыть отслеживание ${esc(t.name)}${bl||ct?" — номер "+esc(bl||ct)+" скопируется":""}">📍 Отследить на ${esc(t.name)} ↗</a>`
+    +(bl?cp("B/L",bl):`<span class="trkno none" title="Впишите номер коносамента: «Открыть весь заказ» → «График и загрузка» → «Коносамент №»">B/L — не указан</span>`)+(ct?cp("конт.",ct):"")+`</span>`}
 document.addEventListener("click",e=>{const a=e.target.closest("a.trk");if(!a)return;e.stopPropagation();const n=a.dataset.trkno;if(n&&navigator.clipboard)navigator.clipboard.writeText(n).catch(()=>{})},true);
+document.addEventListener("click",async e=>{const b=e.target.closest("button.trkno[data-copy]");if(!b)return;e.preventDefault();e.stopPropagation();
+  try{await navigator.clipboard.writeText(b.dataset.copy)}catch(err){const t=document.createElement("textarea");t.value=b.dataset.copy;document.body.appendChild(t);t.select();document.execCommand("copy");t.remove()}
+  const h=b.innerHTML;b.classList.add("done");b.textContent="Скопировано ✓";setTimeout(()=>{b.innerHTML=h;b.classList.remove("done")},1400)},true);
 // order editor: the tracking link appears under «Линия» as soon as the line is known
 function paintTrk(){const el=$("e_trk");if(!el)return;const o={carrier:$("e_carrier").value,vessel:$("e_vessel").value,cont:$("e_cont").value,bl:$("e_bl").value};el.innerHTML=trackA(o,"in")}
 ["e_carrier","e_vessel","e_cont","e_bl"].forEach(id=>$(id)&&$(id).addEventListener("input",paintTrk));
