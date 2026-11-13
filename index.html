@@ -2963,7 +2963,7 @@ renderDocsAll=function(){
     const ext=extOf(f.name), view=f.enc==="raw"&&/pdf|image/.test(f.mime||"")||/^(docx|xlsx|xls|xlsm|csv)$/.test(ext);
     if(fDel===f.aid)return `<div class="dfl del"><span>Удалить «${esc(f.name)}»?</span><span class="da"><button type="button" class="ib danger" data-fdelyes="${esc(f.aid)}" data-oid="${esc(o.id)}">Да</button><button type="button" class="ib" data-fcancel>Нет</button></span></div>`;
     const tag=kindOf(f.kind)==="cs"?[csPart(f.orig||f.name),f.signer&&SIGN[f.signer]?SIGN[f.signer][2]:""].filter(Boolean).join(" · ")
-      :kindOf(f.kind)==="ipl"?[iplPart(f.orig||f.name),f.from==="calc"?"из калькуляции":""].filter(Boolean).join(" · "):f.from==="calc"?"из калькуляции":"";
+      :kindOf(f.kind)==="ipl"?[iplPart(f.orig||f.name),f.from==="calc"?"из калькуляции":""].filter(Boolean).join(" · "):kindOf(f.kind)==="taxinv"?(f.sup||""):f.from==="calc"?"из калькуляции":"";
     const g=guessKind(f.orig||f.name), odd=g&&g!==kindOf(f.kind)&&f.from!=="calc"&&!f.pm&&!(g==="calc"&&kindOf(f.kind)==="kp"&&/offer/i.test(f.name));
     const kindSel=canWrite?`<select class="dks" data-dkind="${esc(f.aid)}" data-oid="${esc(o.id)}" aria-label="Тип «${esc(f.name)}»" title="Сменить тип">${KINDS.map(([k,v])=>`<option value="${k}" ${kindOf(f.kind)===k?"selected":""}>${esc(v)}</option>`).join("")}</select>`:"";
     return `<div class="dfl"><span class="ext ${ext}">${ext||"файл"}</span><span class="dfn">`
@@ -2975,7 +2975,7 @@ renderDocsAll=function(){
     const fs=o.files||[], pics=fs.filter(isPic), docs=fs.filter(f=>!isPic(f));
     const kinds=new Set(docs.map(f=>kindOf(f.kind)));
     if(pics.length||linkOK(o.photoLink))kinds.add("photo");
-    if(!o.arch)(isImp(o)?["cs","ipl","lbl","lblph","test","photo","impdecl","brokinv"]:["kp","cs","ipl","exp","photo","expd","bl","freight"]).forEach(k=>kinds.add(k));
+    if(!o.arch)(isImp(o)?["cs","ipl","lbl","lblph","test","photo","impdecl","brokinv"]:["kp","cs","ipl","taxinv","exp","photo","expd","bl","freight"]).forEach(k=>kinds.add(k));
     let list=[...kinds].sort((a,b)=>kIdx(a)-kIdx(b));
     if(cur)list=list.filter(k=>k===cur);
     if(cur&&!docs.some(f=>kindOf(f.kind)===cur)&&!(cur==="photo"&&(pics.length||linkOK(o.photoLink))))return "";
@@ -2987,7 +2987,11 @@ renderDocsAll=function(){
         if(linkOK(o.photoLink))h+=`<div class="dfl"><a href="${esc(o.photoLink.trim())}" target="_blank" rel="noopener" data-ext>📁 Google Диск ↗</a></div>`;
         if(pics.length){nFiles+=pics.length;h+=`<div class="dfl"><span class="dfn">Фото: ${pics.length}</span><span class="da"><button type="button" class="ib" data-dlpics="${esc(o.id)}" title="Скачать все фото (.zip)">⬇</button></span></div>`}
       }
-      return `<tr class="${h?"":"none"}"><th scope="row">${esc(k==="photo"?"Фотоотчёт":(KIND[k]||"Прочее").replace(/ \(.*\)$/,""))}</th><td>${h||`<span class="dnone">нет</span>`}</td></tr>`;
+      // 세금계산서: which suppliers have not sent theirs yet
+      if(k==="taxinv"){const SL=sups(o).filter(x=>x.name), miss=SL.filter(x=>!taxFiles(o,x,SL).length).map(x=>x.name);
+        if(miss.length&&h)h+=`<div class="dfl"><span></span><span class="dnone">нет от: ${esc(miss.join(", "))}</span></div>`;
+        else if(miss.length)h=`<span class="dnone">нет от: ${esc(miss.join(", "))}</span>`}
+      return `<tr class="${h&&!/^<span class="dnone">/.test(h)?"":"none"}"><th scope="row">${esc(k==="photo"?"Фотоотчёт":k==="taxinv"?"세금계산서":(KIND[k]||"Прочее").replace(/ \(.*\)$/,""))}</th><td>${h||`<span class="dnone">нет</span>`}</td></tr>`;
     }).join("");
     return `<article class="dcard"><header><span class="num" data-open="${esc(o.id)}" title="Открыть заказ">${esc(o.num||"без номера")}</span><span class="who">${esc(o.buyer||"")}</span>${o.arch?`<small class="note">архив</small>`:""}<span class="cnt">${docs.length+pics.length} файл.</span></header><table class="dct"><tbody>${rows}</tbody></table></article>`;
   }).join("");
