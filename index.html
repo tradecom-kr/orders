@@ -762,7 +762,7 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
 .lnum{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 6px;min-width:0}.lnum b{font:600 15px var(--f-display)}.lnum small{flex-basis:100%;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .limp{font:600 10px var(--f-body);text-transform:uppercase;letter-spacing:.05em;background:var(--soft);color:var(--muted);border-radius:999px;padding:1px 7px;vertical-align:middle}
 .lst{display:flex;flex-direction:column;gap:4px;min-width:0}.lst small{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lbar{display:block;height:6px;border-radius:3px;background:var(--soft);overflow:hidden}.lbar>span{display:block;height:100%;background:var(--accent);border-radius:3px}.lbar.bad>span{background:var(--danger)}.lst small b{color:var(--ink);font-weight:600}
+.lbar{display:block;height:6px;border-radius:3px;background:var(--soft);overflow:hidden}.lbar>span{display:block;height:100%;background:var(--accent);border-radius:3px}.lbar.bad>span{background:var(--danger)}.lst small b{color:var(--ink);font-weight:600}.lhint{display:block;text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
 .lnow{display:flex;flex-direction:column;gap:2px;min-width:0;line-height:1.3}.lnow small{font-size:12px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.lnow .bad,.lpay.bad{color:var(--danger)}.lnow .warn{color:var(--warn)}.okt{color:var(--ok)}.muted{color:var(--muted)}
 .ldb{font:600 13px var(--f-mono);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:4px 7px;cursor:pointer;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.2;min-width:62px}
 .ldb:hover{border-color:var(--accent)}.ldb.bad{color:var(--danger);border-color:var(--danger)}.ldb.warn{color:var(--warn);border-color:var(--warn)}.ldb.ok{color:var(--ok)}.ldb.none{border-color:transparent;background:none;cursor:default;color:var(--muted)}
@@ -1442,7 +1442,8 @@ function lDateBtn(o,k,done){
   if(o.arch)return `<span class="ldb none">${d?mdd(d):"—"}</span>`;
   return `<button type="button" class="ldb ${cls} ${done?"ok":""}" data-qd="${esc(o.id)}" data-qk="${k}" title="Изменить дату">${d?mdd(d):"—"}${done?" ✓":""}${w?`<small>было ${mdd(w)}</small>`:""}</button>`}
 function lBar(a){const n=phasesOf(a.o).length, cur=a.closed?n:Math.min(a.cur,n), w=Math.round(Math.min(cur+1,n)/n*100);
-  return `<span class="lbar ${a.overdue?"bad":""}"><span style="width:${w}%"></span></span>`}
+  const why=a.overdue?a.alerts.filter(x=>x.c==="bad"||/была|прибыло/.test(x.t)).map(x=>x.t).filter(t=>!t.startsWith("Не загружены")).join("\n"):"";
+  return `<span class="lbar ${a.overdue?"bad":""}" title="${esc(a.overdue?"Красная — просрочен срок:\n"+why:"Синяя — сроки в порядке")}"><span style="width:${w}%"></span></span>`}
 function lNow(a){
   if(a.arch)return `<span class="muted">Архив${a.o.date?" · "+fd(a.o.date):""}</span>`;
   if(a.closed)return `<span class="okt">🎉 Завершена</span>`;
@@ -1535,7 +1536,7 @@ function renderList(){
   const vis=lSort(visible());
   renderWeek(vis);
   if(!vis.some(o=>o.id===lSel)){const f=vis.find(o=>!o.arch&&!an(o).closed)||vis[0];lSel=f?f.id:""}
-  $("lt").innerHTML=vis.length?`<div class="lr lhd"><div>Заказ</div><div>Этап</div><div>Что сейчас</div><div>Загрузка</div><div>Выход</div><div>Оплата</div></div>`+vis.map(lRow).join(""):`<div class="status">${orders.length?"Нет заказов под этот фильтр.":"Заказов пока нет."}</div>`;
+  $("lt").innerHTML=vis.length?`<div class="lr lhd"><div>Заказ</div><div title="Синяя полоска — сроки в порядке, красная — какой-то срок просрочен (наведите на полоску, чтобы увидеть какой)">Этап <span class="lhint">синяя — в срок · красная — просрочено</span></div><div>Что сейчас</div><div>Загрузка</div><div>Выход</div><div>Оплата</div></div>`+vis.map(lRow).join(""):`<div class="status">${orders.length?"Нет заказов под этот фильтр.":"Заказов пока нет."}</div>`;
   const lp=$("lp"), st=lp.querySelector(".lpb")?lp.scrollTop:0;
   lp.innerHTML=lPanel(orders.find(o=>o.id===lSel));lp.scrollTop=st;
 }
