@@ -904,6 +904,7 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
       <p class="note" id="autoNote" style="margin:0"></p>
       <fieldset data-sec="steps">
         <legend>Ход сделки</legend>
+        <div><button class="btn" type="button" id="flowBtn">Настроить ход</button> <span class="note">убрать лишние шаги, добавить свои шаги и этапы — только для этого заказа</span></div>
         <p class="note" style="margin:-4px 0 0">Шаги с документами отмечаются сами, когда файл загружен. Оплата, сроки поставщиков и место загрузки — когда заполнены поля ниже. Остальное отмечайте галочкой.</p>
         <div class="cl" id="cl"></div>
       </fieldset>
@@ -1611,12 +1612,12 @@ const LIB_EXP=[
 const LIB_IMP=PHASES_IMP.map(p=>p.id==="load"?{...p,steps:["place","photo"]}:p);
 const libOf=o=>isImp(o)?LIB_IMP:LIB_EXP;
 let FL=null; // working copy while the dialog is open: {oid, phases:[{id,t,steps,lib}], cs:{}, on:Set}
-function flowOpen(o){
+function flowOpen(o,local){
   const cur=phasesOf(o), lib=libOf(o), skip=o.skip||{};
   const cs=JSON.parse(JSON.stringify((o.flow&&o.flow.cs)||{}));
   const on=new Set(cur.flatMap(p=>p.steps).filter(id=>!skip[id]));
   const phases=cur.map(p=>({id:p.id,t:p.t,steps:p.steps.slice()}));
-  FL={oid:o.id,imp:isImp(o),phases,cs,on};
+  FL={oid:o.id,src:o,local:!!local,imp:isImp(o),phases,cs,on};
   let d=$("flowDlg");
   if(!d){d=document.createElement("dialog");d.id="flowDlg";d.className="fldlg";d.setAttribute("aria-labelledby","flT");document.body.appendChild(d);
     d.addEventListener("click",flowClick);d.addEventListener("change",flowChange)}
@@ -1626,12 +1627,12 @@ function flowOpen(o){
 function flowStepsOf(p){const L=(libOf(FL.imp?{type:"imp"}:{}).find(x=>x.id===p.id)||{steps:[]}).steps;
   return [...new Set([...L,...p.steps])].filter(id=>STEP[id]||FL.cs[id])}
 const flName=id=>FL.cs[id]?FL.cs[id].t:id==="cs_n"?"Контракт и спецификация — без подписи Ти В.":STEP[id].t;
-function flowPaint(){const d=$("flowDlg"), o=orders.find(x=>x.id===FL.oid)||{};
+function flowPaint(){const d=$("flowDlg"), o=FL.src||{};
   const lib=libOf(FL.imp?{type:"imp"}:{}), missing=lib.filter(p=>!FL.phases.some(x=>x.id===p.id));
   const others=orders.filter(x=>x.id!==FL.oid&&x.flow&&isImp(x)===FL.imp);
   const kOpts=KINDS.map(k=>`<option value="${k[0]}">Документ: ${esc(k[1])}</option>`).join("");
   const last=FL.phases.length-1;
-  d.innerHTML=`<div class="dlg"><header><h3 id="flT">Ход заказа ${esc(o.num||"")}</h3><button class="btn ghost" type="button" data-flx aria-label="Закрыть">✕</button></header>
+  d.innerHTML=`<div class="dlg"><header><h3 id="flT">${o.num?"Ход заказа "+esc(o.num):"Ход нового заказа"}</h3><button class="btn ghost" type="button" data-flx aria-label="Закрыть">✕</button></header>
   <div class="body">
     <p class="note" style="margin:0">Галочка — шаг есть в этом заказе. Снимите лишнее, отметьте нужное, добавьте свои шаги и этапы. Меняется только этот заказ.</p>
     ${others.length?`<label class="f"><span>Взять ход из другого заказа</span><select data-flcopy><option value="">—</option>${others.map(x=>`<option value="${esc(x.id)}">${esc(x.num||"без номера")} · ${esc(x.buyer||"")}</option>`).join("")}</select></label>`:""}
@@ -1668,8 +1669,10 @@ async function flowClick(e){const b=e.target.closest("button");if(!b)return;cons
     let p;if(v==="__new"){const t=d.querySelector("[data-flphname]").value.trim();if(!t)return;p={id:"p"+Date.now().toString(36),t,steps:[]}}
     else{const L=libOf(FL.imp?{type:"imp"}:{}).find(x=>x.id===v);p={id:L.id,t:L.t,steps:L.steps.filter(id=>STEP[id])};p.steps.forEach(id=>FL.on.add(id))}
     const ci=FL.phases.findIndex(x=>x.id==="closed");FL.phases.splice(ci<0?FL.phases.length:ci,0,p);flowPaint();return}
-  const o=orders.find(x=>x.id===FL.oid);if(!o||!db||!canWrite)return;
-  if("flreset" in D){try{await db.collection("orders").doc(o.id).update({flow:null,skip:{},updatedAt:new Date().toISOString()});d.close()}catch(err){$("flNote").textContent="Не сохранилось ("+(err&&err.code||"ошибка")+")."}return}
+  const o=FL.src;if(!o||!canWrite)return;
+  // from the order form: the set-up goes into the form and is saved with it (and at once, if the order already exists)
+  const put=async patch=>{if(FL.local){Object.assign(editing,patch);if(!patch.flow)delete editing.flow;refreshDerived();if(editing.id&&db)await db.collection("orders").doc(editing.id).update({...patch,updatedAt:new Date().toISOString()});$("saveNote").textContent=editing.id?"Ход заказа сохранён.":"Ход настроен — сохранится вместе с заказом."}else{if(!db)return;await db.collection("orders").doc(o.id).update({...patch,updatedAt:new Date().toISOString()})}};
+  if("flreset" in D){try{await put({flow:null,skip:{}});d.close()}catch(err){$("flNote").textContent="Не сохранилось ("+(err&&err.code||"ошибка")+")."}return}
   if("flsave" in D){
     // an own stage left without steps gets one step with its own name, so it does not disappear
     FL.phases.forEach(p=>{if(/^p/.test(p.id)&&!p.steps.some(id=>FL.on.has(id))){const id="c"+Date.now().toString(36)+Math.random().toString(36).slice(2,5);FL.cs[id]={t:p.t};p.steps.push(id);FL.on.add(id)}});
@@ -1679,11 +1682,12 @@ async function flowClick(e){const b=e.target.closest("button");if(!b)return;cons
     flowStepsAll(o).forEach(id=>{if(!phases.some(p=>p.steps.includes(id)))skip[id]=true});
     phases.forEach(p=>p.steps.forEach(id=>{delete skip[id]}));
     Object.keys(FL.cs).forEach(id=>{if(!phases.some(p=>p.steps.includes(id)))delete FL.cs[id]});
-    try{await db.collection("orders").doc(o.id).update({flow:{phases:phases.filter(p=>p.steps.length||p.id==="closed"),cs:FL.cs},skip,updatedAt:new Date().toISOString()});d.close()}
+    try{await put({flow:{phases:phases.filter(p=>p.steps.length||p.id==="closed"),cs:FL.cs},skip});d.close()}
     catch(err){$("flNote").textContent="Не сохранилось ("+(err&&err.code||"ошибка")+")."}
   }
 }
 const flowStepsAll=o=>[...new Set([...libOf(o).flatMap(p=>p.steps),...phasesOf(o).flatMap(p=>p.steps)])].filter(id=>STEP[id]);
+$("flowBtn").onclick=()=>{if(!editing)return;const o=formOrder();o.flow=editing.flow;o.skip=editing.skip;flowOpen(o,true)};
 
 /* ---------- «Квитанции»: weekly expense receipts by photo → rows added to the shared Excel file ---------- */
 let rcRows={}, rcMeta={}, rcEmp="", rcWho="", rcBusy=false, rcHist={};
