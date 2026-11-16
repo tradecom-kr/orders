@@ -788,7 +788,8 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
 .lfiles li{display:flex;flex-direction:column;padding:6px 0;border-bottom:1px solid var(--soft)}.lfiles small{color:var(--muted);font-size:11.5px}
 .lfl{border:0;background:none;padding:0;color:var(--accent);font:500 13px var(--f-body);cursor:pointer;text-align:left;text-decoration:none;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lfl:hover{text-decoration:underline}
 .lfiles .lfl{max-width:100%}
-.lun{border:0;background:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 4px}.lun:hover{color:var(--danger)}
+.lsteps li.skip{color:var(--muted)}.lsteps li.skip>i{border-style:dashed;color:var(--muted)}
+.lun{white-space:nowrap;border:0;background:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 4px}.lun:hover{color:var(--danger)}
 .btn.sm{padding:4px 9px;font-size:12px}
 .lkv{display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 0 0;font-size:12.5px;color:var(--muted)}.lkv b{color:var(--ink)}.lkv b.ok{color:var(--ok)}.lkv b.warn{color:var(--warn)}
 .lpact{margin-top:10px}
@@ -1205,8 +1206,11 @@ const AUTO={
   suppay:o=>{const L=sups(o).filter(x=>x.name||x.date);return L.length>0&&L.every(x=>x.paid)}
 };
 const etaDone=o=>isImp(o)?stepDone(o,"arrive"):(!!o.eta&&days(o.eta)<0)||stepDone(o,"closed");
-function stepDone(o,id){const s=STEP[id];if(id==="bldraft"&&!hasDoc(o,"bldraft"))return hasDoc(o,"bl");if(id==="payreq"&&!hasDoc(o,"payreq"))return AUTO.suppay(o)||!!o.arch;if(s.mode==="doc")return hasDoc(o,s.doc);if(s.mode==="auto")return AUTO[id](o);return !!(o.steps&&o.steps[id])}
-function stepDate(o,id){const s=STEP[id];if(id==="got")return o.date||String(o.createdAt||"").slice(0,10);if(id==="photo"&&linkOK(o.photoLink)&&o.photoAt)return o.photoAt;if(s.mode==="doc")return docDate(o,s.doc);return (o.steps&&o.steps[id])||""}
+// a step marked «не нужно» in this order counts as closed and its paper is not asked for
+const skipped=(o,id)=>!!(o&&o.skip&&o.skip[id]);
+const skipDoc=(o,r)=>!!(o&&o.skip)&&Object.keys(o.skip).some(id=>o.skip[id]&&STEP[id]&&STEP[id].doc===r);
+function stepDone(o,id){if(skipped(o,id))return true;const s=STEP[id];if(id==="bldraft"&&!hasDoc(o,"bldraft"))return hasDoc(o,"bl");if(id==="payreq"&&!hasDoc(o,"payreq"))return AUTO.suppay(o)||!!o.arch;if(s.mode==="doc")return hasDoc(o,s.doc);if(s.mode==="auto")return AUTO[id](o);return !!(o.steps&&o.steps[id])}
+function stepDate(o,id){if(skipped(o,id))return "";const s=STEP[id];if(id==="got")return o.date||String(o.createdAt||"").slice(0,10);if(id==="photo"&&linkOK(o.photoLink)&&o.photoAt)return o.photoAt;if(s.mode==="doc")return docDate(o,s.doc);return (o.steps&&o.steps[id])||""}
 function nextText(o,id){
   const s=STEP[id], L=sups(o).filter(x=>x.name||x.date);
   if(id==="supconf")return L.length?`${s.next} (${L.filter(x=>x.st==="confirmed"&&x.date).length} из ${L.length})`:"Указать поставщиков и подтвердить их сроки";
@@ -1247,7 +1251,7 @@ function analyze0(o){
   if(imp){due.ipl=()=>!!o.loadAt&&days(o.loadAt)<=3;
     due.impdecl=()=>stepDone(o,"arrive")||stepDone(o,"released");due.brokinv=()=>stepDone(o,"released")}
   PHASES.forEach((p,i)=>{if(!REQ[p.id])return;
-    const m=REQ[p.id].filter(r=>due[r]()&&!hasDoc(o,r)); if(m.length){ph[i].issue=true;missing.push(...m)}});
+    const m=REQ[p.id].filter(r=>due[r]()&&!hasDoc(o,r)&&!skipDoc(o,r)); if(m.length){ph[i].issue=true;missing.push(...m)}});
   if(!closed){
     const L=sups(o).filter(x=>x.name||x.date), paid=o.pay==="paid", loaded=stepDone(o,"photo");
     if(missing.length)alerts.push({c:"bad",t:"Не загружены: "+missing.map(r=>REQL[r]).join(", ")});
@@ -1487,7 +1491,9 @@ function renderWeek(vis){
   $("wk").innerHTML=`<h2>На этой неделе <span>${rng}</span></h2><div class="wkl">${L.map(x=>`<button type="button" class="wki ${x.c}" data-lsel="${esc(x.o.id)}"><span class="wkh"><span class="wkt">${x.label}</span>${x.d?`<b>${mdd(x.d)}</b>`:""}</span><span class="wkw"><b>${esc(x.o.num||"")}</b> ${esc(x.what)}</span>${x.sub?`<small>${esc(x.sub)}</small>`:""}</button>`).join("")||`<span class="note">На этой неделе загрузок, выходов судов и других сроков нет.</span>`}</div>`;
 }
 const stepName=id=>SHORT[id]||STEP[id].t;
-function lStepRow(o,id,ph){const s=STEP[id], done=stepDone(o,id), d=done?stepDate(o,id):"";
+function lStepRow(o,id,ph){const s=STEP[id];
+  if(skipped(o,id))return `<li class="skip"><i>–</i><span class="lsn">${esc(stepName(id))}<small>не нужно в этом заказе</small></span><span class="lsa">${canWrite?`<button type="button" class="lun" data-lskip="${id}" data-on="0" title="Вернуть шаг">вернуть</button>`:""}</span></li>`;
+  const done=stepDone(o,id), d=done?stepDate(o,id):"";
   let act="";
   const files=s.mode==="doc"?(s.doc==="photo"&&linkOK(o.photoLink)?[]:reqFiles(o,s.doc)):[];
   if(done){
@@ -1498,6 +1504,7 @@ function lStepRow(o,id,ph){const s=STEP[id], done=stepDone(o,id), d=done?stepDat
     if(s.mode==="doc")act=s.doc==="photo"?`<button type="button" class="btn sm" data-ledit="${ph}">Вставить ссылку</button>`:`<button type="button" class="btn sm" data-lup="${UPK[s.doc]||""}" data-lph="${ph}">+ Загрузить</button>`;
     else if(s.mode==="manual")act=s.req&&!s.req(o)?`<button type="button" class="btn sm" data-ledit="${ph}" title="${esc(s.reqMsg||"")}">Заполнить</button>`:`<button type="button" class="btn sm" data-lstep="${id}" data-on="1">Отметить</button>`;
     else act=`<span class="note" title="${esc(s.hint||"")}">отметится само</span>`;
+    if(!["got","closed"].includes(id))act+=`<button type="button" class="lun" data-lskip="${id}" data-on="1" title="В этом заказе этот шаг не нужен">не нужно</button>`;
   }
   return `<li class="${done?"ok":""}"><i>${done?"✓":""}</i><span class="lsn">${esc(stepName(id))}${d?`<small>${fd(d)}</small>`:""}</span><span class="lsa">${act}</span></li>`}
 function lSups(o){const L=sups(o).filter(x=>x.name||x.date);if(!L.length)return `<p class="note">Поставщики не указаны.</p>`;
@@ -1554,6 +1561,8 @@ $("listView").addEventListener("click",async e=>{
   const o=orders.find(x=>x.id===lSel);
   const ed=t.closest("[data-ledit]");if(ed&&o){openEditor(o,ed.dataset.ledit||null);return}
   const up=t.closest("[data-lup]");if(up&&o){openEditor(o,up.dataset.lph||null);const k=up.dataset.lup;if($("upKind")){$("upKind").value=k;$("upSigner").hidden=k!=="cs"}$("upFile").click();return}
+  const sk=t.closest("[data-lskip]");if(sk&&o&&db&&canWrite){const id=sk.dataset.lskip, skip={...(o.skip||{})};if(sk.dataset.on==="1")skip[id]=true;else delete skip[id];
+    sk.disabled=true;try{await db.collection("orders").doc(o.id).update({skip,updatedAt:new Date().toISOString()})}catch(err){sk.disabled=false;showStatus("Не получилось сохранить ("+(err&&err.code||"ошибка")+").",true)}return}
   const sb=t.closest("[data-lstep]");if(sb&&o&&db&&canWrite){const id=sb.dataset.lstep, on=sb.dataset.on==="1";
     const steps={...(o.steps||{}),[id]:on?isoToday():""}, toArch=id==="closed"&&on&&!o.arch;
     sb.disabled=true;
