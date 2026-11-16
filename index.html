@@ -813,6 +813,11 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
   .lr.lhd{display:none}
   .lpd{grid-template-columns:1fr 1fr 1fr}
 }
+.fldlg{width:min(640px,calc(100vw - 24px))}
+.flph{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.flph>header{display:flex;gap:6px;align-items:center}.flph>header .sp{flex:1}
+.flph ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}.flph li{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.fladd{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.fladd input{flex:1 1 200px;width:auto}.fladd select{width:auto;max-width:230px}
 </style>
 
 </head>
@@ -1063,7 +1068,10 @@ const isImp=o=>!!o&&o.type==="imp";
 // some buyers do not need Ти В.'s signature: their contract step is one plain «Контракт и спецификация»
 const PHASES_NOTI=PHASES.map(p=>p.id==="docs"?{...p,steps:["kp","cs_n","ipl"]}:p);
 const tiNeeded=o=>{try{const b=(buyers||[]).find(x=>x.name===(o&&o.buyer));return !(b&&b.noTi)}catch(e){return true}};
-const phasesOf=o=>isImp(o)?PHASES_IMP:tiNeeded(o)?PHASES:PHASES_NOTI;
+const basePhases=o=>isImp(o)?PHASES_IMP:tiNeeded(o)?PHASES:PHASES_NOTI;
+// an order with its own set-up («Настроить ход») keeps its stages and steps in o.flow; its own steps are in o.flow.cs
+function regFlow(o){const c=o&&o.flow&&o.flow.cs;if(!c)return;for(const[id,d] of Object.entries(c)){if(!d||!d.t)continue;if(!STEP[id]||STEP[id].custom){STEP[id]={n:"",t:d.t,mode:d.doc?"doc":"manual",...(d.doc?{doc:d.doc}:{}),next:(d.doc?"Загрузить: ":"Сделать: ")+d.t,custom:true};SHORT[id]=d.t}}}
+const phasesOf=o=>{if(o&&o.flow&&Array.isArray(o.flow.phases)&&o.flow.phases.length){regFlow(o);const L=o.flow.phases.map(p=>({id:p.id,t:p.t,steps:(p.steps||[]).filter(id=>STEP[id])})).filter(p=>p.steps.length);if(L.length)return L}return basePhases(o)};
 const pidxOf=o=>Object.fromEntries(phasesOf(o).map((p,i)=>[p.id,i]));
 // short names for the step list under each part of the progress bar
 const SHORT={bldraft:"Проверочный B/L",payreq:"Запрос на оплату",arrive:"Контейнер получен",impdecl:"Импортная декларация",released:"Растаможен",brokinv:"Счёт за растаможку",i_cs:"Контракт и спец.",lbl:"Этикетки",lblph:"Фото этикеток",test:"Протокол испытаний",got:"Заказ получен",check:"Цены и наличие",kp:"КП",cs:"Контракт и спец. (Ти)",cs2:"Подписанный контракт",ipl:"Инвойс и упаковочный",vessel:"Судно утверждено",supconf:"Сроки поставщиков",paid:"Оплата получена",bank:"Контракт и спец. (Ден Е.)",place:"Место и время загрузки",exp:"Экспортная декларация",photo:"Фотоотчёт",expd:"Exp. dates",suppay:"Поставщикам оплачено",port:"Контейнер в порту",bl:"Коносамент",freight:"Счёт за отгрузку",broker:"Пакет брокеру",closed:"Сделка завершена 🎉"};
@@ -1256,8 +1264,9 @@ function analyze0(o){
   };
   if(imp){due.ipl=()=>!!o.loadAt&&days(o.loadAt)<=3;
     due.impdecl=()=>stepDone(o,"arrive")||stepDone(o,"released");due.brokinv=()=>stepDone(o,"released")}
+  const allS=PHASES.flatMap(p=>p.steps), inFlow=r=>allS.some(id=>STEP[id]&&STEP[id].doc===r)||(r==="cs_den"&&allS.includes("bank"));
   PHASES.forEach((p,i)=>{if(!REQ[p.id])return;
-    const m=REQ[p.id].filter(r=>due[r]()&&!hasDoc(o,r)&&!skipDoc(o,r)); if(m.length){ph[i].issue=true;missing.push(...m)}});
+    const m=REQ[p.id].filter(r=>inFlow(r)&&due[r]&&due[r]()&&!hasDoc(o,r)&&!skipDoc(o,r)); if(m.length){ph[i].issue=true;missing.push(...m)}});
   if(!closed){
     const L=sups(o).filter(x=>x.name||x.date), paid=o.pay==="paid", loaded=stepDone(o,"photo");
     if(missing.length)alerts.push({c:"bad",t:"Не загружены: "+missing.map(r=>REQL[r]).join(", ")});
@@ -1513,7 +1522,7 @@ function lStepRow(o,id,ph){const s=STEP[id];
     else if(files.length)act=`<button type="button" class="lfl"${fOpen(o,files)}>${esc(byNew(files)[0].name||"файл")}${files.length>1?` +${files.length-1}`:""}</button>`;
     if(s.mode==="manual"&&canWrite&&id!=="got")act+=`<button type="button" class="lun" data-lstep="${id}" data-on="0" title="Снять отметку">✕</button>`;
   }else if(canWrite){
-    if(s.mode==="doc")act=s.doc==="photo"?`<button type="button" class="btn sm" data-ledit="${ph}">Вставить ссылку</button>`:`<button type="button" class="btn sm" data-lup="${UPK[s.doc]||""}" data-lph="${ph}">+ Загрузить</button>`;
+    if(s.mode==="doc")act=s.doc==="photo"?`<button type="button" class="btn sm" data-ledit="${ph}">Вставить ссылку</button>`:`<button type="button" class="btn sm" data-lup="${UPK[s.doc]||(KIND[s.doc]?s.doc:"")}" data-lph="${ph}">+ Загрузить</button>`;
     else if(s.mode==="manual")act=s.req&&!s.req(o)?`<button type="button" class="btn sm" data-ledit="${ph}" title="${esc(s.reqMsg||"")}">Заполнить</button>`:`<button type="button" class="btn sm" data-lstep="${id}" data-on="1">Отметить</button>`;
     else act=`<span class="note" title="${esc(s.hint||"")}">отметится само</span>`;
     if(!["got","closed"].includes(id))act+=`<button type="button" class="lun" data-lskip="${id}" data-on="1" title="В этом заказе этот шаг не нужен">не нужно</button>`;
@@ -1552,7 +1561,7 @@ function lPanel(o){
     ${al?`<div class="alerts lpal">${al}</div>`:""}
     <div class="lptabs" role="tablist">${tabs}</div>
     <div class="lpb">${body}</div>
-    <footer class="lpf"><button type="button" class="btn" data-ledit="">Открыть весь заказ</button>${o.notes?`<span class="note" title="${esc(o.notes)}">📝 ${esc(String(o.notes).slice(0,80))}${String(o.notes).length>80?"…":""}</span>`:""}</footer>`;
+    <footer class="lpf"><button type="button" class="btn" data-ledit="">Открыть весь заказ</button>${canWrite&&!o.arch?`<button type="button" class="btn ghost" data-lflow>Настроить ход</button>`:""}${o.notes?`<span class="note" title="${esc(o.notes)}">📝 ${esc(String(o.notes).slice(0,80))}${String(o.notes).length>80?"…":""}</span>`:""}</footer>`;
 }
 function lSort(vis){const key=o=>String(o.date||o.createdAt||"").slice(0,10), nn=o=>parseInt(String(o.num||"").replace(/\D+/g," ").trim().split(" ").pop())||0, added=o=>String(o.createdAt||o.date||"");
   return vis.sort((x,y)=>(!!x.arch-!!y.arch)||(x.arch?key(y).localeCompare(key(x)):added(y).localeCompare(added(x)))||nn(y)-nn(x))}
@@ -1571,6 +1580,7 @@ $("listView").addEventListener("click",async e=>{
   const tb=t.closest("[data-ltab]");if(tb){lTab[lSel]=tb.dataset.ltab;$("lp").innerHTML=lPanel(orders.find(o=>o.id===lSel));return}
   if(t.closest("[data-lclose]")){document.body.classList.remove("lp-open");return}
   const o=orders.find(x=>x.id===lSel);
+  if(t.closest("[data-lflow]")&&o){flowOpen(o);return}
   const ed=t.closest("[data-ledit]");if(ed&&o){openEditor(o,ed.dataset.ledit||null);return}
   const up=t.closest("[data-lup]");if(up&&o){openEditor(o,up.dataset.lph||null);const k=up.dataset.lup;if($("upKind")){$("upKind").value=k;$("upSigner").hidden=k!=="cs"}$("upFile").click();return}
   const sk=t.closest("[data-lskip]");if(sk&&o&&db&&canWrite){const id=sk.dataset.lskip, skip={...(o.skip||{})};if(sk.dataset.on==="1")skip[id]=true;else delete skip[id];
@@ -1586,6 +1596,94 @@ $("listView").addEventListener("keydown",e=>{const r=e.target.closest(".lr[data-
   if(e.key==="Enter"||e.key===" "){e.preventDefault();lPick(r.dataset.lsel)}
   if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();const n=e.key==="ArrowDown"?r.nextElementSibling:r.previousElementSibling;if(n&&n.dataset.lsel){lPick(n.dataset.lsel);const m=$("lt").querySelector(`[data-lsel="${CSS.escape(n.dataset.lsel)}"]`);m&&m.focus()}}});
 $("vList").onclick=()=>{view="list";save("view",view);render()};
+/* ---------- «Настроить ход»: each order's stages and steps — take out, put back, add your own, change the order ---------- */
+// everything that can go into an order, stage by stage; the board's usual set is a part of it
+const LIB_EXP=[
+  {id:"order", t:"Заказ",      steps:["got","check"]},
+  {id:"docs",  t:"Документы",  steps:["kp","cs","cs2","cs_n","ipl"]},
+  {id:"sched", t:"График",     steps:["vessel","supconf"]},
+  {id:"pay",   t:"Оплата",     steps:["paid","bank"]},
+  {id:"suppay",t:"Поставщики", steps:["suppay","payreq"]},
+  {id:"load",  t:"Загрузка",   steps:["place","exp","photo","expd"]},
+  {id:"port",  t:"Порт",       steps:["port","bldraft","bl","freight","broker"]},
+  {id:"closed",t:"Успех",      steps:["closed"]}
+];
+const LIB_IMP=PHASES_IMP.map(p=>p.id==="load"?{...p,steps:["place","photo"]}:p);
+const libOf=o=>isImp(o)?LIB_IMP:LIB_EXP;
+let FL=null; // working copy while the dialog is open: {oid, phases:[{id,t,steps,lib}], cs:{}, on:Set}
+function flowOpen(o){
+  const cur=phasesOf(o), lib=libOf(o), skip=o.skip||{};
+  const cs=JSON.parse(JSON.stringify((o.flow&&o.flow.cs)||{}));
+  const on=new Set(cur.flatMap(p=>p.steps).filter(id=>!skip[id]));
+  const phases=cur.map(p=>({id:p.id,t:p.t,steps:p.steps.slice()}));
+  FL={oid:o.id,imp:isImp(o),phases,cs,on};
+  let d=$("flowDlg");
+  if(!d){d=document.createElement("dialog");d.id="flowDlg";d.className="fldlg";d.setAttribute("aria-labelledby","flT");document.body.appendChild(d);
+    d.addEventListener("click",flowClick);d.addEventListener("change",flowChange)}
+  flowPaint();d.showModal();
+}
+// steps shown under a stage: the library's steps for it (ticked when used), then the order's own steps
+function flowStepsOf(p){const L=(libOf(FL.imp?{type:"imp"}:{}).find(x=>x.id===p.id)||{steps:[]}).steps;
+  return [...new Set([...L,...p.steps])].filter(id=>STEP[id]||FL.cs[id])}
+const flName=id=>FL.cs[id]?FL.cs[id].t:id==="cs_n"?"Контракт и спецификация — без подписи Ти В.":STEP[id].t;
+function flowPaint(){const d=$("flowDlg"), o=orders.find(x=>x.id===FL.oid)||{};
+  const lib=libOf(FL.imp?{type:"imp"}:{}), missing=lib.filter(p=>!FL.phases.some(x=>x.id===p.id));
+  const others=orders.filter(x=>x.id!==FL.oid&&x.flow&&isImp(x)===FL.imp);
+  const kOpts=KINDS.map(k=>`<option value="${k[0]}">Документ: ${esc(k[1])}</option>`).join("");
+  const last=FL.phases.length-1;
+  d.innerHTML=`<div class="dlg"><header><h3 id="flT">Ход заказа ${esc(o.num||"")}</h3><button class="btn ghost" type="button" data-flx aria-label="Закрыть">✕</button></header>
+  <div class="body">
+    <p class="note" style="margin:0">Галочка — шаг есть в этом заказе. Снимите лишнее, отметьте нужное, добавьте свои шаги и этапы. Меняется только этот заказ.</p>
+    ${others.length?`<label class="f"><span>Взять ход из другого заказа</span><select data-flcopy><option value="">—</option>${others.map(x=>`<option value="${esc(x.id)}">${esc(x.num||"без номера")} · ${esc(x.buyer||"")}</option>`).join("")}</select></label>`:""}
+    ${FL.phases.map((p,i)=>{const fixed=p.id==="closed";return `<section class="flph">
+      <header><b>${i+1}. ${esc(p.t)}</b><span class="sp"></span>${fixed?"":`<button type="button" class="btn ghost sm" data-flup="${i}" ${i===0?"disabled":""} title="Выше">↑</button><button type="button" class="btn ghost sm" data-fldn="${i}" ${i>=last-1?"disabled":""} title="Ниже">↓</button><button type="button" class="btn ghost sm" data-fldel="${i}" title="Убрать этап">Убрать этап</button>`}</header>
+      <ul>${flowStepsOf(p).map(id=>`<li><label class="chk"><input type="checkbox" data-flon="${id}" data-flph="${i}" ${FL.on.has(id)&&p.steps.includes(id)?"checked":""} ${id==="closed"||id==="got"?"disabled":""}> ${esc(flName(id))}${FL.cs[id]?` <span class="note">${FL.cs[id].doc?"· документ":"· отметка"}</span>`:""}</label>${FL.cs[id]?`<button type="button" class="lun" data-flcdel="${id}" data-flph="${i}" title="Удалить свой шаг">удалить</button>`:""}</li>`).join("")}</ul>
+      ${fixed?"":`<div class="fladd"><input placeholder="Свой шаг, например «Сертификат соответствия»" data-flnew="${i}"><select data-flkind="${i}"><option value="">Отметка галочкой</option>${kOpts}</select><button type="button" class="btn sm" data-fladd="${i}">+ Шаг</button></div>`}
+    </section>`}).join("")}
+    <div class="fladd"><select data-flphlib><option value="">+ Добавить этап…</option>${missing.filter(p=>p.id!=="closed").map(p=>`<option value="${p.id}">${esc(p.t)}</option>`).join("")}<option value="__new">Свой этап…</option></select><input placeholder="Название своего этапа" data-flphname hidden><button type="button" class="btn sm" data-flphadd>Добавить</button></div>
+    <p class="note" id="flNote" style="margin:0"></p>
+  </div>
+  <footer><button type="button" class="btn ghost" data-flreset title="Убрать все настройки этого заказа">Стандартный ход</button><span class="sp"></span><button type="button" class="btn" data-flx>Отмена</button><button type="button" class="btn primary" data-flsave>Сохранить</button></footer></div>`;
+}
+function flowChange(e){const t=e.target;
+  if(t.dataset.flon){const id=t.dataset.flon, p=FL.phases[+t.dataset.flph];
+    if(t.checked){FL.on.add(id);if(!p.steps.includes(id)){const L=flowStepsOf(p);p.steps.push(id);p.steps.sort((a,b)=>L.indexOf(a)-L.indexOf(b))}}
+    else FL.on.delete(id)}
+  if("flphlib" in t.dataset){const nm=$("flowDlg").querySelector("[data-flphname]");nm.hidden=t.value!=="__new";if(!nm.hidden)nm.focus()}
+  if("flcopy" in t.dataset&&t.value){const src=orders.find(x=>x.id===t.value);if(!src)return;
+    const cur=phasesOf(src), sk=src.skip||{};
+    FL.phases=cur.map(p=>({id:p.id,t:p.t,steps:p.steps.slice()}));FL.cs=JSON.parse(JSON.stringify((src.flow&&src.flow.cs)||{}));
+    FL.on=new Set(cur.flatMap(p=>p.steps).filter(id=>!sk[id]));flowPaint();$("flNote").textContent=`Взят ход заказа ${src.num||""}. Нажмите «Сохранить».`}
+}
+async function flowClick(e){const b=e.target.closest("button");if(!b)return;const D=b.dataset, d=$("flowDlg");
+  if("flx" in D){d.close();return}
+  if(D.flup){const i=+D.flup;[FL.phases[i-1],FL.phases[i]]=[FL.phases[i],FL.phases[i-1]];flowPaint();return}
+  if(D.fldn){const i=+D.fldn;[FL.phases[i+1],FL.phases[i]]=[FL.phases[i],FL.phases[i+1]];flowPaint();return}
+  if(D.fldel){const p=FL.phases[+D.fldel];p.steps.forEach(id=>FL.on.delete(id));FL.phases.splice(+D.fldel,1);flowPaint();return}
+  if(D.flcdel){const id=D.flcdel, p=FL.phases[+D.flph];p.steps=p.steps.filter(x=>x!==id);delete FL.cs[id];FL.on.delete(id);flowPaint();return}
+  if(D.fladd){const i=+D.fladd, inp=d.querySelector(`[data-flnew="${i}"]`), t=inp.value.trim();if(!t){inp.focus();return}
+    const id="c"+Date.now().toString(36)+Math.random().toString(36).slice(2,5), doc=d.querySelector(`[data-flkind="${i}"]`).value;
+    FL.cs[id]={t,...(doc?{doc}:{})};FL.phases[i].steps.push(id);FL.on.add(id);flowPaint();return}
+  if("flphadd" in D){const v=d.querySelector("[data-flphlib]").value;if(!v)return;
+    let p;if(v==="__new"){const t=d.querySelector("[data-flphname]").value.trim();if(!t)return;p={id:"p"+Date.now().toString(36),t,steps:[]}}
+    else{const L=libOf(FL.imp?{type:"imp"}:{}).find(x=>x.id===v);p={id:L.id,t:L.t,steps:L.steps.filter(id=>STEP[id])};p.steps.forEach(id=>FL.on.add(id))}
+    const ci=FL.phases.findIndex(x=>x.id==="closed");FL.phases.splice(ci<0?FL.phases.length:ci,0,p);flowPaint();return}
+  const o=orders.find(x=>x.id===FL.oid);if(!o||!db||!canWrite)return;
+  if("flreset" in D){try{await db.collection("orders").doc(o.id).update({flow:null,skip:{},updatedAt:new Date().toISOString()});d.close()}catch(err){$("flNote").textContent="Не сохранилось ("+(err&&err.code||"ошибка")+")."}return}
+  if("flsave" in D){
+    // an own stage left without steps gets one step with its own name, so it does not disappear
+    FL.phases.forEach(p=>{if(/^p/.test(p.id)&&!p.steps.some(id=>FL.on.has(id))){const id="c"+Date.now().toString(36)+Math.random().toString(36).slice(2,5);FL.cs[id]={t:p.t};p.steps.push(id);FL.on.add(id)}});
+    const phases=FL.phases.map(p=>({id:p.id,t:p.t,steps:p.steps.filter(id=>FL.on.has(id)||id==="closed"||id==="got")}));
+    // steps taken out count as «не нужно», so the board does not ask for their papers
+    const skip={...(o.skip||{})};
+    flowStepsAll(o).forEach(id=>{if(!phases.some(p=>p.steps.includes(id)))skip[id]=true});
+    phases.forEach(p=>p.steps.forEach(id=>{delete skip[id]}));
+    Object.keys(FL.cs).forEach(id=>{if(!phases.some(p=>p.steps.includes(id)))delete FL.cs[id]});
+    try{await db.collection("orders").doc(o.id).update({flow:{phases:phases.filter(p=>p.steps.length||p.id==="closed"),cs:FL.cs},skip,updatedAt:new Date().toISOString()});d.close()}
+    catch(err){$("flNote").textContent="Не сохранилось ("+(err&&err.code||"ошибка")+")."}
+  }
+}
+const flowStepsAll=o=>[...new Set([...libOf(o).flatMap(p=>p.steps),...phasesOf(o).flatMap(p=>p.steps)])].filter(id=>STEP[id]);
 
 /* ---------- «Квитанции»: weekly expense receipts by photo → rows added to the shared Excel file ---------- */
 let rcRows={}, rcMeta={}, rcEmp="", rcWho="", rcBusy=false, rcHist={};
@@ -1877,11 +1975,11 @@ const PSEC={customs:["sched","docs"],cbill:["docs","notes"],labels:["deal","docs
 const PKIND={customs:["impdecl"],cbill:["brokinv"],labels:["lbl","lblph"],test:["test"],order:["calc","po"],docs:["kp","cs","ipl"],sched:[],pay:["cs","pay"],load:["exp","photo","expd"],suppay:["payreq","pay","po"],port:["bl","freight","cert"],closed:[]};
 function applyFocus(){
   const arch=!!(editing&&editing.arch), f=arch?null:focus;
-  document.querySelectorAll("#form [data-sec]").forEach(el=>{el.hidden=arch?!["deal","docs","notes"].includes(el.dataset.sec):!!f&&el.dataset.sec!=="steps"&&!PSEC[f].includes(el.dataset.sec)});
+  document.querySelectorAll("#form [data-sec]").forEach(el=>{el.hidden=arch?!["deal","docs","notes"].includes(el.dataset.sec):!!f&&el.dataset.sec!=="steps"&&!(PSEC[f]||["docs","notes"]).includes(el.dataset.sec)});
   $("dPh").hidden=arch;$("dAl").hidden=arch;if($("docKinds"))$("docKinds").hidden=arch;
   $("allBtn").hidden=!f;
   $("dlgTitle").textContent=(editing&&editing.id?`Заказ ${editing.num||""}${arch?" · архив":""}`:arch?"Прошлая отгрузка":"Новый заказ")+(f?` · ${(phasesOf(editing).find(p=>p.id===f)||{t:""}).t}`:"");
-  if(f&&PKIND[f].length){$("upKind").value=PKIND[f][0];$("upSigner").hidden=PKIND[f][0]!=="cs"}
+  if(f&&(PKIND[f]||[]).length){$("upKind").value=PKIND[f][0];$("upSigner").hidden=PKIND[f][0]!=="cs"}
 }
 function setFocus(f){focus=f||null;applyFocus();renderFiles();refreshDerived();$("dlg").querySelector(".body").scrollTop=0}
 $("allBtn").onclick=()=>setFocus(null);
@@ -2663,7 +2761,7 @@ function renderFiles(){
   const chk=(ok,t)=>`<span class="pill ${ok?"ok":""}">${ok?"✓ ":""}${t}</span>`;
   $("docKinds").innerHTML=(focus?(REQ[focus]||[]):Object.keys(REQL)).map(r=>chk(hasDoc(editing,r),REQL[r])).join("")
     +(tiNeeded(editing)&&files.some(f=>kindOf(f.kind)==="cs"&&!f.signer)?`<span class="pill warn">Укажите подпись у контракта</span>`:"");
-  const shownAll=focus&&PKIND[focus].length?files.filter(f=>PKIND[focus].includes(kindOf(f.kind))):files;
+  const shownAll=focus&&(PKIND[focus]||[]).length?files.filter(f=>PKIND[focus].includes(kindOf(f.kind))):files;
   const pics=shownAll.filter(isPic), shown=shownAll.filter(f=>!isPic(f));
   $("fileList").innerHTML=(pics.length?galleryRow(pics,editing.id):"")+(shown.length?[...shown].sort((a,b)=>KINDS.findIndex(k=>k[0]===kindOf(a.kind))-KINDS.findIndex(k=>k[0]===kindOf(b.kind))).map(f=>{
     if(fDel===f.aid)return `<div class="frow"><span class="confirm" style="grid-column:1/3">Удалить «${esc(f.name)}» навсегда?</span><span class="acts"><button class="btn danger" type="button" data-fdelyes="${esc(f.aid)}">Удалить</button><button class="btn ghost" type="button" data-fcancel>Отмена</button></span></div>`;
