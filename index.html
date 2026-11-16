@@ -743,6 +743,68 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
 .qdpop{position:absolute;z-index:60;width:260px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:12px;display:flex;flex-direction:column;gap:8px;font-size:13px}
 .qdpop label{display:flex;flex-direction:column;gap:3px;color:var(--muted);font-size:12px}.qdpop input{font-size:14px;padding:5px 8px}
 .qdb{display:flex;gap:6px}
+/* «Заказы»: list + week strip + side panel */
+.wk{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.wk h2{margin:0;font:600 15px var(--f-display);color:var(--ink)}.wk h2 span{color:var(--muted);font-weight:500;margin-left:6px}
+.wkl{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.wki{flex:0 0 210px;text-align:left;border:1px solid var(--line);border-left:4px solid var(--accent);background:var(--bg);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:3px;cursor:pointer;font:13px var(--f-body);color:var(--ink)}
+.wki:hover{border-color:var(--accent)}
+.wki.bad{border-left-color:var(--danger);background:var(--danger-soft)}.wki.warn{border-left-color:var(--warn)}.wki.moved{border-left-color:var(--warn);background:var(--warn-soft)}.wki.miss{border-left-color:var(--danger)}
+.wkh{display:flex;justify-content:space-between;gap:6px}.wkt{font:600 10.5px var(--f-body);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}.wki.bad .wkt,.wki.miss .wkt{color:var(--danger)}.wki.moved .wkt{color:var(--warn)}
+.wkh b{font:600 13px var(--f-mono)}.wkw{line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.wki small{color:var(--muted);font-size:11.5px}.wki.moved small{color:var(--warn);font-weight:600}
+.lv{display:grid;grid-template-columns:minmax(0,1fr) 440px;gap:14px;align-items:start}
+.lt{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.lr{display:grid;grid-template-columns:minmax(120px,1.1fr) 150px minmax(160px,2fr) 82px 82px 92px;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--soft);cursor:pointer;font:13px var(--f-body);color:var(--ink);border-left:3px solid transparent}
+.lr:hover{background:var(--bg)}.lr.sel{background:var(--accent-soft);border-left-color:var(--accent)}
+.lr.bad:not(.sel){border-left-color:var(--danger)}.lr.closed,.lr.arch{color:var(--muted)}
+.lr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.lr.lhd{cursor:default;background:var(--bg);font:600 10.5px var(--f-body);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:7px 12px}.lr.lhd:hover{background:var(--bg)}
+.lnum{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 6px;min-width:0}.lnum b{font:600 15px var(--f-display)}.lnum small{flex-basis:100%;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.limp{font:600 10px var(--f-body);text-transform:uppercase;letter-spacing:.05em;background:var(--soft);color:var(--muted);border-radius:999px;padding:1px 7px;vertical-align:middle}
+.lst{display:flex;flex-direction:column;gap:4px;min-width:0}.lst small{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lbar{display:flex;gap:2px}.lbar i{flex:1;height:6px;border-radius:2px;background:var(--soft)}.lbar i.done{background:var(--ok)}.lbar i.part{background:color-mix(in srgb,var(--ok) 45%,var(--soft))}.lbar i.gap{background:var(--warn-soft);outline:1px solid var(--warn)}.lbar i.now{background:var(--accent)}.lbar i.now.bad{background:var(--danger)}
+.lnow{display:flex;flex-direction:column;gap:2px;min-width:0;line-height:1.3}.lnow small{font-size:12px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.lnow .bad,.lpay.bad{color:var(--danger)}.lnow .warn{color:var(--warn)}.okt{color:var(--ok)}.muted{color:var(--muted)}
+.ldb{font:600 13px var(--f-mono);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:4px 7px;cursor:pointer;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.2;min-width:62px}
+.ldb:hover{border-color:var(--accent)}.ldb.bad{color:var(--danger);border-color:var(--danger)}.ldb.warn{color:var(--warn);border-color:var(--warn)}.ldb.ok{color:var(--ok)}.ldb.none{border-color:transparent;background:none;cursor:default;color:var(--muted)}
+.ldb small{font:500 10.5px var(--f-body);color:var(--warn)}
+.lpay{font-weight:600;color:var(--danger)}.lpay.ok{color:var(--ok)}.lpay.warn{color:var(--warn)}
+.lp{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:12px}
+.lpe{color:var(--muted);padding:30px 10px;text-align:center}
+.lph{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.lph h2{margin:0;font:600 22px var(--f-display)}.lph .muted{font-size:13px}
+.lpx{display:none}
+.lpamt{font:600 15px var(--f-mono);color:var(--ink)}
+.lpd{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.lpd .kdb{cursor:pointer;text-align:left;font:inherit;color:var(--ink)}.lpd .kdb:hover{border-color:var(--accent)}
+.lpal{display:flex;flex-direction:column;gap:4px}
+.lptabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.lpt{font:600 12.5px var(--f-body);border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:999px;padding:4px 10px;cursor:pointer;display:inline-flex;gap:5px;align-items:baseline}
+.lpt small{font:500 11px var(--f-mono)}.lpt.done{color:var(--ok)}.lpt.cur{border-color:var(--accent);color:var(--accent)}.lpt.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.lpb h4{margin:12px 0 6px;font:600 11px var(--f-body);text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.lsteps,.lsup,.lfiles{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.lsteps li,.lsup li{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--soft);font-size:13px}
+.lsteps li>i{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font:700 11px var(--f-body);font-style:normal;color:var(--accent-ink)}.lsteps li.ok>i{background:var(--ok);border-color:var(--ok)}
+.lsn{display:flex;flex-direction:column;min-width:0}.lsn small{color:var(--muted);font-size:11.5px}
+.lsa{display:flex;gap:4px;align-items:center;justify-content:flex-end;min-width:0}
+.lsup li{grid-template-columns:minmax(0,1fr) auto auto}.lsm{display:flex;flex-direction:column;align-items:flex-end;font:600 12.5px var(--f-mono)}.lsm small{font:500 11px var(--f-body);color:var(--danger)}.lsm small.okt{color:var(--ok)}
+.lfiles li{display:flex;flex-direction:column;padding:6px 0;border-bottom:1px solid var(--soft)}.lfiles small{color:var(--muted);font-size:11.5px}
+.lfl{border:0;background:none;padding:0;color:var(--accent);font:500 13px var(--f-body);cursor:pointer;text-align:left;text-decoration:none;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lfl:hover{text-decoration:underline}
+.lfiles .lfl{max-width:100%}
+.lun{border:0;background:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 4px}.lun:hover{color:var(--danger)}
+.btn.sm{padding:4px 9px;font-size:12px}
+.lkv{display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 0 0;font-size:12.5px;color:var(--muted)}.lkv b{color:var(--ink)}.lkv b.ok{color:var(--ok)}.lkv b.warn{color:var(--warn)}
+.lpact{margin-top:10px}
+.lpf{display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px solid var(--line);padding-top:10px}
+@media (max-width:1180px){
+  .lv{grid-template-columns:1fr}
+  .lp{display:none}
+  body.lp-open .lp{display:flex;position:fixed;inset:0;top:0;max-height:none;border-radius:0;z-index:50}
+  body.lp-open .lpx{display:inline-flex}
+}
+@media (max-width:760px){
+  .lr{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"n d e" "w w p"}
+  .lr .lnum{grid-area:n}.lr .lst{display:none}.lr .lnow{grid-area:w}.lr .ldc:nth-child(4){grid-area:d}.lr .ldc:nth-child(5){grid-area:e}.lr .ldc:nth-child(6){grid-area:p;justify-self:end}
+  .lr.lhd{display:none}
+  .lpd{grid-template-columns:1fr 1fr 1fr}
+}
 </style>
 
 </head>
@@ -767,7 +829,8 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
     <select id="fBuyer" aria-label="Покупатель" style="width:auto;max-width:260px;background:var(--panel)"><option value="">Все покупатели</option></select>
     <label class="chk"><input type="checkbox" id="showArch"> Показывать архив</label>
     <div class="seg" role="group" aria-label="Вид">
-      <button type="button" id="vOver" aria-pressed="true">Обзор</button>
+      <button type="button" id="vList" aria-pressed="true">Заказы</button>
+      <button type="button" id="vOver" aria-pressed="false">Карточки</button>
       <button type="button" id="vTime" aria-pressed="false">Календарь</button>
       <button type="button" id="vDocs" aria-pressed="false">Документы</button>
       <button type="button" id="vRc" aria-pressed="false">Квитанции</button>
@@ -778,6 +841,7 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
 
   <div class="status" id="status">Загружаю заказы…</div>
 
+  <section id="listView" hidden><div class="wk" id="wk"></div><div class="lv"><div class="lt" id="lt"></div><aside class="lp" id="lp" aria-label="Заказ"></aside></div></section>
   <section id="overView"><div class="supdue" id="supDue" hidden></div><div class="ovl" id="ovl"></div></section>
   <section id="timeView" hidden style="display:flex;flex-direction:column;gap:12px">
     <div class="upcoming" id="upcoming" hidden></div>
@@ -1048,7 +1112,7 @@ let orders=[], db=null, canWrite=true, canWriteKnown=false, view="over", kpiFilt
 
 function load(k,d){try{const v=localStorage.getItem("tc_orders_"+k);return v==null?d:JSON.parse(v)}catch(e){return d}}
 function save(k,v){try{localStorage.setItem("tc_orders_"+k,JSON.stringify(v))}catch(e){}}
-view=load("view","over"); if(!["over","time","docs"].includes(view))view="over";
+view=load("view","list"); if(!["list","over","time","docs","rc"].includes(view))view="list";
 
 const today=()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate())};
 const pd=s=>{if(!s)return null;const[y,m,d]=String(s).slice(0,10).split("-").map(Number);if(!y)return null;return new Date(y,m-1,d)};
@@ -1367,6 +1431,131 @@ function qdOpen(btn){
 }
 document.addEventListener("click",e=>{const b=e.target.closest("[data-qd]");if(b){e.preventDefault();e.stopPropagation();qdOpen(b);return}
   const p=$("qdPop");if(p&&!p.contains(e.target))qdClose()},true);
+/* ---------- «Заказы»: one row per order, «На этой неделе» on top, the chosen order in a side panel with stage tabs ---------- */
+let lSel=load("lsel",""), lTab={};
+const mdd=d=>d?String(d).slice(8,10)+"."+String(d).slice(5,7):"—";
+const MON=["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
+function weekRange(){const t=today(), k=(t.getDay()+6)%7, s=new Date(t);s.setDate(t.getDate()-k);const e=new Date(s);e.setDate(s.getDate()+6);return [iso(s),iso(e),s,e]}
+const wasOf=(o,k)=>{const w=o[k+"Was"], at=o[k+"MovedAt"];return w&&at&&Date.now()-new Date(at).getTime()<14*86400000&&w!==o[k]?w:""};
+function lDateBtn(o,k,done){
+  const d=o[k], cls=!d||done?"":days(d)<0?"bad":days(d)<=3?"warn":"", w=wasOf(o,k);
+  if(o.arch)return `<span class="ldb none">${d?mdd(d):"—"}</span>`;
+  return `<button type="button" class="ldb ${cls} ${done?"ok":""}" data-qd="${esc(o.id)}" data-qk="${k}" title="Изменить дату">${d?mdd(d):"—"}${done?" ✓":""}${w?`<small>было ${mdd(w)}</small>`:""}</button>`}
+function lBar(a){const P=phasesOf(a.o), cur=a.closed?P.length:a.cur;
+  return `<span class="lbar">${P.map((p,i)=>{const y=a.ph[i], st=y.complete?"done":i===cur?(a.overdue?"now bad":"now"):i<cur?(y.any?"part":"gap"):"";return `<i class="${st}" title="${esc(p.t)}"></i>`}).join("")}</span>`}
+function lNow(a){
+  if(a.arch)return `<span class="muted">Архив${a.o.date?" · "+fd(a.o.date):""}</span>`;
+  if(a.closed)return `<span class="okt">🎉 Завершена</span>`;
+  const bad=a.alerts.find(x=>x.c==="bad"), warn=a.alerts.find(x=>x.c==="warn"&&!x.t.startsWith("Скоро"));
+  return `<span>${esc(a.next)}</span>`+(bad?`<small class="bad">${esc(bad.t)}</small>`:warn?`<small class="warn">${esc(warn.t)}</small>`:"")}
+function lRow(o){const a=an(o), P=phasesOf(o), cur=a.closed?P.length-1:Math.min(a.cur,P.length-1), imp=isImp(o);
+  const pay=imp?`<span class="muted">—</span>`:`<span class="lpay ${PAY[o.pay||"none"][1]}">${PAY[o.pay||"none"][0]}</span>`;
+  return `<div class="lr ${o.id===lSel?"sel":""} ${a.arch?"arch":a.closed?"closed":a.alerts.some(x=>x.c==="bad")?"bad":""}" data-lsel="${esc(o.id)}" tabindex="0" role="button" aria-pressed="${o.id===lSel}">
+    <div class="lnum"><b>${esc(o.num||"без номера")}</b>${imp?`<span class="limp">импорт</span>`:""}<small>${esc([o.buyer,o.goods].filter(Boolean).join(" · ")||"—")}</small></div>
+    <div class="lst">${a.arch?"":lBar(a)}<small>${a.arch?"":a.closed?"Успех":`${cur+1}. ${esc(P[cur].t)}`}</small></div>
+    <div class="lnow">${lNow(a)}</div>
+    <div class="ldc">${lDateBtn(o,"loadAt",stepDone(o,"photo"))}</div>
+    <div class="ldc">${lDateBtn(o,"etd",stepDone(o,"port"))}</div>
+    <div class="ldc">${pay}</div>
+  </div>`}
+function weekItems(vis){
+  const [ws,we]=weekRange(), out=[];
+  calEvents(vis).forEach(e=>{if(!e.o||!e.o.id||e.my)return;if(/ev-done|ev-x/.test(e.c))return;const n=days(e.d);
+    const late=n<0&&n>=-30, inW=e.d>=ws&&e.d<=we;if(!late&&!inW)return;
+    const k=/^Загрузка/.test(e.t)?"loadAt":/^ETD/.test(e.t)?"etd":/^ETA/.test(e.t)?"eta":"", w=k?wasOf(e.o,k):"";
+    const label=late?"Просрочено":k==="loadAt"?"Загрузка":k==="etd"?"Выход судна":k==="eta"?"Прибытие":/^Оплата/.test(e.t)?"Оплата":/^Товар/.test(e.t)?"Товар":"Срок";
+    const what=k==="etd"?(e.o.vessel||e.o.carrier||"выход судна"):k==="loadAt"?(e.o.loadTime?e.o.loadTime+" · ":"")+(e.o.loadPlace||"загрузка контейнера"):k==="eta"?(e.o.vessel||"прибытие судна"):e.t;
+    out.push({o:e.o,d:e.d,c:late?"bad":w?"moved":n<=1?"warn":"",label,what:late?e.t:what,sub:w?`перенесено с ${mdd(w)}`:late?`${-n} дн. назад`:n===0?"сегодня":n===1?"завтра":`через ${n} дн.`,ord:late?0:1})});
+  vis.forEach(o=>{if(o.arch)return;const a=an(o);if(a.closed)return;
+    a.alerts.filter(x=>x.c==="bad"&&x.t.startsWith("Не загружены")||x.t.startsWith("Нет 세금계산서")).forEach(x=>out.push({o,d:"",c:"miss",label:"Не хватает",what:x.t.replace(/^Не загружены: |^Нет /,""),sub:"документы",ord:2}));
+    a.alerts.filter(x=>x.c==="bad"&&/Стоит статус|просрочена/.test(x.t)).forEach(x=>out.push({o,d:"",c:"bad",label:"Внимание",what:x.t,sub:"",ord:0}))});
+  return out.sort((x,y)=>x.ord-y.ord||String(x.d).localeCompare(String(y.d)));
+}
+function renderWeek(vis){
+  const [,,s,e]=weekRange(), L=weekItems(vis);
+  const rng=s.getMonth()===e.getMonth()?`${s.getDate()}–${e.getDate()} ${MON[e.getMonth()]}`:`${s.getDate()} ${MON[s.getMonth()]} – ${e.getDate()} ${MON[e.getMonth()]}`;
+  $("wk").innerHTML=`<h2>На этой неделе <span>${rng}</span></h2><div class="wkl">${L.map(x=>`<button type="button" class="wki ${x.c}" data-lsel="${esc(x.o.id)}"><span class="wkh"><span class="wkt">${x.label}</span>${x.d?`<b>${mdd(x.d)}</b>`:""}</span><span class="wkw"><b>${esc(x.o.num||"")}</b> ${esc(x.what)}</span>${x.sub?`<small>${esc(x.sub)}</small>`:""}</button>`).join("")||`<span class="note">На этой неделе сроков нет, просроченного нет.</span>`}</div>`;
+}
+const stepName=id=>SHORT[id]||STEP[id].t;
+function lStepRow(o,id,ph){const s=STEP[id], done=stepDone(o,id), d=done?stepDate(o,id):"";
+  let act="";
+  const files=s.mode==="doc"?(s.doc==="photo"&&linkOK(o.photoLink)?[]:reqFiles(o,s.doc)):[];
+  if(done){
+    if(s.doc==="photo"&&linkOK(o.photoLink))act=`<a class="lfl" href="${esc(o.photoLink)}" target="_blank" rel="noopener">папка ↗</a>`;
+    else if(files.length)act=`<button type="button" class="lfl"${fOpen(o,files)}>${esc(byNew(files)[0].name||"файл")}${files.length>1?` +${files.length-1}`:""}</button>`;
+    if(s.mode==="manual"&&canWrite&&id!=="got")act+=`<button type="button" class="lun" data-lstep="${id}" data-on="0" title="Снять отметку">✕</button>`;
+  }else if(canWrite){
+    if(s.mode==="doc")act=s.doc==="photo"?`<button type="button" class="btn sm" data-ledit="${ph}">Вставить ссылку</button>`:`<button type="button" class="btn sm" data-lup="${UPK[s.doc]||""}" data-lph="${ph}">+ Загрузить</button>`;
+    else if(s.mode==="manual")act=s.req&&!s.req(o)?`<button type="button" class="btn sm" data-ledit="${ph}" title="${esc(s.reqMsg||"")}">Заполнить</button>`:`<button type="button" class="btn sm" data-lstep="${id}" data-on="1">Отметить</button>`;
+    else act=`<span class="note" title="${esc(s.hint||"")}">отметится само</span>`;
+  }
+  return `<li class="${done?"ok":""}"><i>${done?"✓":""}</i><span class="lsn">${esc(stepName(id))}${d?`<small>${fd(d)}</small>`:""}</span><span class="lsa">${act}</span></li>`}
+function lSups(o){const L=sups(o).filter(x=>x.name||x.date);if(!L.length)return `<p class="note">Поставщики не указаны.</p>`;
+  return `<ul class="lsup">${L.map(x=>{const tx=taxFiles(o,x,L);return `<li><span class="lsn">${esc(x.name||"Поставщик")}<small>${x.date?"товар "+fd(x.date)+" · ":""}${esc((SUPST[x.st]||SUPST.none).toLowerCase())}</small></span><span class="lsm">${x.amt?fm(x.amt,"₩"):""}<small class="${x.paid?"okt":""}">${x.paid?"оплачен":Number(x.paidAmt)>0?"частично":"не оплачен"}</small></span><span class="stx ${tx.length?"on":""}" ${tx.length?fOpen(o,tx):""} title="세금계산서 ${tx.length?"загружен":"нет"}">세</span></li>`}).join("")}</ul>`}
+function lPanel(o){
+  if(!o)return `<div class="lpe">Выберите заказ в списке слева.</div>`;
+  const a=an(o), P=phasesOf(o), imp=isImp(o);
+  const cur=a.closed?P[P.length-1].id:(P[Math.min(a.cur,P.length-1)]||P[0]).id;
+  let tab=lTab[o.id]||(o.arch?"all":cur);
+  const tile=(l,k,done)=>{const d=o[k], w=wasOf(o,k), cls=!d||done?"":days(d)<0?"bad":days(d)<=3?"warn":"";
+    return `<button type="button" class="kdb ${cls} ${done?"ok":""}" ${o.arch?"disabled":`data-qd="${esc(o.id)}" data-qk="${k}"`} title="Изменить дату"><span class="kl">${l}</span><b>${d?mdd(d):"—"}${done?" ✓":""}</b>${w?`<small class="kwas">было ${mdd(w)}</small>`:""}</button>`};
+  const al=a.alerts.filter(x=>x.c!=="info"||1).map(x=>`<div class="al ${x.c}"><i>!</i><span>${esc(x.t)}</span></div>`).join("");
+  const tabs=(o.arch?[]:P.map((p,i)=>{const y=a.ph[i];return `<button type="button" class="lpt ${tab===p.id?"on":""} ${y.complete?"done":""} ${p.id===cur&&!a.closed?"cur":""}" data-ltab="${p.id}">${esc(p.t)}<small>${y.complete?"✓":`${y.done}/${y.total}`}</small></button>`})).join("")
+    +`<button type="button" class="lpt ${tab==="all"?"on":""}" data-ltab="all">Все файлы<small>${(o.files||[]).length}</small></button>`;
+  let body="";
+  if(tab==="all"){const fs=byNew(o.files||[]);
+    body=fs.length?`<ul class="lfiles">${fs.map(f=>`<li><button type="button" class="lfl"${fOpen(o,[f])}>${esc(f.name||"файл")}</button><small>${esc(KIND[kindOf(f.kind)]||"Прочее")}${f.fix?" · исправленная":""} · ${esc(String(f.at||"").slice(0,10))}</small></li>`).join("")}</ul>`:`<p class="note">Документов нет.</p>`;
+    if(canWrite)body+=`<div class="lpact"><button type="button" class="btn sm" data-lup="" data-lph="">+ Загрузить документы</button></div>`;
+  }else{const p=P.find(x=>x.id===tab)||P[0];
+    body=`<ul class="lsteps">${p.steps.map(id=>lStepRow(o,id,p.id)).join("")}</ul>`;
+    if(!imp&&["order","sched","suppay"].includes(p.id))body+=`<h4>Поставщики</h4>`+lSups(o);
+    if(!imp&&p.id==="pay")body+=`<h4>Оплата от покупателя</h4><p class="lkv"><span>Статус <b class="${PAY[o.pay||"none"][1]}">${PAY[o.pay||"none"][0]}</b></span>${o.paid?`<span>Получено <b>${fm(o.paid,o.cur)}</b></span>`:""}${o.payDue?`<span>Оплата до <b>${fd(o.payDue)}</b></span>`:""}${o.inv?`<span>Инвойс <b>${esc(o.inv)}</b></span>`:""}</p>`;
+    if(p.id==="sched"||p.id==="load"||p.id==="port")body+=`<p class="lkv">${o.vessel?`<span>Судно <b>${esc(o.vessel)}</b></span>`:""}${o.carrier?`<span>Линия <b>${esc(o.carrier)}</b></span>`:""}${o.contType||o.cont?`<span>Контейнер <b>${esc([o.contType,o.cont].filter(Boolean).join(" · "))}</b></span>`:""}${o.loadPlace?`<span>Место <b>${esc(o.loadPlace)}${o.loadTime?" · "+esc(o.loadTime):""}</b></span>`:""}</p>`;
+    // papers of this stage that no step above already shows
+    const shown=new Set(p.steps.map(id=>STEP[id].doc).filter(Boolean).flatMap(r=>reqFiles(o,r).map(f=>f.aid)));
+    const extra=byNew((o.files||[]).filter(f=>(PKIND[p.id]||[]).concat(p.id==="suppay"?["taxinv"]:[]).includes(kindOf(f.kind))&&!shown.has(f.aid)));
+    if(extra.length)body+=`<h4>Документы этапа</h4><ul class="lfiles">${extra.map(f=>`<li><button type="button" class="lfl"${fOpen(o,[f])}>${esc(f.name||"файл")}</button><small>${esc(KIND[kindOf(f.kind)]||"Прочее")} · ${esc(String(f.at||"").slice(0,10))}</small></li>`).join("")}</ul>`;
+    body+=`<div class="lpact"><button type="button" class="btn sm ghost" data-ledit="${p.id}">Открыть этап полностью</button></div>`;
+  }
+  return `<header class="lph"><div><h2>${esc(o.num||"без номера")}${imp?` <span class="limp">импорт</span>`:""}${o.arch?` <span class="limp">архив</span>`:""}</h2><span class="muted">${esc([o.buyer,o.goods].filter(Boolean).join(" · ")||"—")}</span></div><button type="button" class="btn ghost lpx" data-lclose aria-label="Закрыть">✕</button></header>
+    <div class="lpamt">${fm(o.amount,o.cur)}${eqText(o)}</div>
+    ${o.arch?"":`<div class="lpd">${tile(imp?"Загрузка":"Загрузка","loadAt",stepDone(o,"photo"))}${tile("Выход судна","etd",stepDone(o,"port"))}${tile("Прибытие","eta",stepDone(o,imp?"arrive":"broker"))}</div>${trackA(o)}`}
+    ${al?`<div class="alerts lpal">${al}</div>`:""}
+    <div class="lptabs" role="tablist">${tabs}</div>
+    <div class="lpb">${body}</div>
+    <footer class="lpf"><button type="button" class="btn" data-ledit="">Открыть весь заказ</button>${o.notes?`<span class="note" title="${esc(o.notes)}">📝 ${esc(String(o.notes).slice(0,80))}${String(o.notes).length>80?"…":""}</span>`:""}</footer>`;
+}
+function lSort(vis){const key=o=>String(o.date||o.createdAt||"").slice(0,10), nn=o=>parseInt(String(o.num||"").replace(/\D+/g," ").trim().split(" ").pop())||0, added=o=>String(o.createdAt||o.date||"");
+  return vis.sort((x,y)=>(!!x.arch-!!y.arch)||(x.arch?key(y).localeCompare(key(x)):added(y).localeCompare(added(x)))||nn(y)-nn(x))}
+function renderList(){
+  const vis=lSort(visible());
+  renderWeek(vis);
+  if(!vis.some(o=>o.id===lSel)){const f=vis.find(o=>!o.arch&&!an(o).closed)||vis[0];lSel=f?f.id:""}
+  $("lt").innerHTML=vis.length?`<div class="lr lhd"><div>Заказ</div><div>Этап</div><div>Что сейчас</div><div>Загрузка</div><div>Выход</div><div>Оплата</div></div>`+vis.map(lRow).join(""):`<div class="status">${orders.length?"Нет заказов под этот фильтр.":"Заказов пока нет."}</div>`;
+  const lp=$("lp"), st=lp.querySelector(".lpb")?lp.scrollTop:0;
+  lp.innerHTML=lPanel(orders.find(o=>o.id===lSel));lp.scrollTop=st;
+}
+function lPick(id){lSel=id;save("lsel",id);document.body.classList.add("lp-open");renderList();
+  const r=$("lt").querySelector(`[data-lsel="${CSS.escape(id)}"]`);if(r&&r.scrollIntoView)r.scrollIntoView({block:"nearest"})}
+$("listView").addEventListener("click",async e=>{
+  const t=e.target;
+  const tb=t.closest("[data-ltab]");if(tb){lTab[lSel]=tb.dataset.ltab;$("lp").innerHTML=lPanel(orders.find(o=>o.id===lSel));return}
+  if(t.closest("[data-lclose]")){document.body.classList.remove("lp-open");return}
+  const o=orders.find(x=>x.id===lSel);
+  const ed=t.closest("[data-ledit]");if(ed&&o){openEditor(o,ed.dataset.ledit||null);return}
+  const up=t.closest("[data-lup]");if(up&&o){openEditor(o,up.dataset.lph||null);const k=up.dataset.lup;if($("upKind")){$("upKind").value=k;$("upSigner").hidden=k!=="cs"}$("upFile").click();return}
+  const sb=t.closest("[data-lstep]");if(sb&&o&&db&&canWrite){const id=sb.dataset.lstep, on=sb.dataset.on==="1";
+    const steps={...(o.steps||{}),[id]:on?isoToday():""}, toArch=id==="closed"&&on&&!o.arch;
+    sb.disabled=true;
+    try{await db.collection("orders").doc(o.id).update({steps,...(toArch?{arch:true}:{}),updatedAt:new Date().toISOString()})}catch(err){sb.disabled=false;showStatus("Не получилось сохранить отметку ("+(err&&err.code||"ошибка")+").",true)}
+    return}
+  const r=t.closest("[data-lsel]");if(r&&!t.closest("[data-qd],[data-view],a,button.trkno")){lPick(r.dataset.lsel)}
+});
+$("listView").addEventListener("keydown",e=>{const r=e.target.closest(".lr[data-lsel]");if(!r)return;
+  if(e.key==="Enter"||e.key===" "){e.preventDefault();lPick(r.dataset.lsel)}
+  if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();const n=e.key==="ArrowDown"?r.nextElementSibling:r.previousElementSibling;if(n&&n.dataset.lsel){lPick(n.dataset.lsel);const m=$("lt").querySelector(`[data-lsel="${CSS.escape(n.dataset.lsel)}"]`);m&&m.focus()}}});
+$("vList").onclick=()=>{view="list";save("view",view);render()};
+
 /* ---------- «Квитанции»: weekly expense receipts by photo → rows added to the shared Excel file ---------- */
 let rcRows={}, rcMeta={}, rcEmp="", rcWho="", rcBusy=false, rcHist={};
 try{rcEmp=localStorage.getItem("tc_rcEmp")||""}catch(e){}
@@ -1641,9 +1830,9 @@ function renderUpcoming(vis){
 function render(){
   fillBuyerFilter();
   renderKpis();
-  [["vOver","over"],["vTime","time"],["vDocs","docs"],["vRc","rc"]].forEach(([b,v])=>$(b).setAttribute("aria-pressed",view===v));
-  $("overView").hidden=view!=="over";$("timeView").hidden=view!=="time";$("docsView").hidden=view!=="docs";$("rcView").hidden=view!=="rc";
-  if(view==="over")renderOverview();else if(view==="time")renderTimeline();else if(view==="rc")renderRc();else renderDocsAll();
+  [["vList","list"],["vOver","over"],["vTime","time"],["vDocs","docs"],["vRc","rc"]].forEach(([b,v])=>$(b).setAttribute("aria-pressed",view===v));
+  $("listView").hidden=view!=="list";$("overView").hidden=view!=="over";$("timeView").hidden=view!=="time";$("docsView").hidden=view!=="docs";$("rcView").hidden=view!=="rc";
+  if(view==="list")renderList();else if(view==="over")renderOverview();else if(view==="time")renderTimeline();else if(view==="rc")renderRc();else renderDocsAll();
   $("addBtn").disabled=!canWrite;$("archBtn").disabled=!canWrite;
 }
 
@@ -3103,7 +3292,7 @@ function fillViewSel(){const s=$("viewSel");if(!s)return;s.value=myView().compac
 function applyView(){
   const hide=myView().hide||[];
   VIEW_KEYS.forEach(k=>document.body.classList.toggle("h-"+k,hide.includes(k)));
-  if(hide.includes("cal")&&view==="time"||hide.includes("docs")&&view==="docs"){view="over";render()}
+  if(hide.includes("cal")&&view==="time"||hide.includes("docs")&&view==="docs"){view="list";render()}
 }
 function viewDialog(){
   let d=$("viewDlg");
