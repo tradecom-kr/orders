@@ -1053,7 +1053,10 @@ const PHASES_IMP=[
   {id:"closed",t:"Успех",      steps:["closed"]}
 ];
 const isImp=o=>!!o&&o.type==="imp";
-const phasesOf=o=>isImp(o)?PHASES_IMP:PHASES;
+// some buyers do not need Ти В.'s signature: their contract step is one plain «Контракт и спецификация»
+const PHASES_NOTI=PHASES.map(p=>p.id==="docs"?{...p,steps:["kp","cs_n","ipl"]}:p);
+const tiNeeded=o=>{try{const b=(buyers||[]).find(x=>x.name===(o&&o.buyer));return !(b&&b.noTi)}catch(e){return true}};
+const phasesOf=o=>isImp(o)?PHASES_IMP:tiNeeded(o)?PHASES:PHASES_NOTI;
 const pidxOf=o=>Object.fromEntries(phasesOf(o).map((p,i)=>[p.id,i]));
 // short names for the step list under each part of the progress bar
 const SHORT={bldraft:"Проверочный B/L",payreq:"Запрос на оплату",arrive:"Контейнер получен",impdecl:"Импортная декларация",released:"Растаможен",brokinv:"Счёт за растаможку",i_cs:"Контракт и спец.",lbl:"Этикетки",lblph:"Фото этикеток",test:"Протокол испытаний",got:"Заказ получен",check:"Цены и наличие",kp:"КП",cs:"Контракт и спец. (Ти)",cs2:"Подписанный контракт",ipl:"Инвойс и упаковочный",vessel:"Судно утверждено",supconf:"Сроки поставщиков",paid:"Оплата получена",bank:"Контракт и спец. (Ден Е.)",place:"Место и время загрузки",exp:"Экспортная декларация",photo:"Фотоотчёт",expd:"Exp. dates",suppay:"Поставщикам оплачено",port:"Контейнер в порту",bl:"Коносамент",freight:"Счёт за отгрузку",broker:"Пакет брокеру",closed:"Сделка завершена 🎉"};
@@ -1074,6 +1077,7 @@ const STEP={
   photo:  {n:"9",   t:"Фотоотчёт о загрузке", mode:"doc", doc:"photo", next:"Получить фотоотчёт и вставить ссылку на Google Диск"},
   expd:   {n:"9-2", t:"Exp. dates — сроки годности товара", mode:"doc", doc:"expd", next:"Получить Exp. dates (сроки годности) от поставщиков"},
   payreq: {n:"8.1", t:"Запрос на оплату поставщикам", mode:"doc", doc:"payreq", next:"Подготовить запрос на оплату поставщикам"},
+  cs_n:   {n:"3",   t:"Контракт и спецификация", mode:"doc", doc:"cs_main", next:"Загрузить контракт и спецификацию"},
   i_cs:   {n:"2",   t:"Контракт и спецификация", mode:"doc", doc:"cs_any", next:"Загрузить контракт и спецификацию"},
   lbl:    {n:"3",   t:"Этикетки", mode:"doc", doc:"lbl", next:"Загрузить этикетки"},
   lblph:  {n:"3",   t:"Фото этикеток", mode:"doc", doc:"lblph", next:"Загрузить фото этикеток"},
@@ -1094,8 +1098,8 @@ const STEP={
 const REQ={docs:["kp","cs_ti","cs_both","ipl"],pay:["cs_den"],load:["exp","photo","expd"],port:["bl","freight"]};
 globalThis.__REQ_EXP=REQ;
 const REQ_IMP={docs:["cs_any","ipl"],labels:["lbl","lblph"],test:["test"],load:["photo"],customs:["impdecl"],cbill:["brokinv"]};
-const REQL={impdecl:"импортная декларация",brokinv:"счёт за растаможку",cs_any:"контракт и спец.",lbl:"этикетки",lblph:"фото этикеток",test:"протокол испытаний",kp:"КП",cs_ti:"контракт и спец. (Ти В.)",cs_both:"контракт и спец. (подписан обеими)",ipl:"инвойс и упаковочный",cs_den:"контракт и спец. (Ден Е.)",exp:"экспортная декларация",photo:"фотоотчёт",expd:"Exp. dates",bl:"коносамент",freight:"счёт за отгрузку"};
-const UPK={bldraft:"bldraft",payreq:"payreq",impdecl:"impdecl",brokinv:"brokinv",cs_any:"cs",lbl:"lbl",lblph:"lblph",test:"test",kp:"kp",cs_ti:"cs",cs_both:"cs",cs_den_both:"cs",cs_den:"cs",ipl:"ipl",exp:"exp",photo:"photo",expd:"expd",bl:"bl",freight:"freight"};
+const REQL={cs_main:"контракт и спец.",impdecl:"импортная декларация",brokinv:"счёт за растаможку",cs_any:"контракт и спец.",lbl:"этикетки",lblph:"фото этикеток",test:"протокол испытаний",kp:"КП",cs_ti:"контракт и спец. (Ти В.)",cs_both:"контракт и спец. (подписан обеими)",ipl:"инвойс и упаковочный",cs_den:"контракт и спец. (Ден Е.)",exp:"экспортная декларация",photo:"фотоотчёт",expd:"Exp. dates",bl:"коносамент",freight:"счёт за отгрузку"};
+const UPK={cs_main:"cs",bldraft:"bldraft",payreq:"payreq",impdecl:"impdecl",brokinv:"brokinv",cs_any:"cs",lbl:"lbl",lblph:"lblph",test:"test",kp:"kp",cs_ti:"cs",cs_both:"cs",cs_den_both:"cs",cs_den:"cs",ipl:"ipl",exp:"exp",photo:"photo",expd:"expd",bl:"bl",freight:"freight"};
 const SUPST={none:"Не запрошен",asked:"Запрошен, ждём",confirmed:"Подтверждён"};
 const PAY={none:["Не оплачен",""],partial:["Частично","warn"],paid:["Оплачен","ok"]};
 const SIGNERS=[["ti","Ти Валерий — для покупателя","Ти В."],["both","Ти В. — подписан обеими сторонами","Ти В., подписан обеими"],["den","Ден Евгений — для банка","Ден Е."],["den_both","Ден Е. — подписан обеими сторонами","Ден Е., подписан обеими"],["nosig","Без подписей и печатей","без подписей"]];
@@ -1171,6 +1175,7 @@ function reqFiles(o,r){const fs=o.files||[];
   // the Den version signed by both sides is kept for the archive and also counts as the Den version
   if(r==="cs_ti")return fs.filter(f=>kindOf(f.kind)==="cs"&&!["den","den_both","nosig"].includes(f.signer));
   if(r==="cs_den")return fs.filter(f=>kindOf(f.kind)==="cs"&&["den","den_both"].includes(f.signer));
+  if(r==="cs_main")return fs.filter(f=>kindOf(f.kind)==="cs"&&!["den","den_both"].includes(f.signer));
   if(r==="cs_both")return fs.filter(f=>kindOf(f.kind)==="cs"&&f.signer==="both");
   return fs.filter(f=>kindOf(f.kind)===r)}
 const linkOK=u=>/^https?:\/\/\S+\.\S+/i.test(String(u||"").trim());
@@ -1215,6 +1220,7 @@ function nextText(o,id){
 function analyze(o){const a=analyze0(o);if(o.arch){a.alerts=[];a.missing=[];a.overdue=false;a.arch=true;a.next="Архив — только документы"}return a}
 function analyze0(o){
   const PHASES=phasesOf(o), PIDX=pidxOf(o), REQ=isImp(o)?REQ_IMP:{...globalThis.__REQ_EXP}, imp=isImp(o);
+  if(!imp&&!tiNeeded(o))REQ.docs=["kp","cs_main","ipl"];
   const iss=k=>{if(ph[PIDX[k]])ph[PIDX[k]].issue=true};
   const ph=PHASES.map(p=>{const sd=p.steps.map(id=>{const done=stepDone(o,id);return {id,done,date:done?stepDate(o,id):""}});const d=sd.filter(z=>z.done).length;const ds=sd.map(z=>z.date).filter(Boolean).sort();
     const plan={sched:supMax(sups(o).filter(x=>x.name||x.date)),pay:o.payDue,load:o.loadAt,port:o.etd,closed:o.eta}[p.id]||"";
@@ -1228,7 +1234,7 @@ function analyze0(o){
   let overdue=false;
   // a document is demanded only once it is due, so the board does not nag about a photo report before loading
   const due={
-    kp:()=>cur>=PIDX.docs||ph[PIDX.docs].any, cs_ti:()=>cur>=PIDX.docs||ph[PIDX.docs].any, cs_both:()=>cur>=PIDX.docs||ph[PIDX.docs].any, ipl:()=>cur>=PIDX.docs||ph[PIDX.docs].any,
+    kp:()=>cur>=PIDX.docs||ph[PIDX.docs].any, cs_main:()=>cur>=PIDX.docs||ph[PIDX.docs].any, cs_ti:()=>cur>=PIDX.docs||ph[PIDX.docs].any, cs_both:()=>cur>=PIDX.docs||ph[PIDX.docs].any, ipl:()=>cur>=PIDX.docs||ph[PIDX.docs].any,
     cs_den:()=>o.pay==="paid"||o.pay==="partial",
     exp:()=>cur>=PIDX.load||(!!o.loadAt&&days(o.loadAt)<=3),
     photo:()=>(!!o.loadAt&&days(o.loadAt)<0)||stepDone(o,"port"),
@@ -2635,7 +2641,7 @@ function renderFiles(){
   $("upNote").textContent=!editing.id?"Файлы прикрепятся к заказу, когда вы нажмёте «Сохранить».":"Word, Excel, PDF, фото — можно перетащить сюда";
   const chk=(ok,t)=>`<span class="pill ${ok?"ok":""}">${ok?"✓ ":""}${t}</span>`;
   $("docKinds").innerHTML=(focus?(REQ[focus]||[]):Object.keys(REQL)).map(r=>chk(hasDoc(editing,r),REQL[r])).join("")
-    +(files.some(f=>kindOf(f.kind)==="cs"&&!f.signer)?`<span class="pill warn">Укажите подпись у контракта</span>`:"");
+    +(tiNeeded(editing)&&files.some(f=>kindOf(f.kind)==="cs"&&!f.signer)?`<span class="pill warn">Укажите подпись у контракта</span>`:"");
   const shownAll=focus&&PKIND[focus].length?files.filter(f=>PKIND[focus].includes(kindOf(f.kind))):files;
   const pics=shownAll.filter(isPic), shown=shownAll.filter(f=>!isPic(f));
   $("fileList").innerHTML=(pics.length?galleryRow(pics,editing.id):"")+(shown.length?[...shown].sort((a,b)=>KINDS.findIndex(k=>k[0]===kindOf(a.kind))-KINDS.findIndex(k=>k[0]===kindOf(b.kind))).map(f=>{
@@ -3535,11 +3541,15 @@ const bankNote=o=>{const n=o&&bankName(o);return n&&n.to?` Покупатель 
       ?`<span class="note">Для банка (как в SWIFT):</span> <input id="bbFrom" value="${esc(n.from||"")}" placeholder="как в контракте, напр. Gruppa Companiy Dvijenie"> → <input id="bbTo" value="${esc(n.to||"")}" placeholder="как в переводе, напр. GK Dvijenie"> <button type="button" class="btn" data-bbsave="${esc(b.id)}">Сохранить</button> <button type="button" class="btn ghost" data-bbcancel>Отмена</button>`
       :`<span class="note">Для банка: ${n.to?`«${esc(n.from)}» → <b>«${esc(n.to)}»</b>`:"как в контракте"}</span>${canWrite?` <button type="button" class="lnk" data-bbedit="${esc(b.id)}">изменить</button>`:""}`;
     info.appendChild(d);
+    const t=document.createElement("div");t.className="bbank";
+    t.innerHTML=`<span class="note">Подпись Ти В.: <b>${b.noTi?"не нужна":"нужна"}</b></span>${canWrite?` <button type="button" class="lnk" data-bnoti="${esc(b.id)}" title="${b.noTi?"Сделать: подпись Ти В. нужна":"Сделать: подпись Ти В. не нужна"}">изменить</button>`:""}`;
+    info.appendChild(t);
   });
   return r};}
 let bankEdit=null;
 $("bList").addEventListener("click",async e=>{const t=e.target.closest("button");if(!t)return;
   if(t.dataset.bbedit){bankEdit=t.dataset.bbedit;renderBuyers();return}
+  if(t.dataset.bnoti){const b=buyers.find(x=>x.id===t.dataset.bnoti);if(!b)return;try{await db.collection("buyers").doc(b.id).update({noTi:!b.noTi});$("bNote").textContent=`«${b.name}»: подпись Ти В. ${b.noTi?"нужна":"не нужна"}.`}catch(err){$("bNote").textContent="Не получилось сохранить ("+(err&&err.code||"ошибка")+")."}return}
   if("bbcancel" in t.dataset){bankEdit=null;renderBuyers();return}
   if(t.dataset.bbsave){try{await db.collection("buyers").doc(t.dataset.bbsave).update({bankFrom:$("bbFrom").value.trim(),bankTo:$("bbTo").value.trim()});bankEdit=null;$("bNote").textContent="Сохранено: имя покупателя для банка."}catch(err){$("bNote").textContent="Не получилось сохранить ("+(err&&err.code||"ошибка")+")."}}
 });
@@ -3690,7 +3700,7 @@ var dbReady=null;
   c.use("downloads").then(d=>{dl=d}).catch(()=>{});
   c.use("user").then(u=>{ if(!u||!u.can)return; Promise.resolve(u.can("data.write")).then(v=>{ if(v===false){canWrite=false;canWriteKnown=true;render()} else if(v===true){canWriteKnown=true} }).catch(()=>{}) });
   db.collection("events").onSnapshot(snap=>{myEvents=snap.docs.filter(d=>d.exists).map(d=>({id:d.id,...d.data()}));if(view==="time")renderTimeline()},()=>{});
-  db.collection("buyers").onSnapshot(snap=>{buyers=snap.docs.filter(d=>d.exists).map(d=>({id:d.id,...d.data()}));fillBuyerFilter();renderBuyers()},()=>{});
+  db.collection("buyers").onSnapshot(snap=>{buyers=snap.docs.filter(d=>d.exists).map(d=>({id:d.id,...d.data()}));fillBuyerFilter();renderBuyers();orders=orders.map(o=>({...o}));render()},()=>{});
   let unsub=null;
   const sub=()=>{unsub=db.collection("orders").onSnapshot(snap=>{
       orders=snap.docs.filter(d=>d.exists).map(d=>normalize({id:d.id,...d.data()}));
