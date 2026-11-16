@@ -1459,22 +1459,26 @@ function lRow(o){const a=an(o), P=phasesOf(o), cur=a.closed?P.length-1:Math.min(
     <div class="ldc">${pay}</div>
   </div>`}
 function weekItems(vis){
-  const [ws,we]=weekRange(), out=[];
-  calEvents(vis).forEach(e=>{if(!e.o||!e.o.id||e.my)return;if(/ev-done|ev-x/.test(e.c))return;const n=days(e.d);
-    const late=n<0&&n>=-30, inW=e.d>=ws&&e.d<=we;if(!late&&!inW)return;
-    const k=/^Загрузка/.test(e.t)?"loadAt":/^ETD/.test(e.t)?"etd":/^ETA/.test(e.t)?"eta":"", w=k?wasOf(e.o,k):"";
-    const label=late?"Просрочено":k==="loadAt"?"Загрузка":k==="etd"?"Выход судна":k==="eta"?"Прибытие":/^Оплата/.test(e.t)?"Оплата":/^Товар/.test(e.t)?"Товар":"Срок";
-    const what=k==="etd"?(e.o.vessel||e.o.carrier||"выход судна"):k==="loadAt"?(e.o.loadTime?e.o.loadTime+" · ":"")+(e.o.loadPlace||"загрузка контейнера"):k==="eta"?(e.o.vessel||"прибытие судна"):e.t;
-    out.push({o:e.o,d:e.d,c:late?"bad":w?"moved":n<=1?"warn":"",label,what:late?e.t:what,sub:w?`перенесено с ${mdd(w)}`:late?`${-n} дн. назад`:n===0?"сегодня":n===1?"завтра":`через ${n} дн.`,ord:late?0:1})});
+  // only what happens this week (Mon–Sun): old overdue dates are not here, their rows in the list are red
+  const [ws,we]=weekRange(), out=[], soonEnd=addDays(isoToday(),7);
+  calEvents(vis).forEach(e=>{if(!e.o||!e.o.id||e.my)return;if(/ev-done|ev-x/.test(e.c))return;
+    if(!(e.d>=ws&&e.d<=we))return;
+    if(isImp(e.o)&&/^Оплата|^Контракт Ден/.test(e.t))return;
+    if(/^Контракт Ден/.test(e.t))return;
+    const n=days(e.d), k=/^Загрузка/.test(e.t)?"loadAt":/^ETD/.test(e.t)?"etd":/^ETA/.test(e.t)?"eta":"", w=k?wasOf(e.o,k):"";
+    const label=k==="loadAt"?"Загрузка":k==="etd"?"Выход судна":k==="eta"?"Прибытие":/^Оплата/.test(e.t)?"Оплата":/^Товар/.test(e.t)?"Товар":"Срок";
+    const what=k==="etd"?(e.o.vessel||e.o.carrier||"выход судна"):k==="loadAt"?(e.o.loadTime?e.o.loadTime+" · ":"")+(e.o.loadPlace||"загрузка контейнера"):k==="eta"?(e.o.vessel||"прибытие судна"):/^Товар/.test(e.t)?e.t.replace(/^Товар:\s*/,""):/^Оплата/.test(e.t)?"от покупателя":e.t;
+    out.push({o:e.o,d:e.d,c:n<0?"bad":w?"moved":n<=1?"warn":"",label,what,sub:w?`перенесено с ${mdd(w)}`:n<0?`${-n} дн. назад — не отмечено`:n===0?"сегодня":n===1?"завтра":`через ${n} дн.`,ord:1})});
+  // missing papers only for orders that load or sail within 7 days — that is when they are needed
   vis.forEach(o=>{if(o.arch)return;const a=an(o);if(a.closed)return;
-    a.alerts.filter(x=>x.c==="bad"&&x.t.startsWith("Не загружены")||x.t.startsWith("Нет 세금계산서")).forEach(x=>out.push({o,d:"",c:"miss",label:"Не хватает",what:x.t.replace(/^Не загружены: |^Нет /,""),sub:"документы",ord:2}));
-    a.alerts.filter(x=>x.c==="bad"&&/Стоит статус|просрочена/.test(x.t)).forEach(x=>out.push({o,d:"",c:"bad",label:"Внимание",what:x.t,sub:"",ord:0}))});
+    const near=[o.loadAt,o.etd].some(d=>d&&d>=isoToday()&&d<=soonEnd);if(!near)return;
+    a.alerts.filter(x=>x.c==="bad"&&x.t.startsWith("Не загружены")).forEach(x=>out.push({o,d:"",c:"miss",label:"Не хватает",what:x.t.replace(/^Не загружены: /,""),sub:"до загрузки / выхода судна",ord:2}))});
   return out.sort((x,y)=>x.ord-y.ord||String(x.d).localeCompare(String(y.d)));
 }
 function renderWeek(vis){
   const [,,s,e]=weekRange(), L=weekItems(vis);
   const rng=s.getMonth()===e.getMonth()?`${s.getDate()}–${e.getDate()} ${MON[e.getMonth()]}`:`${s.getDate()} ${MON[s.getMonth()]} – ${e.getDate()} ${MON[e.getMonth()]}`;
-  $("wk").innerHTML=`<h2>На этой неделе <span>${rng}</span></h2><div class="wkl">${L.map(x=>`<button type="button" class="wki ${x.c}" data-lsel="${esc(x.o.id)}"><span class="wkh"><span class="wkt">${x.label}</span>${x.d?`<b>${mdd(x.d)}</b>`:""}</span><span class="wkw"><b>${esc(x.o.num||"")}</b> ${esc(x.what)}</span>${x.sub?`<small>${esc(x.sub)}</small>`:""}</button>`).join("")||`<span class="note">На этой неделе сроков нет, просроченного нет.</span>`}</div>`;
+  $("wk").innerHTML=`<h2>На этой неделе <span>${rng}</span></h2><div class="wkl">${L.map(x=>`<button type="button" class="wki ${x.c}" data-lsel="${esc(x.o.id)}"><span class="wkh"><span class="wkt">${x.label}</span>${x.d?`<b>${mdd(x.d)}</b>`:""}</span><span class="wkw"><b>${esc(x.o.num||"")}</b> ${esc(x.what)}</span>${x.sub?`<small>${esc(x.sub)}</small>`:""}</button>`).join("")||`<span class="note">На этой неделе загрузок, выходов судов и других сроков нет.</span>`}</div>`;
 }
 const stepName=id=>SHORT[id]||STEP[id].t;
 function lStepRow(o,id,ph){const s=STEP[id], done=stepDone(o,id), d=done?stepDate(o,id):"";
