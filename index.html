@@ -1379,14 +1379,23 @@ async function rcOCR(file){
 }
 const _libs2={};
 function loadLib(key,src,test){return _libs2[key]||(_libs2[key]=new Promise((ok,no)=>{if(test())return ok();const s=document.createElement("script");s.src=src;s.onload=()=>test()?ok():no({code:"lib"});s.onerror=()=>{_libs2[key]=null;no({code:"lib"})};document.head.appendChild(s)}))}
+// receipt photos are kept small (about 100–200 KB): long side 1400 px is plenty to read a receipt; the reading itself uses the original
+async function rcShrink(f){
+  if(!/^image\//i.test(f.type||"")||typeof createImageBitmap!=="function")return f;
+  try{const bm=await createImageBitmap(f,{imageOrientation:"from-image"});
+    const M=1400, s=Math.min(1,M/Math.max(bm.width,bm.height)), w=Math.round(bm.width*s), h=Math.round(bm.height*s);
+    const c=document.createElement("canvas");c.width=w;c.height=h;const g=c.getContext("2d");g.fillStyle="#fff";g.fillRect(0,0,w,h);g.drawImage(bm,0,0,w,h);if(bm.close)bm.close();
+    const b=await new Promise(r=>c.toBlob(r,"image/jpeg",0.7));
+    return b&&b.size<f.size?new File([b],f.name.replace(/\.\w+$/,"")+".jpg",{type:"image/jpeg"}):f}catch(e){return f}
+}
 async function rcAddPhotos(list){
   if(!rcEmp){$("rcNote").textContent="Сначала выберите сотрудника.";return}
   for(const file of list){
     const id="r"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
     $("rcNote").textContent=`Загружаю «${file.name}»…`;
     try{
-      const up=await shrinkPic(file);const r=await assets.upload(up,{type:up.type});
-      const rec={emp:rcEmp,photo:r.id,photoName:file.name,by:window.TC_USER||"",at:new Date().toISOString(),date:"",shop:"",cat:"",amt:null,note:"",st:"ocr"};
+      const up=await rcShrink(file);const r=await assets.upload(up,{type:up.type});
+      const rec={emp:rcEmp,photo:r.id,photoKB:Math.round(up.size/1024),photoName:file.name,by:window.TC_USER||"",at:new Date().toISOString(),date:"",shop:"",cat:"",amt:null,note:"",st:"ocr"};
       await db.collection("receipts").doc(id).set(rec);rcRows[id]=rec;renderRc();
       $("rcNote").textContent=`Читаю чек «${file.name}»…`;
       if(!rcNames.length)await rcLoadNames();
