@@ -747,7 +747,14 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
 .wk{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
 .wk h2{margin:0;font:600 15px var(--f-display);color:var(--ink)}.wk h2 span{color:var(--muted);font-weight:500;margin-left:6px}
 .wkl{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
-.wki{flex:0 0 210px;text-align:left;border:1px solid var(--line);border-left:4px solid var(--accent);background:var(--bg);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:3px;cursor:pointer;font:13px var(--f-body);color:var(--ink)}
+.wkg{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;padding:6px;border-radius:10px}
+.wkgh{font:12.5px var(--f-body);color:var(--muted);padding:0 2px;white-space:nowrap}.wkgh b{color:var(--ink);font-weight:600}
+.wkgc{display:flex;gap:6px}
+.wkg.today{background:var(--accent-soft);outline:2px solid var(--accent)}.wkg.today .wkgh b{color:var(--accent);text-transform:uppercase;letter-spacing:.04em}
+.wkg.tmrw{background:var(--soft)}.wkg.tmrw .wkgh b{text-transform:uppercase;letter-spacing:.04em}
+.wkg.past{opacity:.85}
+.wki .wkt{display:block}
+.wki{flex:0 0 190px;text-align:left;border:1px solid var(--line);border-left:4px solid var(--accent);background:var(--bg);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:3px;cursor:pointer;font:13px var(--f-body);color:var(--ink)}
 .wki:hover{border-color:var(--accent)}
 .wki.bad{border-left-color:var(--danger);background:var(--danger-soft)}.wki.warn{border-left-color:var(--warn)}.wki.moved{border-left-color:var(--warn);background:var(--warn-soft)}.wki.miss{border-left-color:var(--danger)}
 .wkh{display:flex;justify-content:space-between;gap:6px}.wkt{font:600 10.5px var(--f-body);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}.wki.bad .wkt,.wki.miss .wkt{color:var(--danger)}.wki.moved .wkt{color:var(--warn)}
@@ -1485,10 +1492,16 @@ function weekItems(vis){
     a.alerts.filter(x=>x.c==="bad"&&x.t.startsWith("Не загружены")).forEach(x=>out.push({o,d:"",c:"miss",label:"Не хватает",what:x.t.replace(/^Не загружены: /,""),sub:"до загрузки / выхода судна",ord:2}))});
   return out.sort((x,y)=>x.ord-y.ord||String(x.d).localeCompare(String(y.d)));
 }
+const WD=["вс","пн","вт","ср","чт","пт","сб"];
+function dayName(d){const n=days(d), w=WD[pd(d).getDay()]+" "+mdd(d);return n===0?["Сегодня",w]:n===1?["Завтра",w]:n===-1?["Вчера",w]:[w.charAt(0).toUpperCase()+w.slice(1),n<0?"прошло":""]}
 function renderWeek(vis){
   const [,,s,e]=weekRange(), L=weekItems(vis);
   const rng=s.getMonth()===e.getMonth()?`${s.getDate()}–${e.getDate()} ${MON[e.getMonth()]}`:`${s.getDate()} ${MON[s.getMonth()]} – ${e.getDate()} ${MON[e.getMonth()]}`;
-  $("wk").innerHTML=`<h2>На этой неделе <span>${rng}</span></h2><div class="wkl">${L.map(x=>`<button type="button" class="wki ${x.c}" data-lsel="${esc(x.o.id)}"><span class="wkh"><span class="wkt">${x.label}</span>${x.d?`<b>${mdd(x.d)}</b>`:""}</span><span class="wkw"><b>${esc(x.o.num||"")}</b> ${esc(x.what)}</span>${x.sub?`<small>${esc(x.sub)}</small>`:""}</button>`).join("")||`<span class="note">На этой неделе загрузок, выходов судов и других сроков нет.</span>`}</div>`;
+  const card=x=>`<button type="button" class="wki ${x.c}" data-lsel="${esc(x.o.id)}"><span class="wkt">${x.label}</span><span class="wkw"><b>${esc(x.o.num||"")}</b> ${esc(x.what)}</span>${x.sub&&!/^сегодня$|^завтра$|^через/.test(x.sub)?`<small>${esc(x.sub)}</small>`:""}</button>`;
+  // one group per day, «Сегодня» and «Завтра» named and marked; missing papers last
+  const groups=[];L.forEach(x=>{const k=x.d||"~";let g=groups.find(g=>g.k===k);if(!g)groups.push(g={k,L:[]});g.L.push(x)});
+  $("wk").innerHTML=`<h2>На этой неделе <span>${rng}</span></h2><div class="wkl">${groups.map(g=>{const n=g.k==="~"?null:days(g.k), [t,sub]=g.k==="~"?["Не хватает документов",""]:dayName(g.k);
+    return `<div class="wkg ${n===0?"today":n===1?"tmrw":n!=null&&n<0?"past":""}"><div class="wkgh"><b>${t}</b>${sub?` <span>${sub}</span>`:""}</div><div class="wkgc">${g.L.map(card).join("")}</div></div>`}).join("")||`<span class="note">На этой неделе загрузок, выходов судов и других сроков нет.</span>`}</div>`;
 }
 const stepName=id=>SHORT[id]||STEP[id].t;
 function lStepRow(o,id,ph){const s=STEP[id];
