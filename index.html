@@ -2159,7 +2159,8 @@ function fileActs(f,oid,canDel,canRepl){
   const native=f.enc==="raw"&&/pdf|image/.test(f.mime||"");
   return `${native?`<button class="btn" type="button" data-view="${esc(f.aid)}" data-oid="${esc(oid)}" title="Посмотреть здесь, на доске">Открыть</button>`:""}
     <button class="btn" type="button" data-dl="${esc(f.aid)}" data-oid="${esc(oid)}">Скачать</button>
-    ${canRepl&&assets&&canWrite&&!f.fix?`<button class="btn" type="button" data-fix="${esc(f.aid)}" title="Загрузить исправленную версию: этот файл останется как есть, с пометкой «есть исправленная версия»">Исправленная версия</button>`:""}
+    ${canRepl&&assets&&canWrite&&!f.fix?`<button class="btn" type="button" data-fix="${esc(f.aid)}" title="Загрузить исправленную версию (можно сразу PDF и Word): этот файл останется как есть, с пометкой «есть исправленная версия»">Исправленная версия</button>`:""}
+    ${canRepl&&assets&&canWrite&&f.fix&&f.fixOf?`<button class="btn" type="button" data-fix="${esc(f.fixOf)}" title="Добавить эту же исправленную версию в другом формате (например, Word к PDF)">+ Другой формат</button>`:""}
     ${canRepl&&assets&&canWrite?`<button class="btn" type="button" data-repl="${esc(f.aid)}" title="Загрузить другой файл вместо этого">Заменить</button>`:""}
     ${canDel&&canWrite?`<button class="btn ghost danger" type="button" data-fdel="${esc(f.aid)}" data-oid="${esc(oid)}">Удалить</button>`:""}`;
 }
