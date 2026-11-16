@@ -732,7 +732,7 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .rct-t{border-collapse:collapse;width:100%;font-size:13px}.rct-t th{font-weight:500;color:var(--muted);font-size:11.5px;text-align:left;padding:4px 6px}
 .rct-t td{padding:3px 6px;border-top:1px solid var(--line);vertical-align:middle}.rct-t .n{text-align:right}
 .rct-t input{font-size:13px;padding:4px 6px;width:100%;min-width:90px}.rct-t input[type=date]{min-width:130px}
-.rcph{width:38px;height:38px;object-fit:cover;border-radius:6px;display:block;background:var(--soft)}
+.rcph{width:38px;height:38px;object-fit:cover;border-radius:6px;display:block;background:var(--soft)}.rcph.gone{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px}
 .rcs{font-size:11.5px;color:var(--muted);white-space:nowrap}
 tr.st-check .rcs,tr.st-many .rcs{color:var(--warn);font-weight:600}tr.st-ocr .rcs{color:var(--accent)}tr.st-done .rcs{color:var(--ok)}
 tr.st-done input,tr.st-dup input{color:var(--muted)}tr.st-dup .rcs{color:var(--muted)}
@@ -800,7 +800,7 @@ tr.st-done input,tr.st-dup input{color:var(--muted)}tr.st-dup .rcs{color:var(--m
       <button class="btn primary" type="button" id="rcExport" disabled>Выгрузить в Excel</button>
     </div>
     <div class="bar rcbar"><span id="rcFile"></span><button class="btn ghost" type="button" id="rcMasterDl" title="Скачать текущий общий файл">Скачать</button><button class="btn ghost" type="button" id="rcMasterBtn" title="Загрузить общий файл (заменит текущий)">Общий файл…</button><input type="file" id="rcMasterIn" accept=".xlsx" hidden></div>
-    <p class="note" id="rcNote" style="margin:0">Фото — по одному чеку на снимок. Доска сама прочитает дату, название и сумму; строки можно поправить.</p>
+    <p class="note" id="rcNote" style="margin:0">Фото — по одному чеку на снимок. Доска сама прочитает дату, название и сумму; строки можно поправить. Фото чеков удаляются через 2 недели после выгрузки в Excel.</p>
     <datalist id="rcCats"><option>식대</option><option>주유비</option><option>하이패스</option><option>택배비</option><option>사무용품</option><option>창고용품</option><option>주차비</option><option>교통비</option><option>개인지출</option><option>기타</option></datalist>
     <div id="rcAll" class="rcall"></div>
   </section>
@@ -1424,7 +1424,7 @@ function renderRc(){
     return `<section class="rcw"><header><b>${w==="—"?"Без даты":`Неделя ${md2(w)} – ${md2(end)}`}</b><span class="note">${rows.length} чек.</span><span class="rct">${tot.toLocaleString("ru-RU")} ₩</span></header>
       <table class="rct-t"><thead><tr><th></th>${show==="all"?"<th>Сотрудник</th>":""}<th>Дата</th><th>상호 / Имя</th><th>내역 / Вид</th><th class="n">Сумма</th><th>Примечание</th><th>Статус</th><th></th></tr></thead><tbody>
       ${rows.map(r=>{const ro=r.exported||!canWrite?"disabled":"";const st=r.dup?"dup":r.exported?"done":r.st||"new";
-        return `<tr data-rc="${esc(r.id)}" class="st-${st}"><td><a href="#" data-rcph="${esc(r.photo)}" title="Открыть фото"><img src="/_blob/${esc(r.photo)}" alt="" class="rcph"></a></td>${show==="all"?`<td class="note">${esc(r.emp)}</td>`:""}
+        return `<tr data-rc="${esc(r.id)}" class="st-${st}"><td>${r.photo?`<a href="#" data-rcph="${esc(r.photo)}" title="Открыть фото"><img src="/_blob/${esc(r.photo)}" alt="" class="rcph"></a>`:`<span class="rcph gone" title="Фото удалено через 2 недели после выгрузки в Excel">—</span>`}</td>${show==="all"?`<td class="note">${esc(r.emp)}</td>`:""}
           <td><input type="date" data-f="date" value="${esc(r.date||"")}" ${ro}></td><td><input data-f="shop" value="${esc(r.shop||"")}" ${ro}></td>
           <td><input data-f="cat" list="rcCats" value="${esc(r.cat||"")}" ${ro} style="width:110px"></td><td class="n"><input data-f="amt" inputmode="numeric" value="${r.amt?Number(r.amt).toLocaleString("ru-RU"):""}" ${ro} style="width:100px;text-align:right"></td>
           <td><input data-f="note" value="${esc(r.note||"")}" ${ro} placeholder="—"></td><td><span class="rcs">${stT[st]||st}</span></td>
@@ -1505,8 +1505,20 @@ $("rcExport").onclick=rcExport;
 $("rcAll").addEventListener("change",e=>{const i=e.target.closest("input[data-f]");if(!i)return;rcSave(i.closest("tr"),i.dataset.f,i.value).then(()=>{if(i.dataset.f==="date"||i.dataset.f==="amt")renderRc()})});
 $("rcAll").addEventListener("click",async e=>{const ph=e.target.closest("[data-rcph]");if(ph){e.preventDefault();window.open(ph.querySelector("img").src,"_blank");return}
   const d=e.target.closest("[data-rcdel]");if(d){const id=d.dataset.rcdel;const r=rcRows[id];try{await db.collection("receipts").doc(id).delete();delete rcRows[id];if(r&&r.photo&&assets)assets.delete(r.photo).catch(()=>{});renderRc()}catch(err){}}});
+// photos of receipts already in the Excel file are deleted 2 weeks after the export (the rows stay; paper receipts are kept)
+const RC_KEEP_DAYS=14;let rcCleaning=false;
+async function rcCleanup(){
+  if(rcCleaning||!canWrite||!assets||!db)return;rcCleaning=true;
+  try{const lim=Date.now()-RC_KEEP_DAYS*86400000;
+    for(const [id,r] of Object.entries(rcRows)){
+      if(!r.exported||!r.photo||!r.exportedAt||new Date(r.exportedAt).getTime()>lim)continue;
+      try{await assets.delete(r.photo)}catch(e){}
+      try{await db.collection("receipts").doc(id).update({photo:null,photoGone:new Date().toISOString()});Object.assign(rcRows[id],{photo:null})}catch(e){}
+    }}finally{rcCleaning=false}
+}
+setInterval(rcCleanup,3600000);
 (function waitRc(){if(!db){setTimeout(waitRc,500);return}
-  db.collection("receipts").onSnapshot(s=>{rcRows={};s.docs.filter(x=>x.exists).forEach(x=>rcRows[x.id]=x.data());if(view==="rc")renderRc()},()=>{});
+  let first=true;db.collection("receipts").onSnapshot(s=>{rcRows={};s.docs.filter(x=>x.exists).forEach(x=>rcRows[x.id]=x.data());if(view==="rc")renderRc();if(first){first=false;setTimeout(rcCleanup,5000)}},()=>{});
   db.collection("rcmeta").onSnapshot(s=>{rcMeta={};s.docs.filter(x=>x.exists).forEach(x=>rcMeta[x.id]=x.data());if(view==="rc")renderRc()},()=>{});
 })();
 
