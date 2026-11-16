@@ -718,6 +718,12 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .stx{flex:none;display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:4px;font:700 9.5px/1 var(--f-body);margin-right:5px;vertical-align:-2px;
   color:var(--muted);border:1px solid var(--line);background:var(--panel);opacity:.7;align-self:center}
 .stx.on{color:#fff;background:var(--ok);border-color:var(--ok);opacity:1;cursor:pointer}
+/* corrected versions */
+.pill.fixo,.fixmark a{color:var(--warn)!important}.pill.fixo{border-color:var(--warn)}
+.pill.fixn{color:var(--accent);border-color:var(--accent)}
+.fixmark{display:block}.fixmark a{text-decoration:none;font-size:11.5px}.fixmark a:hover{text-decoration:underline}
+.fixsrc{display:block;color:var(--muted);font-size:11.5px}
+.dct tr.fixrow>th{color:var(--accent)}.dct tr.fixrow>*{border-top:2px solid var(--accent-soft,var(--line))}
 </style>
 
 </head>
@@ -1039,6 +1045,9 @@ const sups=o=>{const L=sups0(o);return L.map(x=>{if(x.amt!=null&&x.amt!=="")retu
 // what is still owed to suppliers on one deal
 const supDue=o=>sups(o).filter(x=>x.name&&!x.paid);
 // part payments to a supplier: «оплачено» as an amount or a percentage of the supplier amount; paid in full counts as «оплачен»
+// corrected versions: which file is the correction of which
+const fixesOf=(o,f)=>(o&&o.files||[]).filter(x=>x.fix&&x.fixOf===f.aid).sort((a,b)=>String(b.at||"").localeCompare(String(a.at||"")));
+const fixedTag=(o,f)=>{if(f.fix){const src=(o.files||[]).find(x=>x.aid===f.fixOf);return `исправленная версия${src?" «"+src.name+"»":""}`}const n=fixesOf(o,f);return n.length?"есть исправленная версия":""};
 const supLeft=x=>x.paid?0:Math.max(0,(Number(x.amt)||0)-(Number(x.paidAmt)||0));
 // 세금계산서 from each supplier: a file of that type tied to the supplier by its name (in the file name or inside it)
 const taxFiles=(o,x,L)=>{const T=(o.files||[]).filter(f=>kindOf(f.kind)==="taxinv");if(!T.length)return [];
@@ -2150,10 +2159,17 @@ function fileActs(f,oid,canDel,canRepl){
   const native=f.enc==="raw"&&/pdf|image/.test(f.mime||"");
   return `${native?`<button class="btn" type="button" data-view="${esc(f.aid)}" data-oid="${esc(oid)}" title="Посмотреть здесь, на доске">Открыть</button>`:""}
     <button class="btn" type="button" data-dl="${esc(f.aid)}" data-oid="${esc(oid)}">Скачать</button>
+    ${canRepl&&assets&&canWrite&&!f.fix?`<button class="btn" type="button" data-fix="${esc(f.aid)}" title="Загрузить исправленную версию: этот файл останется как есть, с пометкой «есть исправленная версия»">Исправленная версия</button>`:""}
     ${canRepl&&assets&&canWrite?`<button class="btn" type="button" data-repl="${esc(f.aid)}" title="Загрузить другой файл вместо этого">Заменить</button>`:""}
     ${canDel&&canWrite?`<button class="btn ghost danger" type="button" data-fdel="${esc(f.aid)}" data-oid="${esc(oid)}">Удалить</button>`:""}`;
 }
-let replAid=null, replArm=false;
+let replAid=null, replArm=false, fixAid=null;
+// corrected version: the old file stays untouched; the new one goes to «Документы после исправлений» with a link to it
+function startFix(aid){
+  const f=(editing&&editing.files||[]).find(x=>x.aid===aid); if(!f||!assets)return;
+  fixAid=aid; replAid=null; const k=kindOf(f.kind); $("upKind").value=k; $("upSigner").hidden=k!=="cs"; if(k==="cs")$("upSigner").value=f.signer||"";
+  $("upNote").textContent=`Выберите исправленную версию «${f.name}»`; replArm=true; $("upFile").click();
+}
 function startReplace(aid){
   const f=(editing&&editing.files||[]).find(x=>x.aid===aid); if(!f||!assets)return;
   replAid=aid; const k=kindOf(f.kind); $("upKind").value=k; $("upSigner").hidden=k!=="cs"; if(k==="cs")$("upSigner").value=f.signer||"";
@@ -2180,7 +2196,7 @@ function renderFiles(){
     const canDen=kindOf(f.kind)==="cs"&&!["den","both","den_both","nosig"].includes(f.signer)&&extOf(f.name)==="docx"&&assets&&canWrite;
     const splitBtn=kindOf(f.kind)==="calc"&&/\.xlsx$/i.test(f.name)&&assets&&canWrite?`<button class="btn" type="button" data-split="${esc(f.aid)}" title="Сделать из вкладок КП, заказы поставщикам и инвойсы">Разобрать на документы</button>`:"";
     const denBtn=canDen?`<button class="btn" type="button" data-mkden="${esc(f.aid)}" title="Создать копию с именами и подписью Ден Евгения — для корейского банка">Сделать вариант Ден Е.</button>`:"";
-    return `<div class="frow"><span style="justify-self:start;display:flex;flex-direction:column;align-items:flex-start">${canWrite?`<select class="fkind" data-fkind="${esc(f.aid)}" aria-label="Тип документа «${esc(f.name)}»">${KINDS.map(([k,v])=>`<option value="${k}" ${kindOf(f.kind)===k?"selected":""}>${v}</option>`).join("")}</select>`:`<span class="pill acc">${KIND[f.kind]||"Прочее"}</span>`}${signUI}</span><span class="fn"><span class="ext ${extOf(f.name)}">${extOf(f.name)||"файл"}</span>${esc(f.name)}${f.from==="calc"?`<span class="pill" title="Сделано из вкладки «${esc(f.sheet||"")}» калькуляции">из калькуляции</span>`:""}<small>${fsize(f.size||0)} · ${fWhen(f)}</small></span><span class="acts">${splitBtn}${denBtn}${kindOf(f.kind)==="cs"&&f.signer!=="nosig"&&extOf(f.name)==="docx"&&assets&&canWrite?`<button class="btn" type="button" data-nosig="${esc(f.aid)}" title="Копия этого контракта в Word без факсимиле подписей и печатей">Без подписей</button>`:""}${fileActs(f,editing.id,true,true)}</span></div>`}).join("")
+    return `<div class="frow"><span style="justify-self:start;display:flex;flex-direction:column;align-items:flex-start">${canWrite?`<select class="fkind" data-fkind="${esc(f.aid)}" aria-label="Тип документа «${esc(f.name)}»">${KINDS.map(([k,v])=>`<option value="${k}" ${kindOf(f.kind)===k?"selected":""}>${v}</option>`).join("")}</select>`:`<span class="pill acc">${KIND[f.kind]||"Прочее"}</span>`}${signUI}</span><span class="fn"><span class="ext ${extOf(f.name)}">${extOf(f.name)||"файл"}</span>${esc(f.name)}${f.from==="calc"?`<span class="pill" title="Сделано из вкладки «${esc(f.sheet||"")}» калькуляции">из калькуляции</span>`:""}${fixedTag(editing,f)?`<span class="pill ${f.fix?"fixn":"fixo"}">${esc(fixedTag(editing,f))}</span>`:""}<small>${fsize(f.size||0)} · ${fWhen(f)}</small></span><span class="acts">${splitBtn}${denBtn}${kindOf(f.kind)==="cs"&&f.signer!=="nosig"&&extOf(f.name)==="docx"&&assets&&canWrite?`<button class="btn" type="button" data-nosig="${esc(f.aid)}" title="Копия этого контракта в Word без факсимиле подписей и печатей">Без подписей</button>`:""}${fileActs(f,editing.id,true,true)}</span></div>`}).join("")
     :pics.length?"":`<div class="frow"><span class="note" style="grid-column:1/-1">Документов пока нет. Прикрепите калькуляцию, КП, контракт и спецификацию, инвойс и упаковочный и другие файлы по заказу.</span></div>`);
 }
 function toB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]||"");r.onerror=()=>rej(r.error);r.readAsDataURL(file)})}
@@ -2189,7 +2205,8 @@ async function uploadFiles(list){
   if(!editing.id){pendingFiles.push(...list);renderPending();$("upFile").value="";autofillFiles(await Promise.all([...list].map(async f=>({bytes:new Uint8Array(await f.arrayBuffer()),name:f.name}))),false);return}
   if(!assets)return;
   const repl=replAid&&(editing.files||[]).find(f=>f.aid===replAid); replAid=null;
-  const kindSel=repl?repl.kind:$("upKind").value, signSel=repl?(repl.signer||""):$("upSigner").value, added=[], expList=[], calcList=[];
+  const fixOf=fixAid&&(editing.files||[]).find(f=>f.aid===fixAid); fixAid=null;
+  const kindSel=repl?repl.kind:fixOf?fixOf.kind:$("upKind").value, signSel=repl?(repl.signer||""):fixOf?(fixOf.signer||""):$("upSigner").value, added=[], expList=[], calcList=[];
   for(const file of list){
     $("upNote").textContent=`Загружаю «${file.name}»…`;
     try{
@@ -2200,6 +2217,7 @@ async function uploadFiles(list){
       const kind=kindSel||guessKind(file.name)||"other";
       const rec={aid:r.id,name:up.name,kind,size:r.sizeBytes||up.size,mime:up.type||"",enc,at:new Date().toISOString(),by:window.TC_USER||""};
       if(kindOf(kind)==="cs"){rec.signer=signSel||guessSigner(file.name)||sigByName[file.name]||"";if(!rec.signer)rec.signer=await signerFromText(file)}
+      if(fixOf){rec.fix=true;rec.fixOf=fixOf.aid}
       added.push(rec);
       if((rec.kind==="other"||rec.kind==="pay")&&(!kindSel||kindSel==="pay")&&/\.pdf$/i.test(file.name)){const pm=await readPayOrder(file);if(pm){rec.kind="pay";rec.pm=pm;rec.orig=rec.name;rec.name=payName(editing,pm,rec.name)}}
       if(rec.kind==="other"&&!kindSel&&/\.pdf$/i.test(file.name)&&await isImpDecl(file))rec.kind="impdecl";
@@ -2208,7 +2226,7 @@ async function uploadFiles(list){
       if(rec.kind==="taxinv"||((rec.kind==="other"||rec.kind==="")&&!kindSel&&/\.(pdf|xlsx|xls|html?|xml)$/i.test(file.name))){const tx=await taxSupplier(file,sups(editing));if(tx.isTax&&rec.kind!=="taxinv"&&!kindSel)rec.kind="taxinv";if(rec.kind==="taxinv"&&tx.sup)rec.sup=tx.sup}
       if(kindOf(rec.kind)==="exp")expList.push(file);
       if(kindOf(rec.kind)==="ipl"&&/\.xlsx?$/i.test(file.name))Object.assign(rec,invEquiv(new Uint8Array(await file.arrayBuffer())));
-      if(/\.xlsx$/i.test(file.name)&&!repl){const bytes=new Uint8Array(await file.arrayBuffer());if(await isCalcBook(bytes)){rec.kind="calc";calcList.push({rec,bytes})}}
+      if(/\.xlsx$/i.test(file.name)&&!repl&&!fixOf){const bytes=new Uint8Array(await file.arrayBuffer());if(await isCalcBook(bytes)){rec.kind="calc";calcList.push({rec,bytes})}}
     }catch(e){
       const m=e&&e.code==="too_large"?"слишком большой файл (до 20 МБ; Word и Excel — до 15 МБ)":e&&e.code==="quota_exceeded"?"хранилище заполнено":(e&&e.code)||"ошибка";
       $("upNote").textContent=`«${file.name}» не загружен: ${m}.`;
@@ -2217,7 +2235,7 @@ async function uploadFiles(list){
   if(!added.length)return;
   const files=[...(editing.files||[]).filter(f=>!repl||f.aid!==repl.aid),...added];
   try{await db.collection("orders").doc(editing.id).update({files,updatedAt:new Date().toISOString()});editing.files=files;renderFiles();refreshDerived();
-      $("upNote").textContent=(repl?`Заменено: «${repl.name}» → `:"Загружено: ")+added.map(a=>a.name+" → "+(KIND[a.kind]||"Прочее")).join(", ")+otherOrderWarn(added);upSticky={t:Date.now(),txt:$("upNote").textContent};
+      $("upNote").textContent=(repl?`Заменено: «${repl.name}» → `:fixOf?`Исправленная версия «${fixOf.name}» (прежний файл оставлен с пометкой): `:"Загружено: ")+added.map(a=>a.name+" → "+(KIND[a.kind]||"Прочее")).join(", ")+otherOrderWarn(added);upSticky={t:Date.now(),txt:$("upNote").textContent};
       if(repl&&assets)assets.delete(repl.aid).catch(()=>{});
       if(expList.length){const l=[];for(const f of expList)l.push({bytes:new Uint8Array(await f.arrayBuffer()),name:f.name});applyExpNo(l,false)}
       autofillFiles(await Promise.all([...list].map(async f=>({bytes:new Uint8Array(await f.arrayBuffer()),name:f.name}))),true);
@@ -2257,7 +2275,7 @@ async function deleteFile(aid,oid){
     if(assets)assets.delete(aid).catch(()=>{});
   }catch(e){const m="Не получилось удалить ("+(e&&e.code||"ошибка")+").";if(editing)$("upNote").textContent=m;else showStatus(m,true)}
 }
-$("upFile").addEventListener("click",()=>{if(!replArm)replAid=null;replArm=false});
+$("upFile").addEventListener("click",()=>{if(!replArm){replAid=null;fixAid=null}replArm=false});
 $("upFile").addEventListener("change",()=>uploadFiles([...$("upFile").files]));
 $("upKind").addEventListener("change",()=>{$("upSigner").hidden=$("upKind").value!=="cs"});
 $("fileList").addEventListener("change",async e=>{const sel=e.target.closest("[data-fsign]");if(!sel||!editing||!editing.id)return;
@@ -2275,6 +2293,7 @@ $("fileList").addEventListener("click",e=>{const b=e.target.closest("button");if
   else if(b.dataset.fdelyes)deleteFile(b.dataset.fdelyes);
   else if(b.dataset.mkden)makeDen(b.dataset.mkden,b);
   else if(b.dataset.repl)startReplace(b.dataset.repl);
+  else if(b.dataset.fix)startFix(b.dataset.fix);
   else if(b.dataset.dlpics)dlPics(b.dataset.dlpics);});
 async function blobBytes(f){
   const res=await fetch("/_blob/"+f.aid); if(!res.ok)throw {code:"fetch_"+res.status};
@@ -2963,16 +2982,18 @@ renderDocsAll=function(){
     const ext=extOf(f.name), view=f.enc==="raw"&&/pdf|image/.test(f.mime||"")||/^(docx|xlsx|xls|xlsm|csv)$/.test(ext);
     if(fDel===f.aid)return `<div class="dfl del"><span>Удалить «${esc(f.name)}»?</span><span class="da"><button type="button" class="ib danger" data-fdelyes="${esc(f.aid)}" data-oid="${esc(o.id)}">Да</button><button type="button" class="ib" data-fcancel>Нет</button></span></div>`;
     const tag=kindOf(f.kind)==="cs"?[csPart(f.orig||f.name),f.signer&&SIGN[f.signer]?SIGN[f.signer][2]:""].filter(Boolean).join(" · ")
-      :kindOf(f.kind)==="ipl"?[iplPart(f.orig||f.name),f.from==="calc"?"из калькуляции":""].filter(Boolean).join(" · "):kindOf(f.kind)==="taxinv"?(f.sup||""):f.from==="calc"?"из калькуляции":"";
+      :kindOf(f.kind)==="ipl"?[iplPart(f.orig||f.name),f.from==="calc"?"из калькуляции":""].filter(Boolean).join(" · "):kindOf(f.kind)==="taxinv"?(f.sup||""):f.fix?"":f.from==="calc"?"из калькуляции":"";
     const g=guessKind(f.orig||f.name), odd=g&&g!==kindOf(f.kind)&&f.from!=="calc"&&!f.pm&&!(g==="calc"&&kindOf(f.kind)==="kp"&&/offer/i.test(f.name));
     const kindSel=canWrite?`<select class="dks" data-dkind="${esc(f.aid)}" data-oid="${esc(o.id)}" aria-label="Тип «${esc(f.name)}»" title="Сменить тип">${KINDS.map(([k,v])=>`<option value="${k}" ${kindOf(f.kind)===k?"selected":""}>${esc(v)}</option>`).join("")}</select>`:"";
     return `<div class="dfl"><span class="ext ${ext}">${ext||"файл"}</span><span class="dfn">`
       +(view?`<a href="#" data-view="${esc(f.aid)}" data-oid="${esc(o.id)}" data-sibs="${esc((o.files||[]).filter(x=>kindOf(x.kind)===kindOf(f.kind)).map(x=>x.aid).join(","))}">${esc(f.name)}</a>`:`<button type="button" class="lnkb" data-dl="${esc(f.aid)}" data-oid="${esc(o.id)}">${esc(f.name)}</button>`)
       +(odd?`<small class="warn-t">⚠ по названию похоже на «${esc(KIND[g]||g)}» — проверьте тип в заказе</small>`:"")
+      +(()=>{if(f.fix){const src=(o.files||[]).find(x=>x.aid===f.fixOf);return `<small class="fixsrc">${esc(KIND[f.kind]||"")}${src?" · вместо «"+esc(src.name)+"»":""}</small>`}
+        const n=fixesOf(o,f);return n.length?`<small class="fixmark"><a href="#" data-view="${esc(n[0].aid)}" data-oid="${esc(o.id)}">⚠ есть исправленная версия от ${fWhen({at:n[0].at}).slice(0,5)} — открыть</a></small>`:""})()
       +`</span><span class="dfd">${fWhen({at:f.at})}</span><span class="dfi">${esc(tag)}</span><span class="dfb" title="${esc(f.by||"")}">${esc(f.by?String(f.by).split("@")[0]:"")}</span><span class="da"><button type="button" class="ib" data-dl="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Скачать" aria-label="Скачать ${esc(f.name)}">⬇</button>${canWrite?`<button type="button" class="ib danger" data-fdel="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Удалить" aria-label="Удалить ${esc(f.name)}">✕</button>`:""}</span></div>`;
   };
   const blocks=rowsO.map(o=>{
-    const fs=o.files||[], pics=fs.filter(isPic), docs=fs.filter(f=>!isPic(f));
+    const fs=o.files||[], pics=fs.filter(isPic), docsAll=fs.filter(f=>!isPic(f)), fixed=docsAll.filter(f=>f.fix), docs=docsAll.filter(f=>!f.fix);
     const kinds=new Set(docs.map(f=>kindOf(f.kind)));
     if(pics.length||linkOK(o.photoLink))kinds.add("photo");
     if(!o.arch)(isImp(o)?["cs","ipl","lbl","lblph","test","photo","impdecl","brokinv"]:["kp","cs","ipl","taxinv","exp","photo","expd","bl","freight"]).forEach(k=>kinds.add(k));
@@ -2992,8 +3013,8 @@ renderDocsAll=function(){
         if(miss.length&&h)h+=`<div class="dfl"><span></span><span class="dnone">нет от: ${esc(miss.join(", "))}</span></div>`;
         else if(miss.length)h=`<span class="dnone">нет от: ${esc(miss.join(", "))}</span>`}
       return `<tr class="${h&&!/^<span class="dnone">/.test(h)?"":"none"}"><th scope="row">${esc(k==="photo"?"Фотоотчёт":k==="taxinv"?"세금계산서":(KIND[k]||"Прочее").replace(/ \(.*\)$/,""))}</th><td>${h||`<span class="dnone">нет</span>`}</td></tr>`;
-    }).join("");
-    return `<article class="dcard"><header><span class="num" data-open="${esc(o.id)}" title="Открыть заказ">${esc(o.num||"без номера")}</span><span class="who">${esc(o.buyer||"")}</span>${o.arch?`<small class="note">архив</small>`:""}<span class="cnt">${docs.length+pics.length} файл.</span></header><table class="dct"><tbody>${rows}</tbody></table></article>`;
+    }).join("")+(fixed.length&&!cur?`<tr class="fixrow"><th scope="row">Документы после исправлений</th><td>${(nFiles+=fixed.length,fixed.slice().sort((a,b)=>String(b.at||"").localeCompare(String(a.at||""))).map(f=>fileRow(o,f)).join(""))}</td></tr>`:"");
+    return `<article class="dcard"><header><span class="num" data-open="${esc(o.id)}" title="Открыть заказ">${esc(o.num||"без номера")}</span><span class="who">${esc(o.buyer||"")}</span>${o.arch?`<small class="note">архив</small>`:""}<span class="cnt">${docsAll.length+pics.length} файл.</span></header><table class="dct"><tbody>${rows}</tbody></table></article>`;
   }).join("");
   $("docsCount").textContent=nFiles?`Файлов: ${nFiles}`:"";
   $("docsAll").innerHTML=blocks||`<div class="frow"><span class="note" style="grid-column:1/-1">${rowsO.length?"Нет документов под этот фильтр.":"Заказов пока нет."}</span></div>`;
@@ -3094,7 +3115,7 @@ function invTotals(o){
   // an invoice uploaded as its own file replaces the one cut out of the calculation, so the two are not added up
   const ipl=(o.files||[]).filter(f=>kindOf(f.kind)==="ipl"), own=ipl.filter(f=>f.from!=="calc"&&(Object.keys(f.inv||{}).length||Object.keys(f.eq||{}).length));
   // a proforma is replaced by the commercial invoice once that one is read
-  let use=own.length?own:ipl;const fin=use.filter(f=>iplPart(f.orig||f.name)!=="Проформа-инвойс"&&(Object.keys(f.inv||{}).length||Object.keys(f.eq||{}).length));if(fin.length)use=fin;
+  let use=own.length?own:ipl;use=use.filter(f=>!fixesOf(o,f).length);const fin=use.filter(f=>iplPart(f.orig||f.name)!=="Проформа-инвойс"&&(Object.keys(f.inv||{}).length||Object.keys(f.eq||{}).length));if(fin.length)use=fin;
   for(const f of use){
     for(const[k,v]of Object.entries(f.inv||{}))if(v)inv[k]=(inv[k]||0)+v;
     for(const[k,v]of Object.entries(f.eq||{}))if(v)eq[k]=(eq[k]||0)+v;
