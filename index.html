@@ -736,6 +736,13 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .rcs{font-size:11.5px;color:var(--muted);white-space:nowrap}
 tr.st-check .rcs,tr.st-many .rcs{color:var(--warn);font-weight:600}tr.st-ocr .rcs{color:var(--accent)}tr.st-done .rcs{color:var(--ok)}
 tr.st-done input,tr.st-dup input{color:var(--muted)}tr.st-dup .rcs{color:var(--muted)}
+/* quick date change */
+button.kdb{font:inherit;color:inherit;text-align:left;cursor:pointer;border:1px solid var(--line);appearance:none}
+button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.kwas{display:block;font-size:11px;color:var(--muted);text-decoration:line-through;margin-top:2px}
+.qdpop{position:absolute;z-index:60;width:260px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:12px;display:flex;flex-direction:column;gap:8px;font-size:13px}
+.qdpop label{display:flex;flex-direction:column;gap:3px;color:var(--muted);font-size:12px}.qdpop input{font-size:14px;padding:5px 8px}
+.qdb{display:flex;gap:6px}
 </style>
 
 </head>
@@ -1332,6 +1339,34 @@ document.addEventListener("click",async e=>{const b=e.target.closest("button.trk
 function paintTrk(){const el=$("e_trk");if(!el)return;const o={carrier:$("e_carrier").value,vessel:$("e_vessel").value,cont:$("e_cont").value,bl:$("e_bl").value};el.innerHTML=trackA(o,"in")}
 ["e_carrier","e_vessel","e_cont","e_bl"].forEach(id=>$(id)&&$(id).addEventListener("input",paintTrk));
 {const _oe2=openEditor;openEditor=function(){const r=_oe2.apply(this,arguments);paintTrk();return r};}
+
+/* ---------- quick date change: click a date tile on the board, change loading / ETD / ETA / ship, done ---------- */
+function qdClose(){const d=$("qdPop");if(d)d.remove()}
+function qdOpen(btn){
+  qdClose();const o=orders.find(x=>x.id===btn.dataset.qd);if(!o||!canWrite)return;
+  const pop=document.createElement("div");pop.id="qdPop";pop.className="qdpop";pop.setAttribute("role","dialog");pop.setAttribute("aria-label","Изменить даты "+(o.num||""));
+  pop.innerHTML=`<b>${esc(o.num||"")}: даты</b>
+    <label>Загрузка<input type="date" data-k="loadAt" value="${esc(o.loadAt||"")}"></label>
+    <label>Выход судна (ETD)<input type="date" data-k="etd" value="${esc(o.etd||"")}"></label>
+    <label>Прибытие (ETA)<input type="date" data-k="eta" value="${esc(o.eta||"")}"></label>
+    <label>Судно / рейс<input data-k="vessel" value="${esc(o.vessel||"")}" placeholder="—"></label>
+    <div class="qdb"><button type="button" class="btn primary" data-qsave>Сохранить</button><button type="button" class="btn ghost" data-qx>Отмена</button></div>
+    <small class="note" id="qdNote">Прежняя дата будет видна на плитке как «было …» ещё 2 недели.</small>`;
+  document.body.appendChild(pop);
+  const r=btn.getBoundingClientRect(), W=260;pop.style.top=(window.scrollY+r.bottom+6)+"px";pop.style.left=Math.max(8,Math.min(window.scrollX+r.left,window.scrollX+document.documentElement.clientWidth-W-8))+"px";
+  const first=pop.querySelector(`[data-k="${btn.dataset.qk}"]`);if(first){first.focus();try{first.showPicker&&first.showPicker()}catch(e){}}
+  pop.addEventListener("keydown",e=>{if(e.key==="Escape")qdClose();if(e.key==="Enter")pop.querySelector("[data-qsave]").click()});
+  pop.querySelector("[data-qx]").onclick=qdClose;
+  pop.querySelector("[data-qsave]").onclick=async()=>{
+    const patch={},now=new Date().toISOString();
+    pop.querySelectorAll("[data-k]").forEach(i=>{const k=i.dataset.k,v=i.value.trim();if((o[k]||"")!==v){patch[k]=v;if(k!=="vessel"&&o[k]){patch[k+"Was"]=o[k];patch[k+"MovedAt"]=now}}});
+    if(!Object.keys(patch).length){qdClose();return}
+    patch.updatedAt=now;
+    try{await db.collection("orders").doc(o.id).update(patch);qdClose()}catch(e){$("qdNote").textContent="Не сохранилось ("+(e&&e.code||"ошибка")+")."}
+  };
+}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-qd]");if(b){e.preventDefault();e.stopPropagation();qdOpen(b);return}
+  const p=$("qdPop");if(p&&!p.contains(e.target))qdClose()},true);
 /* ---------- «Квитанции»: weekly expense receipts by photo → rows added to the shared Excel file ---------- */
 let rcRows={}, rcMeta={}, rcEmp="", rcWho="", rcBusy=false, rcHist={};
 try{rcEmp=localStorage.getItem("tc_rcEmp")||""}catch(e){}
@@ -1524,13 +1559,15 @@ setInterval(rcCleanup,3600000);
 
 function keyDates(o,loaded){
   const port=stepDone(o,"port"), dcls=(d,done)=>!d||done?"":days(d)<0?"bad":days(d)<=3?"warn":"";
-  const box=(l,d,done,ico)=>`<div class="kdb ${dcls(d,done)} ${done?"ok":""}"><span class="kl">${ico||""}${l}</span><b>${d?String(d).slice(5,7)+"."+String(d).slice(8,10):"—"}${done?" ✓":""}</b></div>`;
+  // a tile is a button: one click changes the date right here; a recent move shows «было …»
+  const was=k=>{const w=o[k+"Was"], at=o[k+"MovedAt"];return w&&at&&Date.now()-new Date(at).getTime()<14*86400000&&w!==o[k]?`<small class="kwas" title="Перенесено ${fWhen({at})}">было ${String(w).slice(5,7)}.${String(w).slice(8,10)}</small>`:""};
+  const box=(l,d,done,ico,k)=>`<button type="button" class="kdb ${dcls(d,done)} ${done?"ok":""}" data-qd="${esc(o.id)}" data-qk="${k}" title="Изменить дату (${l.toLowerCase()})"><span class="kl">${ico||""}${l}</span><b>${d?String(d).slice(5,7)+"."+String(d).slice(8,10):"—"}${done?" ✓":""}</b>${was(k)}</button>`;
   const rel=d=>{const n=days(d);return n===0?"сегодня":n>0?"через "+n+" дн.":n<0?Math.abs(n)+" дн. назад":""};
   // who loads (suppliers) above the loading date, which ship above the departure date
   const short=n=>String(n).replace(/\([^)]*\)/g,"").replace(/주식회사|영어조합법인|농업회사법인|\(주\)|\(유\)|co\.?,?\s*ltd\.?|llc/ig,"").trim()||String(n);
   const supN=sups(o).map(x=>x.name).filter(Boolean), sup=supN.map(short).join(", "), ship=o.vessel||o.carrier||"";
   const col=(top,full,boxHtml)=>`<div class="kcol"><span class="kwho ${top?"":"none"}" title="${esc(full||"")}">${esc(top||"—")}</span>${boxHtml}</div>`;
-  return `<div class="kds">${col(sup,supN.join(", "),box("Загрузка",o.loadAt,loaded,ICO_BOX))}<span class="kar" aria-hidden="true">→</span>${col(ship,[o.vessel,o.carrier].filter(Boolean).join(" · "),box("Выход судна",o.etd,port,ICO_SHIP)+trackA(o))}</div>`;
+  return `<div class="kds">${col(sup,supN.join(", "),box("Загрузка",o.loadAt,loaded,ICO_BOX,"loadAt"))}<span class="kar" aria-hidden="true">→</span>${col(ship,[o.vessel,o.carrier].filter(Boolean).join(" · "),box("Выход судна",o.etd,port,ICO_SHIP,"etd")+trackA(o))}</div>`;
 }
 function archCard(o){
   const fs=o.files||[], kinds=[...new Set(fs.map(f=>kindOf(f.kind)))];
