@@ -1037,7 +1037,7 @@ const PHASES=[
   {id:"pay",   t:"Оплата",      steps:["paid","bank"]},
   {id:"suppay",t:"Поставщики",  steps:["suppay"]},
   {id:"load",  t:"Загрузка",    steps:["place","exp","photo","expd"]},
-  {id:"port",  t:"Порт",        steps:["port","bldraft","bl","freight","broker"]},
+  {id:"port",  t:"Порт",        steps:["port","bldraft","bl","freight"]},
   {id:"closed",t:"Успех",       steps:["closed"]}
 ];
 const PIDX=Object.fromEntries(PHASES.map((p,i)=>[p.id,i]));
@@ -1199,6 +1199,7 @@ const AUTO={
   place:o=>!!(o.loadAt&&o.loadPlace),
   suppay:o=>{const L=sups(o).filter(x=>x.name||x.date);return L.length>0&&L.every(x=>x.paid)}
 };
+const etaDone=o=>isImp(o)?stepDone(o,"arrive"):(!!o.eta&&days(o.eta)<0)||stepDone(o,"closed");
 function stepDone(o,id){const s=STEP[id];if(id==="bldraft"&&!hasDoc(o,"bldraft"))return hasDoc(o,"bl");if(id==="payreq"&&!hasDoc(o,"payreq"))return AUTO.suppay(o)||!!o.arch;if(s.mode==="doc")return hasDoc(o,s.doc);if(s.mode==="auto")return AUTO[id](o);return !!(o.steps&&o.steps[id])}
 function stepDate(o,id){const s=STEP[id];if(id==="got")return o.date||String(o.createdAt||"").slice(0,10);if(id==="photo"&&linkOK(o.photoLink)&&o.photoAt)return o.photoAt;if(s.mode==="doc")return docDate(o,s.doc);return (o.steps&&o.steps[id])||""}
 function nextText(o,id){
@@ -1256,7 +1257,6 @@ function analyze0(o){
     if(o.loadAt&&!loaded){const d=days(o.loadAt);if(d<0){overdue=true;iss("load");alerts.push({c:"warn",t:`Загрузка была ${fds(o.loadAt)} — нет фотоотчёта`})}else if(d<=3)soon.push(`загрузка ${fds(o.loadAt)}${o.loadTime?" "+o.loadTime:""}`)}
     if(o.etd&&!stepDone(o,"port")){const d=days(o.etd);if(d<0){overdue=true;iss("port");alerts.push({c:"bad",t:`ETD ${fds(o.etd)} прошла — контейнер не отмечен в порту`})}else if(d<=3)soon.push(`ETD ${fds(o.etd)}`)}
     if(imp&&o.eta&&!stepDone(o,"arrive")&&days(o.eta)<0){iss("customs");alerts.push({c:"warn",t:`Судно прибыло (ETA ${fds(o.eta)}) — отметьте получение контейнера`})}
-    if(!imp&&o.eta&&!stepDone(o,"broker")&&days(o.eta)<0){overdue=true;iss("port");alerts.push({c:"warn",t:`Судно прибыло (ETA ${fds(o.eta)}) — пакет брокеру не отправлен`})}
     if(soon.length)alerts.push({c:"warn",t:"Скоро: "+soon.join(", ")});
   }
   let next="";
@@ -1523,7 +1523,7 @@ function lPanel(o){
   }
   return `<header class="lph"><div><h2>${esc(o.num||"без номера")}${imp?` <span class="limp">импорт</span>`:""}${o.arch?` <span class="limp">архив</span>`:""}</h2><span class="muted">${esc([o.buyer,o.goods].filter(Boolean).join(" · ")||"—")}</span></div><button type="button" class="btn ghost lpx" data-lclose aria-label="Закрыть">✕</button></header>
     <div class="lpamt">${fm(o.amount,o.cur)}${eqText(o)}</div>
-    ${o.arch?"":`<div class="lpd">${tile(imp?"Загрузка":"Загрузка","loadAt",stepDone(o,"photo"))}${tile("Выход судна","etd",stepDone(o,"port"))}${tile("Прибытие","eta",stepDone(o,imp?"arrive":"broker"))}</div>${trackA(o)}`}
+    ${o.arch?"":`<div class="lpd">${tile(imp?"Загрузка":"Загрузка","loadAt",stepDone(o,"photo"))}${tile("Выход судна","etd",stepDone(o,"port"))}${tile("Прибытие","eta",etaDone(o))}</div>${trackA(o)}`}
     ${al?`<div class="alerts lpal">${al}</div>`:""}
     <div class="lptabs" role="tablist">${tabs}</div>
     <div class="lpb">${body}</div>
@@ -1773,7 +1773,7 @@ function cardHTML(o){
   if(o.arch)return archCard(o);
   const a=an(o), bad=a.alerts.some(x=>x.c==="bad"), warn=a.alerts.length>0, L=sups(o).filter(x=>x.name||x.date);
   const loaded=stepDone(o,"photo");
-  const dt=[["Оплата до",o.payDue,o.pay==="paid"],["Товар к",supMax(L),loaded],["Загрузка",o.loadAt,loaded],["ETD",o.etd,stepDone(o,"port")],["ETA",o.eta,stepDone(o,"broker")]];
+  const dt=[["Оплата до",o.payDue,o.pay==="paid"],["Товар к",supMax(L),loaded],["Загрузка",o.loadAt,loaded],["ETD",o.etd,stepDone(o,"port")],["ETA",o.eta,etaDone(o)]];
   const dcls=(d,done)=>!d||done?"":days(d)<0?"bad":days(d)<=3?"warn":"";
   const dates=dt.map(([l,d,done])=>`<span>${l} <b class="${dcls(d,done)}">${d?fds(d)+(done?" ✓":""):"—"}</b></span>`).join("")
     +(o.contType?`<span>Контейнер <b>${esc(o.contType)}${o.cont?" · "+esc(o.cont):""}</b></span>`:"")+`<span>Оплата <b>${PAY[o.pay||"none"][0]}</b></span><span>Документов <b>${(o.files||[]).length}</b></span>`
@@ -1810,7 +1810,7 @@ function calEvents(vis){
       ev.push({d:x.date,o,t:"Товар: "+(x.name||"поставщик")+(x.st==="confirmed"?" ✓":" (не подтв.)"),c:"ev-sup "+(loaded?"ev-done":(n<0&&x.st!=="confirmed"?"ev-late":"")),why:x.st==="confirmed"?"срок подтверждён":"срок не подтверждён"})});
     if(o.loadAt)ev.push({d:o.loadAt,o,ico:ICO_BOX,t:"Загрузка"+(o.loadTime?" "+o.loadTime:"")+(o.loadPlace?" · "+o.loadPlace:""),c:loaded?"ev-done":cls(o.loadAt),why:loaded?"загружено":"загрузка контейнера"});
     if(o.etd)ev.push({d:o.etd,o,ico:ICO_SHIP,t:"ETD — выход судна",c:stepDone(o,"port")?"ev-done":cls(o.etd),why:"выход судна"});
-    if(o.eta)ev.push({d:o.eta,o,t:"ETA — прибытие",c:stepDone(o,"broker")?"ev-done":cls(o.eta),why:"прибытие судна"});
+    if(o.eta)ev.push({d:o.eta,o,t:"ETA — прибытие",c:etaDone(o)?"ev-done":cls(o.eta),why:"прибытие судна"});
   });
   const ids=new Set(vis.map(o=>o.id)), fb=$("fBuyer").value, q=$("q").value.trim().toLowerCase();
   myEvents.forEach(x=>{
