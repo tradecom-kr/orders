@@ -724,6 +724,18 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
 .fixmark{display:block}.fixmark a{text-decoration:none;font-size:11.5px}.fixmark a:hover{text-decoration:underline}
 .fixsrc{display:block;color:var(--muted);font-size:11.5px}
 .dct tr.fixrow>th{color:var(--accent)}.dct tr.fixrow>*{border-top:2px solid var(--accent-soft,var(--line))}
+/* Квитанции */
+.rcbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.rcall{display:flex;flex-direction:column;gap:12px}
+.rcw{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;overflow-x:auto}
+.rcw header{display:flex;gap:12px;align-items:baseline;margin-bottom:6px}.rcw header .rct{margin-left:auto;font:700 15px var(--f-mono)}
+.rct-t{border-collapse:collapse;width:100%;font-size:13px}.rct-t th{font-weight:500;color:var(--muted);font-size:11.5px;text-align:left;padding:4px 6px}
+.rct-t td{padding:3px 6px;border-top:1px solid var(--line);vertical-align:middle}.rct-t .n{text-align:right}
+.rct-t input{font-size:13px;padding:4px 6px;width:100%;min-width:90px}.rct-t input[type=date]{min-width:130px}
+.rcph{width:38px;height:38px;object-fit:cover;border-radius:6px;display:block;background:var(--soft)}
+.rcs{font-size:11.5px;color:var(--muted);white-space:nowrap}
+tr.st-check .rcs,tr.st-many .rcs{color:var(--warn);font-weight:600}tr.st-ocr .rcs{color:var(--accent)}tr.st-done .rcs{color:var(--ok)}
+tr.st-done input,tr.st-dup input{color:var(--muted)}tr.st-dup .rcs{color:var(--muted)}
 </style>
 
 </head>
@@ -751,6 +763,7 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
       <button type="button" id="vOver" aria-pressed="true">Обзор</button>
       <button type="button" id="vTime" aria-pressed="false">Календарь</button>
       <button type="button" id="vDocs" aria-pressed="false">Документы</button>
+      <button type="button" id="vRc" aria-pressed="false">Квитанции</button>
     </div>
     <button class="btn ghost" type="button" id="foldAll">Свернуть все</button>
     <button class="btn ghost" type="button" id="xlsBtn">Выгрузить в Excel</button>
@@ -776,6 +789,20 @@ body.as-other .vwbar select{border-color:var(--accent);box-shadow:0 0 0 2px var(
   <section id="docsView" hidden style="display:flex;flex-direction:column;gap:10px">
     <div class="bar"><select id="fOrder" aria-label="Номер заказа" style="width:auto;max-width:260px;background:var(--panel)"><option value="">Все заказы</option></select><select id="fKind" aria-label="Тип документа" style="width:auto;background:var(--panel)"></select><select id="dSort" aria-label="Сортировка документов" style="width:auto;background:var(--panel)"><option value="num">По номеру заказа</option><option value="date">По дате загрузки</option></select><span class="note" id="docsCount"></span><span id="stor" class="stor" hidden></span></div>
     <div class="files" id="docsAll"></div>
+  </section>
+  <section id="rcView" hidden style="display:flex;flex-direction:column;gap:12px">
+    <div class="bar rcbar">
+      <select id="rcEmp" aria-label="Сотрудник" style="width:auto;background:var(--panel)"></select>
+      <label class="btn primary" style="cursor:pointer">+ Фото чеков<input type="file" id="rcPhotos" accept="image/*" multiple hidden></label>
+      <select id="rcShow" aria-label="Чьи чеки" style="width:auto;background:var(--panel)"><option value="mine">Чеки сотрудника</option><option value="all">Все сотрудники</option></select>
+      <label class="chk"><input type="checkbox" id="rcDone"> показывать уже выгруженные</label>
+      <span style="flex:1"></span>
+      <button class="btn primary" type="button" id="rcExport" disabled>Выгрузить в Excel</button>
+    </div>
+    <div class="bar rcbar"><span id="rcFile"></span><button class="btn ghost" type="button" id="rcMasterDl" title="Скачать текущий общий файл">Скачать</button><button class="btn ghost" type="button" id="rcMasterBtn" title="Загрузить общий файл (заменит текущий)">Общий файл…</button><input type="file" id="rcMasterIn" accept=".xlsx" hidden></div>
+    <p class="note" id="rcNote" style="margin:0">Фото — по одному чеку на снимок. Доска сама прочитает дату, название и сумму; строки можно поправить.</p>
+    <datalist id="rcCats"><option>식대</option><option>주유비</option><option>하이패스</option><option>택배비</option><option>사무용품</option><option>창고용품</option><option>주차비</option><option>교통비</option><option>개인지출</option><option>기타</option></datalist>
+    <div id="rcAll" class="rcall"></div>
   </section>
 </div>
 
@@ -1305,6 +1332,175 @@ document.addEventListener("click",async e=>{const b=e.target.closest("button.trk
 function paintTrk(){const el=$("e_trk");if(!el)return;const o={carrier:$("e_carrier").value,vessel:$("e_vessel").value,cont:$("e_cont").value,bl:$("e_bl").value};el.innerHTML=trackA(o,"in")}
 ["e_carrier","e_vessel","e_cont","e_bl"].forEach(id=>$(id)&&$(id).addEventListener("input",paintTrk));
 {const _oe2=openEditor;openEditor=function(){const r=_oe2.apply(this,arguments);paintTrk();return r};}
+/* ---------- «Квитанции»: weekly expense receipts by photo → rows added to the shared Excel file ---------- */
+let rcRows={}, rcMeta={}, rcEmp="", rcWho="", rcBusy=false, rcHist={};
+try{rcEmp=localStorage.getItem("tc_rcEmp")||""}catch(e){}
+const RC_CATS=["식대","주유비","하이패스","택배비","사무용품","창고용품","주차비","교통비","통신비","개인지출","기타"];
+const rcMaster=()=>rcMeta.master||null;
+const rcSheets=()=>(rcMaster()&&rcMaster().sheets)||[];
+const isoD=d=>{const p=n=>String(n).padStart(2,"0");return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`};
+const weekOf=iso=>{const d=new Date(iso+"T00:00:00");if(isNaN(d))return "";const k=(d.getDay()+6)%7;d.setDate(d.getDate()-k);return isoD(d)};
+const md2=iso=>iso?`${+iso.slice(5,7)}.${iso.slice(8,10).padStart(2,"0")}`:"";
+function rcCatGuess(shop,text){
+  const s=String(shop||""), t=String(text||"")+" "+s;
+  if(rcHist[s.replace(/\s/g,"")])return rcHist[s.replace(/\s/g,"")];
+  if(/충전소|주유|LPG|에너지|오일|GS칼텍스|SK에너지|S-OIL/i.test(t))return "주유비";
+  if(/영업소|하이패스|도로공사|129-82-00103|138-81-37650/.test(t))return "하이패스";
+  if(/우체국|택배|CJ대한통운|로젠|한진/.test(t))return "택배비";
+  if(/주차/.test(t))return "주차비";
+  if(/다이소|문구|오피스/.test(t))return "사무용품";
+  return "식대";
+}
+// what a receipt photo says: date, shop, total (the total wins over item prices)
+function rcParse(text){
+  const raw=String(text||""), lines=raw.split(/\n/).map(l=>l.trim()).filter(Boolean), out={};
+  const dm=raw.replace(/\s/g,"").match(/(20\d\d)[-./년](\d{1,2})[-./월](\d{1,2})/)||raw.replace(/\s/g,"").match(/(?:^|\D)(\d{2})\/(\d{2})\/(\d{2})(?:\D|$)/);
+  if(dm){let y=+dm[1];if(y<100)y+=2000;out.date=`${y}-${String(+dm[2]).padStart(2,"0")}-${String(+dm[3]).padStart(2,"0")}`}
+  const nums=l=>(l.replace(/(\d)\s*([,.])\s*(\d{3})/g,"$1$2$3").match(/\d{1,3}(?:[,.]\d{3})+|\d{3,7}/g)||[]).map(x=>+x.replace(/[,.]/g,"")).filter(n=>n>=100&&n<20000000);
+  const KEY=/받을금액|결제금액|합계금액|승인금액|청구금액|판매금액|총액|합계|요금|총/;
+  let best=0;for(const l of lines){const k=l.replace(/\s/g,"");if(KEY.test(k)){const n=nums(l);if(n.length)best=Math.max(best,...n)}}
+  if(!best){const all=lines.flatMap(nums);if(all.length)best=Math.max(...all)}
+  if(best)out.amt=best;
+  const flat=lines.map(l=>l.replace(/\s+/g," "));
+  let shop="";
+  for(const l of flat){const m=l.replace(/\s/g,"").match(/(?:상호|매장명|가맹점명|가맹점)[:：]?([^\d\[\]:：]{2,30})/);if(m){shop=m[1];break}}
+  if(!shop)for(const l of flat){const m=l.match(/^(.{2,30}?)\s*\/\s*\d{3}-\d{2}-\d{5}/);if(m){shop=m[1].trim();break}}
+  if(!shop)for(const l of flat.slice(0,6)){if(/영\s*수\s*증|매출전표|고객용|신용승인|확인증|^\[|^\d|주문번호/.test(l))continue;if(/[가-힣A-Za-z]{2,}/.test(l)){shop=l.replace(/[\[\]()]/g,"").trim().slice(0,30);break}}
+  out.shop=shop;
+  const dates=new Set((raw.replace(/\s/g,"").match(/20\d\d[-./]\d{1,2}[-./]\d{1,2}/g)||[]).map(x=>x.slice(0,10)));
+  out.many=dates.size>2;
+  return out;
+}
+let _tess=null;
+async function rcOCR(file){
+  await loadLib("tess","https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js",()=>window.Tesseract);
+  if(!_tess)_tess=window.Tesseract.createWorker(["kor","eng"],1);
+  const w=await _tess;const r=await w.recognize(file);return r.data.text||"";
+}
+const _libs2={};
+function loadLib(key,src,test){return _libs2[key]||(_libs2[key]=new Promise((ok,no)=>{if(test())return ok();const s=document.createElement("script");s.src=src;s.onload=()=>test()?ok():no({code:"lib"});s.onerror=()=>{_libs2[key]=null;no({code:"lib"})};document.head.appendChild(s)}))}
+async function rcAddPhotos(list){
+  if(!rcEmp){$("rcNote").textContent="Сначала выберите сотрудника.";return}
+  for(const file of list){
+    const id="r"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+    $("rcNote").textContent=`Загружаю «${file.name}»…`;
+    try{
+      const up=await shrinkPic(file);const r=await assets.upload(up,{type:up.type});
+      const rec={emp:rcEmp,photo:r.id,photoName:file.name,by:window.TC_USER||"",at:new Date().toISOString(),date:"",shop:"",cat:"",amt:null,note:"",st:"ocr"};
+      await db.collection("receipts").doc(id).set(rec);rcRows[id]=rec;renderRc();
+      $("rcNote").textContent=`Читаю чек «${file.name}»…`;
+      if(!rcNames.length)await rcLoadNames();
+      let p={};try{const t=await rcOCR(file);p=rcParse(t);p.shop=rcKnownName(p.shop);p.cat=rcCatGuess(p.shop,t)}catch(e){p={err:true}}
+      const patch={date:p.date||"",shop:p.shop||"",cat:p.cat||"식대",amt:p.amt||null,st:p.err?"check":p.many?"many":(p.date&&p.amt?"new":"check")};
+      await db.collection("receipts").doc(id).update(patch);Object.assign(rcRows[id],patch);renderRc();
+    }catch(e){$("rcNote").textContent=`«${file.name}» не загружен (${e&&e.code||"ошибка"}).`}
+  }
+  $("rcNote").textContent="Готово. Проверьте строки: дату, название, вид расхода и сумму — их можно поправить прямо в таблице.";
+}
+function renderRc(){
+  const box=$("rcAll");if(!box)return;
+  const m=rcMaster(), sh=rcSheets();
+  const sel=$("rcEmp");sel.innerHTML=`<option value="">— сотрудник —</option>`+sh.map(n=>`<option ${n===rcEmp?"selected":""}>${esc(n)}</option>`).join("");
+  $("rcFile").innerHTML=m?`Общий файл: <b>${esc(m.name)}</b> <span class="note">· обновлён ${fWhen({at:m.updatedAt})}</span>`:`<span class="warn-t">Общий файл ещё не загружен — нажмите «Общий файл…»</span>`;
+  const show=$("rcShow").value||"mine";
+  const L=Object.entries(rcRows).map(([id,r])=>({id,...r})).filter(r=>show==="all"||r.emp===rcEmp).filter(r=>$("rcDone").checked||!r.exported);
+  const fresh=Object.values(rcRows).filter(r=>!r.exported&&r.amt&&r.date);
+  $("rcExport").textContent=`Выгрузить в Excel${fresh.length?` (${fresh.length})`:""}`;$("rcExport").disabled=!fresh.length||!m||!canWrite;
+  const weeks={};L.forEach(r=>{const w=r.date?weekOf(r.date):"—";(weeks[w]=weeks[w]||[]).push(r)});
+  const keys=Object.keys(weeks).sort().reverse();
+  const stT={ocr:"читаю…",check:"проверьте",many:"несколько чеков на фото",new:"новый",done:"в файле",dup:"уже был в файле"};
+  box.innerHTML=keys.length?keys.map(w=>{const rows=weeks[w].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    const end=w!=="—"?(()=>{const d=new Date(w+"T00:00:00");d.setDate(d.getDate()+6);return isoD(d)})():"";
+    const tot=rows.reduce((t,r)=>t+(Number(r.amt)||0),0);
+    return `<section class="rcw"><header><b>${w==="—"?"Без даты":`Неделя ${md2(w)} – ${md2(end)}`}</b><span class="note">${rows.length} чек.</span><span class="rct">${tot.toLocaleString("ru-RU")} ₩</span></header>
+      <table class="rct-t"><thead><tr><th></th>${show==="all"?"<th>Сотрудник</th>":""}<th>Дата</th><th>상호 / Имя</th><th>내역 / Вид</th><th class="n">Сумма</th><th>Примечание</th><th>Статус</th><th></th></tr></thead><tbody>
+      ${rows.map(r=>{const ro=r.exported||!canWrite?"disabled":"";const st=r.dup?"dup":r.exported?"done":r.st||"new";
+        return `<tr data-rc="${esc(r.id)}" class="st-${st}"><td><a href="#" data-rcph="${esc(r.photo)}" title="Открыть фото"><img src="/_blob/${esc(r.photo)}" alt="" class="rcph"></a></td>${show==="all"?`<td class="note">${esc(r.emp)}</td>`:""}
+          <td><input type="date" data-f="date" value="${esc(r.date||"")}" ${ro}></td><td><input data-f="shop" value="${esc(r.shop||"")}" ${ro}></td>
+          <td><input data-f="cat" list="rcCats" value="${esc(r.cat||"")}" ${ro} style="width:110px"></td><td class="n"><input data-f="amt" inputmode="numeric" value="${r.amt?Number(r.amt).toLocaleString("ru-RU"):""}" ${ro} style="width:100px;text-align:right"></td>
+          <td><input data-f="note" value="${esc(r.note||"")}" ${ro} placeholder="—"></td><td><span class="rcs">${stT[st]||st}</span></td>
+          <td>${r.exported||!canWrite?"":`<button type="button" class="ib danger" data-rcdel="${esc(r.id)}" title="Удалить чек" aria-label="Удалить">✕</button>`}</td></tr>`}).join("")}
+      </tbody></table></section>`}).join(""):`<div class="note" style="padding:20px">Чеков пока нет. Выберите сотрудника и загрузите фото чеков — по одному чеку на фото.</div>`;
+}
+async function rcSave(tr,f,v){const id=tr.dataset.rc;let val=v;if(f==="amt")val=Number(String(v).replace(/[^\d]/g,""))||null;
+  const patch={[f]:val};const r=rcRows[id];if(r&&(r.st==="check"||r.st==="many")&&(f==="amt"||f==="date"))patch.st="new";
+  try{await db.collection("receipts").doc(id).update(patch);Object.assign(rcRows[id],patch)}catch(e){$("rcNote").textContent="Не сохранилось ("+(e&&e.code||"ошибка")+")."}}
+// the shared file: kept on the board; each export writes the new rows into it and becomes the new version
+async function rcSetMaster(file){
+  $("rcNote").textContent="Загружаю общий файл…";
+  try{await loadLib("exceljs","https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js",()=>window.ExcelJS);
+    const buf=await file.arrayBuffer();const wb=new window.ExcelJS.Workbook();await wb.xlsx.load(buf);
+    const sheets=wb.worksheets.map(w=>w.name);
+    const r=await assets.upload(new Blob([buf],{type:file.type||"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    const m={aid:r.id,name:file.name,sheets,updatedAt:new Date().toISOString(),by:window.TC_USER||""};
+    await db.collection("rcmeta").doc("master").set(m);rcMeta.master=m;rcLearn(wb);renderRc();
+    $("rcNote").textContent=`Общий файл «${file.name}» сохранён: листов ${sheets.length} (${sheets.join(", ")}).`;
+  }catch(e){$("rcNote").textContent="Не получилось прочитать файл ("+(e&&e.code||e&&e.message||"ошибка")+")."}
+}
+// learn «shop → kind of expense» from the rows already in the file
+let rcNames=[];
+function rcLearn(wb){const n=new Set();wb.worksheets.forEach(ws=>ws.eachRow((row,i)=>{if(i<4)return;const s=row.getCell(2).value, c=row.getCell(3).value;if(s&&typeof s==="string"){n.add(s.trim());if(c&&typeof c==="string")rcHist[s.replace(/\s/g,"")]=c.split(/\s/)[0]}}));rcNames=[...n]}
+function rcKnownName(shop){const k=String(shop||"").replace(/\s/g,"");if(k.length<2)return shop;const hit=rcNames.filter(x=>x.replace(/\s/g,"").startsWith(k));return hit.length===1?hit[0]:shop}
+async function rcLoadNames(){try{const m=rcMaster();if(!m)return;await loadLib("exceljs","https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js",()=>window.ExcelJS);
+  const res=await fetch("/_blob/"+m.aid);const wb=new window.ExcelJS.Workbook();await wb.xlsx.load(await res.arrayBuffer());rcLearn(wb)}catch(e){}}
+async function rcExport(){
+  if(rcBusy)return;const m=rcMaster();if(!m)return;rcBusy=true;$("rcExport").disabled=true;
+  try{
+    await loadLib("exceljs","https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js",()=>window.ExcelJS);
+    const res=await fetch("/_blob/"+m.aid);if(!res.ok)throw {code:"fetch_"+res.status};
+    const wb=new window.ExcelJS.Workbook();await wb.xlsx.load(await res.arrayBuffer());
+    const todo=Object.entries(rcRows).filter(([,r])=>!r.exported&&r.amt&&r.date);
+    const byEmp={};todo.forEach(([id,r])=>(byEmp[r.emp]=byEmp[r.emp]||[]).push([id,r]));
+    const tmpl=wb.worksheets.find(w=>w.actualRowCount>3)||wb.worksheets[0];
+    const clone=o=>JSON.parse(JSON.stringify(o||{}));
+    let added=0;const missing=[], dups=[];
+    for(let [emp,list] of Object.entries(byEmp)){
+      const ws=wb.getWorksheet(emp);if(!ws){missing.push(emp);continue}
+      let last=0;ws.eachRow({includeEmpty:false},(row,i)=>{if((row.values||[]).some(v=>v!=null&&v!==""))last=i});
+      if(last<3){for(let i=1;i<=3;i++){const src=tmpl.getRow(i),dst=ws.getRow(i);for(let k=1;k<=6;k++){dst.getCell(k).value=src.getCell(k).value;dst.getCell(k).style=clone(src.getCell(k).style)}dst.commit()}last=3}
+      // a data row and the yellow total row of the file are the models for the new rows
+      let dataP=null,sumP=null;for(let i=last;i>3&&(!dataP||!sumP);i--){const c4=ws.getRow(i).getCell(4).value;if(!sumP&&c4&&c4.formula)sumP=ws.getRow(i);else if(!dataP&&typeof c4==="number")dataP=ws.getRow(i)}
+      if(!dataP)dataP=tmpl.getRow(4);if(!sumP)sumP=null;
+      const have=new Set();ws.eachRow((row,i)=>{if(i<4)return;const a=row.getCell(4).value, d=row.getCell(1).value;if(typeof a!=="number"||d==null)return;
+        let k="";if(d instanceof Date)k=`${d.getUTCMonth()+1}-${d.getUTCDate()}`;else{const m2=String(d).match(/(\d{1,2})\s*월\s*(\d{1,2})/);if(m2)k=`${+m2[1]}-${+m2[2]}`}if(k)have.add(k+"|"+a)});
+      list=list.filter(([id,x])=>{const k=`${+x.date.slice(5,7)}-${+x.date.slice(8,10)}|${Number(x.amt)}`;if(have.has(k)){dups.push(id);return false}return true});
+      if(!list.length)continue;
+      let r=last>3?last+2:4;const start=r;
+      list.sort((a,b)=>String(a[1].date).localeCompare(String(b[1].date))).forEach(([,x])=>{const row=ws.getRow(r);
+        const d=new Date(x.date+"T00:00:00Z");row.getCell(1).value=d;row.getCell(2).value=x.shop||"";row.getCell(3).value=x.cat||"";row.getCell(4).value=Number(x.amt);if(x.note)row.getCell(6).value=x.note;
+        for(let k=1;k<=6;k++)row.getCell(k).style=clone(dataP.getCell(k).style);row.getCell(1).numFmt=dataP.getCell(1).numFmt||'m"월" d"일"';row.commit();r++;added++});
+      const sr=ws.getRow(r);sr.getCell(4).value={formula:`SUM(D${start}:D${r-1})`};
+      for(let k=1;k<=6;k++)sr.getCell(k).style=clone((sumP||dataP).getCell(k).style);if(!sumP)sr.getCell(4).fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFFFFF00"}};sr.commit();
+    }
+    const out=await wb.xlsx.writeBuffer();const blob=new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    const up=await assets.upload(blob,{type:blob.type});
+    const name=m.name.replace(/[_ ]?\d{6}(?=\.xlsx$)/i,"").replace(/\.xlsx$/i,"")+"_"+isoD(new Date()).slice(2).replace(/-/g,"")+".xlsx";
+    const nm={...m,aid:up.id,name,updatedAt:new Date().toISOString(),prev:m.aid};
+    await db.collection("rcmeta").doc("master").set(nm);rcMeta.master=nm;
+    const now=new Date().toISOString();
+    for(const [id] of todo.filter(([,r])=>!missing.includes(r.emp))){const pt={exported:true,exportedAt:now,st:"done",...(dups.includes(id)?{dup:true}:{})};await db.collection("receipts").doc(id).update(pt);Object.assign(rcRows[id],pt)}
+    if(dl)await dl.save({filename:name,data:blob}).catch(()=>{});else{const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click()}
+    $("rcNote").textContent=`Дописано строк: ${added}. Файл «${name}» скачан и сохранён на доске как текущий общий файл.`+(dups.length?` Уже были в файле (та же дата и сумма), не дописаны: ${dups.length}.`:"")+(missing.length?` Нет листа для: ${missing.join(", ")} — эти чеки не выгружены.`:"");
+  }catch(e){$("rcNote").textContent="Выгрузить не получилось ("+(e&&e.code||e&&e.message||"ошибка")+")."}
+  rcBusy=false;renderRc();
+}
+// wiring
+$("vRc").onclick=()=>{view="rc";save("view",view);render()};
+$("rcEmp").addEventListener("change",e=>{rcEmp=e.target.value;try{localStorage.setItem("tc_rcEmp",rcEmp)}catch(err){}renderRc()});
+$("rcShow").addEventListener("change",renderRc);$("rcDone").addEventListener("change",renderRc);
+$("rcPhotos").addEventListener("change",e=>{const l=[...e.target.files];e.target.value="";if(l.length)rcAddPhotos(l)});
+$("rcMasterIn").addEventListener("change",e=>{const f=e.target.files[0];e.target.value="";if(f)rcSetMaster(f)});
+$("rcMasterBtn").onclick=()=>$("rcMasterIn").click();
+$("rcMasterDl").onclick=async()=>{const m=rcMaster();if(!m)return;const res=await fetch("/_blob/"+m.aid);const b=await res.blob();if(dl)dl.save({filename:m.name,data:b}).catch(()=>{});};
+$("rcExport").onclick=rcExport;
+$("rcAll").addEventListener("change",e=>{const i=e.target.closest("input[data-f]");if(!i)return;rcSave(i.closest("tr"),i.dataset.f,i.value).then(()=>{if(i.dataset.f==="date"||i.dataset.f==="amt")renderRc()})});
+$("rcAll").addEventListener("click",async e=>{const ph=e.target.closest("[data-rcph]");if(ph){e.preventDefault();window.open(ph.querySelector("img").src,"_blank");return}
+  const d=e.target.closest("[data-rcdel]");if(d){const id=d.dataset.rcdel;const r=rcRows[id];try{await db.collection("receipts").doc(id).delete();delete rcRows[id];if(r&&r.photo&&assets)assets.delete(r.photo).catch(()=>{});renderRc()}catch(err){}}});
+(function waitRc(){if(!db){setTimeout(waitRc,500);return}
+  db.collection("receipts").onSnapshot(s=>{rcRows={};s.docs.filter(x=>x.exists).forEach(x=>rcRows[x.id]=x.data());if(view==="rc")renderRc()},()=>{});
+  db.collection("rcmeta").onSnapshot(s=>{rcMeta={};s.docs.filter(x=>x.exists).forEach(x=>rcMeta[x.id]=x.data());if(view==="rc")renderRc()},()=>{});
+})();
+
 function keyDates(o,loaded){
   const port=stepDone(o,"port"), dcls=(d,done)=>!d||done?"":days(d)<0?"bad":days(d)<=3?"warn":"";
   const box=(l,d,done,ico)=>`<div class="kdb ${dcls(d,done)} ${done?"ok":""}"><span class="kl">${ico||""}${l}</span><b>${d?String(d).slice(5,7)+"."+String(d).slice(8,10):"—"}${done?" ✓":""}</b></div>`;
@@ -1387,9 +1583,9 @@ function renderUpcoming(vis){
 function render(){
   fillBuyerFilter();
   renderKpis();
-  [["vOver","over"],["vTime","time"],["vDocs","docs"]].forEach(([b,v])=>$(b).setAttribute("aria-pressed",view===v));
-  $("overView").hidden=view!=="over";$("timeView").hidden=view!=="time";$("docsView").hidden=view!=="docs";
-  if(view==="over")renderOverview();else if(view==="time")renderTimeline();else renderDocsAll();
+  [["vOver","over"],["vTime","time"],["vDocs","docs"],["vRc","rc"]].forEach(([b,v])=>$(b).setAttribute("aria-pressed",view===v));
+  $("overView").hidden=view!=="over";$("timeView").hidden=view!=="time";$("docsView").hidden=view!=="docs";$("rcView").hidden=view!=="rc";
+  if(view==="over")renderOverview();else if(view==="time")renderTimeline();else if(view==="rc")renderRc();else renderDocsAll();
   $("addBtn").disabled=!canWrite;$("archBtn").disabled=!canWrite;
 }
 
