@@ -1137,8 +1137,10 @@ view=load("view","list"); if(!["list","over","time","docs","rc"].includes(view))
 const today=()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate())};
 const pd=s=>{if(!s)return null;const[y,m,d]=String(s).slice(0,10).split("-").map(Number);if(!y)return null;return new Date(y,m-1,d)};
 const days=s=>{const d=pd(s);return d?Math.round((d-today())/864e5):null};
-const fd=s=>{const d=pd(s);return d?d.toLocaleDateString("ru-RU",{day:"2-digit",month:"2-digit",year:"2-digit"}):"—"};
-const fds=s=>{const d=pd(s);return d?d.toLocaleDateString("ru-RU",{day:"2-digit",month:"2-digit"}):"—"};
+// dates as month.day (and .year)
+const p2=n=>String(n).padStart(2,"0");
+const fd=s=>{const d=pd(s);return d?p2(d.getMonth()+1)+"."+p2(d.getDate())+"."+p2(d.getFullYear()%100):"—"};
+const fds=s=>{const d=pd(s);return d?p2(d.getMonth()+1)+"."+p2(d.getDate()):"—"};
 const iso=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 const isoToday=()=>iso(today());
 const addDays=(s,n)=>{const d=pd(s);d.setDate(d.getDate()+n);return iso(d)};
@@ -1350,7 +1352,7 @@ function stLi(z,a){
     const full=v=>Math.round(v).toLocaleString("ru-RU")+" KRW";
     const cf=fOpen(a.o,kindFiles(a.o,"calc","po"));
     if(L.length)h+=(all?`<li class="sub money r1 ${due?"due":"ok"}"${cf} title="${due?"К оплате поставщикам":"Поставщикам оплачено"}">${full(due||all)}</li>`:`<li class="sub money">—</li>`)
-      +L.map(x=>{const pt=supPart(x), md=d=>d?" "+String(d).slice(8,10)+"."+String(d).slice(5,7):"";
+      +L.map(x=>{const pt=supPart(x), md=d=>d?" "+String(d).slice(5,7)+"."+String(d).slice(8,10):"";
         const tip=x.name+(x.amt?" — "+full(x.amt):"")+(x.paid?" · оплачен":pt?` · оплачено${md(x.paidAt)} ${full(x.paidAmt)}${x.amt?" ("+Math.round(x.paidAmt/x.amt*100)+"%)":""}, осталось ${full(supLeft(x))}`:" · не оплачен");
         return `<li class="sub supl sp ${x.paid?"ok":pt?"part":"no"}"${cf} title="${esc(tip)}"><span class="sn">${esc(x.name)}</span>${(()=>{const T=taxFiles(a.o,x,L), tb=`<span class="stx ${T.length?"on":""}"${T.length?fOpen(a.o,T):""} title="세금계산서 ${esc(x.name)}: ${T.length?"загружен — открыть":"не загружен"}">세</span>`;
           return x.amt?`<span class="samt ${x.paid?"paid":""}">${tb}${pt&&x.amt?`<small>${Math.round(x.paidAmt/x.amt*100)}%</small> `:""}${full(pt?supLeft(x):x.amt).replace(" KRW","")}</span>`:tb})()}</li>`}).join("")
@@ -1459,7 +1461,7 @@ document.addEventListener("click",e=>{const b=e.target.closest("[data-qd]");if(b
   const p=$("qdPop");if(p&&!p.contains(e.target))qdClose()},true);
 /* ---------- «Заказы»: one row per order, «На этой неделе» on top, the chosen order in a side panel with stage tabs ---------- */
 let lSel=load("lsel",""), lTab={};
-const mdd=d=>d?String(d).slice(8,10)+"."+String(d).slice(5,7):"—";
+const mdd=d=>d?String(d).slice(5,7)+"."+String(d).slice(8,10):"—";
 const MON=["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
 function weekRange(){const t=today(), k=(t.getDay()+6)%7, s=new Date(t);s.setDate(t.getDate()-k);const e=new Date(s);e.setDate(s.getDate()+6);return [iso(s),iso(e),s,e]}
 const wasOf=(o,k)=>{const w=o[k+"Was"], at=o[k+"MovedAt"];return w&&at&&Date.now()-new Date(at).getTime()<14*86400000&&w!==o[k]?w:""};
