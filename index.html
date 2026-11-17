@@ -1800,13 +1800,18 @@ async function rcAddPhotos(list){
   }
   $("rcNote").textContent="Готово. Проверьте строки: дату, название, вид расхода и сумму — их можно поправить прямо в таблице.";
 }
+// a sheet may be renamed in Excel («발레라 Валера» → «발레라 TI VALERII Валера»): the first word (the Korean name) ties receipts to it
+const empKey=n=>String(n||"").trim().split(/\s+/)[0];
+const sameEmp=(a,b)=>!!a&&!!b&&(a===b||empKey(a)===empKey(b));
+const empSheet=n=>rcSheets().find(x=>x===n)||rcSheets().find(x=>sameEmp(x,n))||n;
 function renderRc(){
   const box=$("rcAll");if(!box)return;
   const m=rcMaster(), sh=rcSheets();
+  if(rcEmp&&!sh.includes(rcEmp)&&empSheet(rcEmp)!==rcEmp){rcEmp=empSheet(rcEmp);try{localStorage.setItem("tc_rcEmp",rcEmp)}catch(e){}}
   const sel=$("rcEmp");sel.innerHTML=`<option value="">— сотрудник —</option>`+sh.map(n=>`<option ${n===rcEmp?"selected":""}>${esc(n)}</option>`).join("");
   $("rcFile").innerHTML=m?`Общий файл: <b>${esc(m.name)}</b> <span class="note">· обновлён ${fWhen({at:m.updatedAt})}</span>`:`<span class="warn-t">Общий файл ещё не загружен — нажмите «Общий файл…»</span>`;
   const show=$("rcShow").value||"mine";
-  const L=Object.entries(rcRows).map(([id,r])=>({id,...r})).filter(r=>show==="all"||r.emp===rcEmp).filter(r=>$("rcDone").checked||!r.exported);
+  const L=Object.entries(rcRows).map(([id,r])=>({id,...r})).filter(r=>show==="all"||sameEmp(r.emp,rcEmp)).filter(r=>$("rcDone").checked||!r.exported);
   const fresh=Object.values(rcRows).filter(r=>!r.exported&&r.amt&&r.date);
   $("rcExport").textContent=`Выгрузить в Excel${fresh.length?` (${fresh.length})`:""}`;$("rcExport").disabled=!fresh.length||!m||!canWrite;
   const weeks={};L.forEach(r=>{const w=r.date?weekOf(r.date):"—";(weeks[w]=weeks[w]||[]).push(r)});
@@ -1853,12 +1858,12 @@ async function rcExport(){
     const res=await fetch("/_blob/"+m.aid);if(!res.ok)throw {code:"fetch_"+res.status};
     const wb=new window.ExcelJS.Workbook();await wb.xlsx.load(await res.arrayBuffer());
     const todo=Object.entries(rcRows).filter(([,r])=>!r.exported&&r.amt&&r.date);
-    const byEmp={};todo.forEach(([id,r])=>(byEmp[r.emp]=byEmp[r.emp]||[]).push([id,r]));
+    const byEmp={};todo.forEach(([id,r])=>{const k=empSheet(r.emp);(byEmp[k]=byEmp[k]||[]).push([id,r])});
     const tmpl=wb.worksheets.find(w=>w.actualRowCount>3)||wb.worksheets[0];
     const clone=o=>JSON.parse(JSON.stringify(o||{}));
     let added=0;const missing=[], dups=[];
     for(let [emp,list] of Object.entries(byEmp)){
-      const ws=wb.getWorksheet(emp);if(!ws){missing.push(emp);continue}
+      const ws=wb.getWorksheet(emp)||wb.worksheets.find(w=>sameEmp(w.name,emp));if(!ws){missing.push(emp);continue}
       let last=0;ws.eachRow({includeEmpty:false},(row,i)=>{if((row.values||[]).some(v=>v!=null&&v!==""))last=i});
       if(last<3){for(let i=1;i<=3;i++){const src=tmpl.getRow(i),dst=ws.getRow(i);for(let k=1;k<=6;k++){dst.getCell(k).value=src.getCell(k).value;dst.getCell(k).style=clone(src.getCell(k).style)}dst.commit()}last=3}
       // a data row and the yellow total row of the file are the models for the new rows
@@ -1881,7 +1886,7 @@ async function rcExport(){
     const nm={...m,aid:up.id,name,updatedAt:new Date().toISOString(),prev:m.aid};
     await db.collection("rcmeta").doc("master").set(nm);rcMeta.master=nm;
     const now=new Date().toISOString();
-    for(const [id] of todo.filter(([,r])=>!missing.includes(r.emp))){const pt={exported:true,exportedAt:now,st:"done",...(dups.includes(id)?{dup:true}:{})};await db.collection("receipts").doc(id).update(pt);Object.assign(rcRows[id],pt)}
+    for(const [id] of todo.filter(([,r])=>!missing.includes(empSheet(r.emp)))){const pt={exported:true,exportedAt:now,st:"done",...(dups.includes(id)?{dup:true}:{})};await db.collection("receipts").doc(id).update(pt);Object.assign(rcRows[id],pt)}
     if(dl)await dl.save({filename:name,data:blob}).catch(()=>{});else{const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click()}
     $("rcNote").textContent=`Дописано строк: ${added}. Файл «${name}» скачан и сохранён на доске как текущий общий файл.`+(dups.length?` Уже были в файле (та же дата и сумма), не дописаны: ${dups.length}.`:"")+(missing.length?` Нет листа для: ${missing.join(", ")} — эти чеки не выгружены.`:"");
   }catch(e){$("rcNote").textContent="Выгрузить не получилось ("+(e&&e.code||e&&e.message||"ошибка")+")."}
