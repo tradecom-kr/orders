@@ -765,6 +765,7 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
 .lr:hover{background:var(--bg)}.lr.sel{background:var(--accent-soft);border-left-color:var(--accent)}
 .lr.bad:not(.sel){border-left-color:var(--danger)}.lr.closed,.lr.arch{color:var(--muted)}
 .lr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.lsrt{border:0;background:none;padding:0;font:inherit;color:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;display:inline-flex;gap:3px;align-items:center}.lsrt:hover,.lsrt.on{color:var(--accent)}.lsrt span{font-size:12px}
 .lr.lhd{cursor:default;background:var(--bg);font:600 10.5px var(--f-body);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:7px 12px}.lr.lhd:hover{background:var(--bg)}
 .lnum{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 6px;min-width:0}.lnum b{font:600 15px var(--f-display)}.lnum small{flex-basis:100%;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .limp{font:600 10px var(--f-body);text-transform:uppercase;letter-spacing:.05em;background:var(--soft);color:var(--muted);border-radius:999px;padding:1px 7px;vertical-align:middle}
@@ -1569,14 +1570,17 @@ function lPanel(o){
 // on top: the order whose loading, departure or arrival date is closest to today (either side); finished and archive last
 function urg(o){if(o.arch)return 3e6;if(an(o).closed)return 2e6;
   const L=[o.loadAt,o.etd,o.eta].filter(Boolean).map(d=>Math.abs(days(d)));return L.length?Math.min(...L):1e6}
-function lSort(vis){const nn=o=>parseInt(String(o.num||"").replace(/\D+/g," ").trim().split(" ").pop())||0;
+let lOrd=load("lord","");  // "", "loadAt:1", "loadAt:-1", "etd:1", "etd:-1"
+function lSort(vis){if(lOrd){const [k,dir]=lOrd.split(":"), sg=+dir||1;
+    return vis.sort((x,y)=>(!!x.arch-!!y.arch)||(!x[k]-!y[k])||sg*String(x[k]||"").localeCompare(String(y[k]||"")))}
+  const nn=o=>parseInt(String(o.num||"").replace(/\D+/g," ").trim().split(" ").pop())||0;
   vis.forEach(o=>o.__u=urg(o));
   return vis.sort((x,y)=>x.__u-y.__u||String(y.date||y.createdAt||"").localeCompare(String(x.date||x.createdAt||""))||nn(y)-nn(x))}
 function renderList(){
   const vis=lSort(visible());
   renderWeek(vis);
   if(!vis.some(o=>o.id===lSel)){const f=vis.find(o=>!o.arch&&!an(o).closed)||vis[0];lSel=f?f.id:""}
-  $("lt").innerHTML=vis.length?`<div class="lr lhd"><div>Заказ</div><div>Этап</div><div>Что сейчас</div><div>Загрузка</div><div>Выход</div><div>Оплата</div></div>`+vis.map(lRow).join(""):`<div class="status">${orders.length?"Нет заказов под этот фильтр.":"Заказов пока нет."}</div>`;
+  $("lt").innerHTML=vis.length?`<div class="lr lhd"><div>Заказ</div><div>Этап</div><div>Что сейчас</div>${["loadAt","etd"].map(k=>{const [ck,cd]=lOrd.split(":"), on=ck===k;return `<div><button type="button" class="lsrt ${on?"on":""}" data-lord="${k}" title="Сортировать по дате; ещё раз — в обратном порядке, третий раз — как было">${k==="loadAt"?"Загрузка":"Выход"} <span>${on?(cd==="-1"?"↓":"↑"):"↕"}</span></button></div>`}).join("")}<div>Оплата</div></div>`+vis.map(lRow).join(""):`<div class="status">${orders.length?"Нет заказов под этот фильтр.":"Заказов пока нет."}</div>`;
   const lp=$("lp"), st=lp.querySelector(".lpb")?lp.scrollTop:0;
   lp.innerHTML=lPanel(orders.find(o=>o.id===lSel));lp.scrollTop=st;
 }
@@ -1584,6 +1588,7 @@ function lPick(id){lSel=id;save("lsel",id);document.body.classList.add("lp-open"
   const r=$("lt").querySelector(`[data-lsel="${CSS.escape(id)}"]`);if(r&&r.scrollIntoView)r.scrollIntoView({block:"nearest"})}
 $("listView").addEventListener("click",async e=>{
   const t=e.target;
+  const so=t.closest("[data-lord]");if(so){const k=so.dataset.lord, [ck,cd]=lOrd.split(":");lOrd=ck!==k?k+":1":cd==="1"?k+":-1":"";save("lord",lOrd);renderList();return}
   const tb=t.closest("[data-ltab]");if(tb){lTab[lSel]=tb.dataset.ltab;$("lp").innerHTML=lPanel(orders.find(o=>o.id===lSel));return}
   if(t.closest("[data-lclose]")){document.body.classList.remove("lp-open");return}
   const o=orders.find(x=>x.id===lSel);
