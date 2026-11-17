@@ -1415,21 +1415,46 @@ const ICO_BOX='<svg class="kico" viewBox="0 0 24 24" aria-hidden="true"><rect x=
 const ICO_SHIP='<svg class="kico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14.5h18l-2.6 4.2a1.5 1.5 0 0 1-1.3.8H6.9a1.5 1.5 0 0 1-1.3-.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M6 14.5V10h12v4.5M8.5 10V7h7v3M10.5 7V4.5h3V7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.5 12.2h1.2M11.4 12.2h1.2M14.3 12.2h1.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
 // container tracking on the line's own site: the link opens it, and the container (or B/L) number is copied to paste there
 // the line is known from «Линия» or from the container / B/L number prefix (CKLU…, CKCO… are CK Line)
-const TRACK=[{re:/ck\s*line|ckline|천경/i,no:/^\s*CK(LU|CO|LS)/i,name:"CK Line",url:"https://es.ckline.co.kr/?cmd=TRK"}];
-const trackOf=o=>{const c=String(o&&o.carrier||"")+" "+String(o&&o.vessel||"");return TRACK.find(t=>t.re.test(c)||(t.no&&(t.no.test(o&&o.cont||"")||t.no.test(o&&o.bl||""))))||null};
+const TRACK=[{re:/ck\s*line|ckline|천경/i,no:/^\s*CK(LU|CO|LS)/i,name:"CK Line",url:"https://es.ckline.co.kr/?cmd=TRK"},
+  {re:/dong\s*-?\s*young|동영|pcs\s*line|pan\s*con/i,no:/^\s*PCS(L|U)/i,name:"DY e-service (Dongyoung)",url:"https://ebiz.pcsline.co.kr/"}];
+// container numbers (ISO 6346, check digit verified) and B/L numbers found in an order's papers
+const ISO_V=(()=>{const m={};let v=10;for(const c of "ABCDEFGHIJKLMNOPQRSTUVWXYZ"){if(v%11===0)v++;m[c]=v++}return m})();
+const contOK=c=>{if(!/^[A-Z]{3}[UJZ]\d{7}$/.test(c))return false;let s=0;for(let i=0;i<10;i++)s+=(i<4?ISO_V[c[i]]:+c[i])*2**i;return s%11%10===+c[10]};
+function findNos(T){const t=String(T||"").toUpperCase(), cont=[], bl=[];let m;
+  const cr=/\b([A-Z]{3}[UJZ])\s?(\d{6})\s?-?\s?(\d)\b/g;while((m=cr.exec(t))){const c=m[1]+m[2]+m[3];if(contOK(c)&&!cont.includes(c))cont.push(c)}
+  const br=/(?:B\s*\/\s*L|BILL\s+OF\s+LADING|선하증권|B\/L\s*번호)\s*(?:NO|NUMBER|#|번호)?\.?\s*[:：.]?\s*([A-Z]{2,5}[A-Z0-9-]{5,18})/g;
+  while((m=br.exec(t))){const v=m[1].replace(/-+$/,"");if(/\d{4}/.test(v)&&!contOK(v)&&!/^(DATE|NUMBER|SHIPPER)/.test(v)&&!bl.includes(v))bl.push(v)}
+  const pr=/\b((?:PCSL|CKCO|CKLS)[A-Z0-9]{6,14})\b/g;while((m=pr.exec(t))){if(!contOK(m[1])&&!bl.includes(m[1]))bl.push(m[1])}
+  return {cont,bl}}
+const docNos=o=>{const r={cont:[],bl:[]};byNew((o&&o.files)||[]).forEach(f=>{if(!f.nos)return;(f.nos.cont||[]).forEach(c=>r.cont.includes(c)||r.cont.push(c));(f.nos.bl||[]).forEach(c=>r.bl.includes(c)||r.bl.push(c))});return r};
+const trackOf=o=>{const c=String(o&&o.carrier||"")+" "+String(o&&o.vessel||""), n=docNos(o), nos=[o&&o.cont,o&&o.bl,...n.cont,...n.bl].filter(Boolean);return TRACK.find(t=>t.re.test(c)||(t.no&&nos.some(x=>t.no.test(x))))||null};
 const clean=v=>String(v||"").replace(/[\/,;]+\s*$/,"").trim();
 const trackNo=o=>clean(o&&(o.bl||o.cont));
 // the link, plus the B/L and container numbers as buttons that copy themselves (the line's site wants the number typed in)
-function trackA(o,cls){const t=trackOf(o);if(!t)return "";const bl=clean(o&&o.bl), ct=clean(o&&o.cont);
-  const cp=(lbl,v)=>`<button type="button" class="trkno" data-copy="${esc(v)}" title="Скопировать ${lbl} ${esc(v)}">${lbl} <b>${esc(v)}</b> ⧉</button>`;
-  return `<span class="trkw ${cls||""}"><a class="trk" href="${t.url}" target="_blank" rel="noopener" data-trkno="${esc(bl||ct)}" title="Открыть отслеживание ${esc(t.name)}${bl||ct?" — номер "+esc(bl||ct)+" скопируется":""}">📍 Отследить на ${esc(t.name)} ↗</a>`
-    +(bl?cp("B/L",bl):`<span class="trkno none" title="Впишите номер коносамента: «Открыть весь заказ» → «График и загрузка» → «Коносамент №»">B/L — не указан</span>`)+(ct?cp("конт.",ct):"")+`</span>`}
+function trackA(o,cls){o=o||{};const t=trackOf(o), n=docNos(o);
+  // numbers from the order's fields; if empty there — the ones read from its papers
+  const bl=clean(o&&o.bl)||n.bl[0]||"", ct=clean(o&&o.cont)||n.cont[0]||"", fromDoc=v=>v&&!(clean(o.bl)===v||clean(o.cont)===v);
+  if(!t&&!bl&&!ct)return "";
+  const cp=(lbl,v)=>`<button type="button" class="trkno" data-copy="${esc(v)}" title="Скопировать ${lbl} ${esc(v)}${fromDoc(v)?" (найден в документах)":""}">${lbl} <b>${esc(v)}</b> ⧉</button>`;
+  const more=n.cont.filter(c=>c!==ct).slice(0,3).map(c=>cp("конт.",c)).join("");
+  return `<span class="trkw ${cls||""}">${t?`<a class="trk" href="${t.url}" target="_blank" rel="noopener" data-trkno="${esc(bl||ct)}" title="Открыть отслеживание ${esc(t.name)}${bl||ct?" — номер "+esc(bl||ct)+" скопируется":""}">📍 Отследить на ${esc(t.name)} ↗</a>`:`<span class="trkno none" title="Впишите линию в «Линия / перевозчик», чтобы появилась ссылка на отслеживание">📍 линия не указана</span>`}`
+    +(bl?cp("B/L",bl):`<span class="trkno none" title="Впишите номер коносамента: «Открыть весь заказ» → «График и загрузка» → «Коносамент №», или загрузите коносамент — номер найдётся сам">B/L — не указан</span>`)+(ct?cp("конт.",ct):"")+more+(fromDoc(bl)||fromDoc(ct)?`<span class="note">· из документов</span>`:"")+`</span>`}
+// read container / B/L numbers from the papers that carry them, once per file; the result is kept with the file
+const NOS_KINDS=["bl","bldraft","freight","exp","ipl","impdecl","brokinv","cert","other","dt"], nosBusy=new Set();
+async function scanNos(o){if(!o||!db||!canWrite||nosBusy.has(o.id))return;
+  const todo=(o.files||[]).filter(f=>!f.nos&&f.aid&&NOS_KINDS.includes(kindOf(f.kind))&&/\.(pdf|docx|txt)$/i.test(f.name||"")).slice(0,6);if(!todo.length)return;
+  nosBusy.add(o.id);const got={};
+  for(const f of todo){try{const t=await fileText(await blobBytes(f),f.name);const r=t==null?{cont:[],bl:[]}:findNos(t);got[f.aid]={cont:r.cont.slice(0,10),bl:r.bl.slice(0,5)}}catch(e){got[f.aid]={cont:[],bl:[],err:1}}}
+  const cur=orders.find(x=>x.id===o.id);if(!cur){nosBusy.delete(o.id);return}
+  const files=(cur.files||[]).map(f=>got[f.aid]&&!f.nos?{...f,nos:got[f.aid]}:f);
+  try{await db.collection("orders").doc(o.id).update({files})}catch(e){}
+  nosBusy.delete(o.id)}
 document.addEventListener("click",e=>{const a=e.target.closest("a.trk");if(!a)return;e.stopPropagation();const n=a.dataset.trkno;if(n&&navigator.clipboard)navigator.clipboard.writeText(n).catch(()=>{})},true);
 document.addEventListener("click",async e=>{const b=e.target.closest("button.trkno[data-copy]");if(!b)return;e.preventDefault();e.stopPropagation();
   try{await navigator.clipboard.writeText(b.dataset.copy)}catch(err){const t=document.createElement("textarea");t.value=b.dataset.copy;document.body.appendChild(t);t.select();document.execCommand("copy");t.remove()}
   const h=b.innerHTML;b.classList.add("done");b.textContent="Скопировано ✓";setTimeout(()=>{b.innerHTML=h;b.classList.remove("done")},1400)},true);
 // order editor: the tracking link appears under «Линия» as soon as the line is known
-function paintTrk(){const el=$("e_trk");if(!el)return;const o={carrier:$("e_carrier").value,vessel:$("e_vessel").value,cont:$("e_cont").value,bl:$("e_bl").value};el.innerHTML=trackA(o,"in")}
+function paintTrk(){const el=$("e_trk");if(!el)return;const o={carrier:$("e_carrier").value,vessel:$("e_vessel").value,cont:$("e_cont").value,bl:$("e_bl").value,files:editing&&editing.files};el.innerHTML=trackA(o,"in")}
 ["e_carrier","e_vessel","e_cont","e_bl"].forEach(id=>$(id)&&$(id).addEventListener("input",paintTrk));
 {const _oe2=openEditor;openEditor=function(){const r=_oe2.apply(this,arguments);paintTrk();return r};}
 
@@ -1583,7 +1608,7 @@ function renderList(){
   if(!vis.some(o=>o.id===lSel)){const f=vis.find(o=>!o.arch&&!an(o).closed)||vis[0];lSel=f?f.id:""}
   $("lt").innerHTML=vis.length?`<div class="lr lhd"><div>Заказ</div><div>Этап</div><div>Что сейчас</div>${["loadAt","etd"].map(k=>{const [ck,cd]=lOrd.split(":"), on=ck===k;return `<div><button type="button" class="lsrt ${on?"on":""}" data-lord="${k}" title="Сортировать по дате; ещё раз — в обратном порядке, третий раз — как было">${k==="loadAt"?"Загрузка":"Выход"} <span>${on?(cd==="-1"?"↓":"↑"):"↕"}</span></button></div>`}).join("")}<div>Оплата</div></div>`+vis.map(lRow).join(""):`<div class="status">${orders.length?"Нет заказов под этот фильтр.":"Заказов пока нет."}</div>`;
   const lp=$("lp"), st=lp.querySelector(".lpb")?lp.scrollTop:0;
-  lp.innerHTML=lPanel(orders.find(o=>o.id===lSel));lp.scrollTop=st;
+  const so=orders.find(o=>o.id===lSel);lp.innerHTML=lPanel(so);lp.scrollTop=st;if(so&&!so.arch)scanNos(so);
 }
 function lPick(id){lSel=id;save("lsel",id);document.body.classList.add("lp-open");renderList();
   const r=$("lt").querySelector(`[data-lsel="${CSS.escape(id)}"]`);if(r&&r.scrollIntoView)r.scrollIntoView({block:"nearest"})}
@@ -2366,6 +2391,7 @@ function extractDeal(raw){
   if((m=T.match(/в лице\s+(?:генерального\s+)?директора\s+(Ти|Ден)(?=\s)/)))f.signer=m[1]==="Ден"?"den":"ti";
   if((m=T.match(/(?:Контейнер|Тип контейнера)\s*:?\s*(20|40)\s*(HC)?\s*(Dry|Reefer)/i)))f.contType=`${m[1]}${m[2]?"HC":""} ${m[3][0].toUpperCase()+m[3].slice(1).toLowerCase()}`;
   if(/수출신고필증|신고번호/.test(T)){const e=findExpNo(T);if(e)f.expNo=e}
+  {const n=findNos(T);if(n.bl[0])f.bl=n.bl[0];if(n.cont[0])f.cont=n.cont[0]}
   return f;
 }
 // calculation workbook: suppliers with their positions, boxes and purchase sums; container type
@@ -2409,8 +2435,8 @@ async function readDealFile(bytes,name){
   return f;
 }
 const AF_PRIO={cs:0,ipl:1,exp:2,calc:3,kp:4};
-const AF_LABEL={num:"номер",date:"дата контракта",buyer:"покупатель",goods:"товар",amount:"сумма",cur:"валюта",inco:"Инкотермс",specNo:"№ спецификации",inv:"инвойс №",payDue:"оплата до",contType:"тип контейнера",expNo:"№ экспортной декларации",suppliers:"поставщики"};
-const AF_FIELD={num:"e_num",date:"e_date",goods:"e_goods",inco:"e_inco",specNo:"e_specNo",inv:"e_inv",payDue:"e_paydue",contType:"e_contType",expNo:"e_expNo"};
+const AF_LABEL={bl:"коносамент №",cont:"контейнер",num:"номер",date:"дата контракта",buyer:"покупатель",goods:"товар",amount:"сумма",cur:"валюта",inco:"Инкотермс",specNo:"№ спецификации",inv:"инвойс №",payDue:"оплата до",contType:"тип контейнера",expNo:"№ экспортной декларации",suppliers:"поставщики"};
+const AF_FIELD={bl:"e_bl",cont:"e_cont",num:"e_num",date:"e_date",goods:"e_goods",inco:"e_inco",specNo:"e_specNo",inv:"e_inv",payDue:"e_paydue",contType:"e_contType",expNo:"e_expNo"};
 let sigByName={}, pendingFiles=[];
 function applyDeal(f){
   const done=[];
@@ -2427,6 +2453,7 @@ function applyDeal(f){
     done.push(AF_LABEL.buyer+(hit?"":" (новый)"));
   }
   if(f.suppliers&&f.suppliers.length&&!readSups().some(x=>x.name)){renderSups(f.suppliers);done.push(AF_LABEL.suppliers)}
+  if(f.bl||f.cont)paintTrk();
   return done;
 }
 async function autofillFiles(list,existing){
