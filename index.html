@@ -1833,7 +1833,7 @@ function renderRc(){
         return `<tr data-rc="${esc(r.id)}" class="st-${st}"><td>${r.photo?`<a href="#" data-rcph="${esc(r.photo)}" title="Открыть фото"><img src="/_blob/${esc(r.photo)}" alt="" class="rcph"></a>`:`<span class="rcph gone" title="Фото удалено через 2 недели после выгрузки в Excel">—</span>`}</td>${show==="all"?`<td class="note">${esc(r.emp)}</td>`:""}
           <td><input type="date" data-f="date" value="${esc(r.date||"")}" ${ro}></td><td><input data-f="shop" value="${esc(r.shop||"")}" ${ro}></td>
           <td><input data-f="cat" list="rcCats" value="${esc(r.cat||"")}" ${ro} style="width:110px"></td><td class="n"><input data-f="amt" inputmode="numeric" value="${r.amt?Number(r.amt).toLocaleString("ru-RU"):""}" ${ro} style="width:100px;text-align:right"></td>
-          <td><select data-f="pay" ${ro} class="rcpay ${r.pay||"none"}" title="Определено по чеку; можно поправить"><option value="" ${!r.pay?"selected":""}>—</option><option value="card" ${r.pay==="card"?"selected":""}>💳 карта</option><option value="cash" ${r.pay==="cash"?"selected":""}>💵 наличные</option></select></td>
+          <td><select data-f="pay" ${ro} class="rcpay ${r.pay||"none"}" title="Определено по чеку; можно поправить. В Excel пишется в 비고"><option value="" ${!r.pay?"selected":""}>—</option><option value="card" ${r.pay==="card"?"selected":""}>💳 개인카드</option><option value="cash" ${r.pay==="cash"?"selected":""}>💵 현금</option></select></td>
           <td><input data-f="note" value="${esc(r.note||"")}" ${ro} placeholder="—"></td><td><span class="rcs">${stT[st]||st}</span></td>
           <td>${r.exported||!canWrite?"":`<button type="button" class="ib danger" data-rcdel="${esc(r.id)}" title="Удалить чек" aria-label="Удалить">✕</button>`}</td></tr>`}).join("")}
       </tbody></table></section>`}).join(""):`<div class="note" style="padding:20px">Чеков пока нет. Выберите сотрудника и загрузите фото чеков — по одному чеку на фото.</div>`;
@@ -1883,7 +1883,7 @@ async function rcExport(){
       if(!list.length)continue;
       let r=last>3?last+2:4;const start=r;
       list.sort((a,b)=>String(a[1].date).localeCompare(String(b[1].date))).forEach(([,x])=>{const row=ws.getRow(r);
-        const d=new Date(x.date+"T00:00:00Z");row.getCell(1).value=d;row.getCell(2).value=x.shop||"";row.getCell(3).value=x.cat||"";row.getCell(4).value=Number(x.amt);if(x.note)row.getCell(6).value=x.note;
+        const d=new Date(x.date+"T00:00:00Z");row.getCell(1).value=d;row.getCell(2).value=x.shop||"";row.getCell(3).value=x.cat||"";row.getCell(4).value=Number(x.amt);{const pw=x.pay==="card"?"개인카드":x.pay==="cash"?"현금":"", v=[pw,x.note].filter(Boolean).join(", ");if(v)row.getCell(6).value=v}
         for(let k=1;k<=6;k++)row.getCell(k).style=clone(dataP.getCell(k).style);row.getCell(1).numFmt=dataP.getCell(1).numFmt||'m"월" d"일"';row.commit();r++;added++});
       const sr=ws.getRow(r);sr.getCell(4).value={formula:`SUM(D${start}:D${r-1})`};
       for(let k=1;k<=6;k++)sr.getCell(k).style=clone((sumP||dataP).getCell(k).style);if(!sumP)sr.getCell(4).fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFFFFF00"}};sr.commit();
