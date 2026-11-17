@@ -765,6 +765,7 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
 .lr:hover{background:var(--bg)}.lr.sel{background:var(--accent-soft);border-left-color:var(--accent)}
 .lr.bad:not(.sel){border-left-color:var(--danger)}.lr.closed,.lr.arch{color:var(--muted)}
 .lr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.lgrp{padding:7px 12px 5px;font:600 12px var(--f-body);letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:var(--bg);border-bottom:1px solid var(--soft)}.lgrp.g0{color:var(--danger);background:var(--danger-soft)}.lgrp.g1{color:var(--accent-ink);background:var(--accent)}.lgrp.g2{color:var(--accent);background:var(--accent-soft)}
 .lr.lhd{cursor:default;background:var(--bg);font:600 10.5px var(--f-body);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:7px 12px}.lr.lhd:hover{background:var(--bg)}
 .lnum{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 6px;min-width:0}.lnum b{font:600 15px var(--f-display)}.lnum small{flex-basis:100%;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .limp{font:600 10px var(--f-body);text-transform:uppercase;letter-spacing:.05em;background:var(--soft);color:var(--muted);border-radius:999px;padding:1px 7px;vertical-align:middle}
@@ -842,7 +843,7 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
     <select id="fBuyer" aria-label="Покупатель" style="width:auto;max-width:260px;background:var(--panel)"><option value="">Все покупатели</option></select>
     <label class="chk"><input type="checkbox" id="showArch"> Показывать архив</label>
     <div class="seg" role="group" aria-label="Вид">
-      <button type="button" id="vList" aria-pressed="true">Заказы</button>
+      <button type="button" id="vList" aria-pressed="true">Текущие</button>
       <button type="button" id="vOver" aria-pressed="false">Карточки</button>
       <button type="button" id="vTime" aria-pressed="false">Календарь</button>
       <button type="button" id="vDocs" aria-pressed="false">Документы</button>
@@ -1564,13 +1565,23 @@ function lPanel(o){
     <div class="lpb">${body}</div>
     <footer class="lpf"><button type="button" class="btn" data-ledit="">Открыть весь заказ</button>${canWrite&&!o.arch?`<button type="button" class="btn ghost" data-lflow>Настроить ход</button>`:""}${o.notes?`<span class="note" title="${esc(o.notes)}">📝 ${esc(String(o.notes).slice(0,80))}${String(o.notes).length>80?"…":""}</span>`:""}</footer>`;
 }
-function lSort(vis){const key=o=>String(o.date||o.createdAt||"").slice(0,10), nn=o=>parseInt(String(o.num||"").replace(/\D+/g," ").trim().split(" ").pop())||0, added=o=>String(o.createdAt||o.date||"");
-  return vis.sort((x,y)=>(!!x.arch-!!y.arch)||(x.arch?key(y).localeCompare(key(x)):added(y).localeCompare(added(x)))||nn(y)-nn(x))}
+// urgency: the order's nearest open date (loading, departure, arrival, payment, supplier); a missed one counts as today
+function urg(o){if(o.arch)return {g:7,d:""};const a=an(o);if(a.closed)return {g:6,d:""};
+  const L=calEvents([o]).filter(e=>e.o&&!e.my&&!/ev-done|ev-x/.test(e.c)&&e.d).map(e=>e.d).sort();
+  if(!L.length)return {g:5,d:""};
+  const late=L.filter(d=>days(d)<0), up=L.filter(d=>days(d)>=0), d=late.length&&(!up.length||days(up[0])>0)?late[late.length-1]:up[0], n=Math.max(days(d),0);
+  // a missed date (and nothing today) goes to «Просрочено», the freshest first
+  if(days(d)<0)return {g:0,d:String(99999999-Number(d.replace(/-/g,""))),late:true};
+  return {g:n===0?1:n===1?2:n<=7?3:4,d,late:late.length>0}}
+const UG=["Просрочено","Сегодня","Завтра","Ближайшие 7 дней","Позже","Без дат","Завершённые","Архив"];
+function lSort(vis){const nn=o=>parseInt(String(o.num||"").replace(/\D+/g," ").trim().split(" ").pop())||0;
+  vis.forEach(o=>o.__u=urg(o));
+  return vis.sort((x,y)=>x.__u.g-y.__u.g||String(x.__u.d).localeCompare(String(y.__u.d))||(y.__u.late?1:0)-(x.__u.late?1:0)||String(y.date||y.createdAt||"").localeCompare(String(x.date||x.createdAt||""))||nn(y)-nn(x))}
 function renderList(){
   const vis=lSort(visible());
   renderWeek(vis);
   if(!vis.some(o=>o.id===lSel)){const f=vis.find(o=>!o.arch&&!an(o).closed)||vis[0];lSel=f?f.id:""}
-  $("lt").innerHTML=vis.length?`<div class="lr lhd"><div>Заказ</div><div>Этап</div><div>Что сейчас</div><div>Загрузка</div><div>Выход</div><div>Оплата</div></div>`+vis.map(lRow).join(""):`<div class="status">${orders.length?"Нет заказов под этот фильтр.":"Заказов пока нет."}</div>`;
+  $("lt").innerHTML=vis.length?`<div class="lr lhd"><div>Заказ</div><div>Этап</div><div>Что сейчас</div><div>Загрузка</div><div>Выход</div><div>Оплата</div></div>`+vis.map((o,i)=>(i===0||vis[i-1].__u.g!==o.__u.g?`<div class="lgrp g${o.__u.g}">${UG[o.__u.g]}</div>`:"")+lRow(o)).join(""):`<div class="status">${orders.length?"Нет заказов под этот фильтр.":"Заказов пока нет."}</div>`;
   const lp=$("lp"), st=lp.querySelector(".lpb")?lp.scrollTop:0;
   lp.innerHTML=lPanel(orders.find(o=>o.id===lSel));lp.scrollTop=st;
 }
@@ -1595,7 +1606,7 @@ $("listView").addEventListener("click",async e=>{
 });
 $("listView").addEventListener("keydown",e=>{const r=e.target.closest(".lr[data-lsel]");if(!r)return;
   if(e.key==="Enter"||e.key===" "){e.preventDefault();lPick(r.dataset.lsel)}
-  if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();const n=e.key==="ArrowDown"?r.nextElementSibling:r.previousElementSibling;if(n&&n.dataset.lsel){lPick(n.dataset.lsel);const m=$("lt").querySelector(`[data-lsel="${CSS.escape(n.dataset.lsel)}"]`);m&&m.focus()}}});
+  if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();let n=r;do{n=e.key==="ArrowDown"?n.nextElementSibling:n.previousElementSibling}while(n&&!n.dataset.lsel);if(n&&n.dataset.lsel){lPick(n.dataset.lsel);const m=$("lt").querySelector(`[data-lsel="${CSS.escape(n.dataset.lsel)}"]`);m&&m.focus()}}});
 $("vList").onclick=()=>{view="list";save("view",view);render()};
 /* ---------- «Настроить ход»: each order's stages and steps — take out, put back, add your own, change the order ---------- */
 // everything that can go into an order, stage by stage; the board's usual set is a part of it
