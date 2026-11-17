@@ -772,7 +772,7 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
 .lst{display:flex;flex-direction:column;gap:4px;min-width:0}.lst small{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lbar{display:block;height:6px;border-radius:3px;background:var(--soft);overflow:hidden}.lbar>span{display:block;height:100%;background:var(--accent);border-radius:3px}.lstn{font:600 14px var(--f-body);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lr.arch .lstn,.lr.closed .lstn{color:var(--muted);font-weight:500}.lhint{display:block;text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
 .lnow{display:flex;flex-direction:column;gap:2px;min-width:0;line-height:1.3}.lnow small{font-size:12px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.lnow .bad,.lpay.bad{color:var(--danger)}.lnow .warn{color:var(--warn)}.okt{color:var(--ok)}.muted{color:var(--muted)}
-.ldb{font:600 13px var(--f-mono);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:4px 7px;cursor:pointer;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.2;min-width:62px}
+.ldb{font:600 13px var(--f-mono);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:4px 7px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;line-height:1.2;width:70px;height:30px;white-space:nowrap}
 .ldb:hover{border-color:var(--accent)}.ldb.bad{color:var(--danger);border-color:var(--danger)}.ldb.warn{color:var(--warn);border-color:var(--warn)}.ldb.ok{color:var(--ok)}.ldb.none{border-color:transparent;background:none;cursor:default;color:var(--muted)}
 .ldb small{font:500 10.5px var(--f-body);color:var(--warn)}
 .lpay{font-weight:600;color:var(--danger)}.lpay.ok{color:var(--ok)}.lpay.warn{color:var(--warn)}
@@ -1469,7 +1469,7 @@ const wasOf=(o,k)=>{const w=o[k+"Was"], at=o[k+"MovedAt"];return w&&at&&Date.now
 function lDateBtn(o,k,done){
   const d=o[k], cls=!d||done?"":days(d)<0?"bad":days(d)<=3?"warn":"", w=wasOf(o,k);
   if(o.arch)return `<span class="ldb none">${d?mdd(d):"—"}</span>`;
-  return `<button type="button" class="ldb ${cls} ${done?"ok":""}" data-qd="${esc(o.id)}" data-qk="${k}" title="Изменить дату">${d?mdd(d):"—"}${done?" ✓":""}${w?`<small>было ${mdd(w)}</small>`:""}</button>`}
+  return `<button type="button" class="ldb ${cls} ${done?"ok":""}" data-qd="${esc(o.id)}" data-qk="${k}" title="${w?`Перенесено с ${mdd(w)}. `:""}Изменить дату">${d?mdd(d):"—"}${done?" ✓":""}</button>`}
 function lBar(a){const n=phasesOf(a.o).length, cur=a.closed?n:Math.min(a.cur,n), w=Math.round(Math.min(cur+1,n)/n*100);
   return `<span class="lbar"><span style="width:${w}%"></span></span>`}
 function lNow(a){
