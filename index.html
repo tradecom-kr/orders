@@ -765,12 +765,11 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
 .lr:hover{background:var(--bg)}.lr.sel{background:var(--accent-soft);border-left-color:var(--accent)}
 .lr.bad:not(.sel){border-left-color:var(--danger)}.lr.closed,.lr.arch{color:var(--muted)}
 .lr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
-.lgrp{padding:7px 12px 5px;font:600 12px var(--f-body);letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:var(--bg);border-bottom:1px solid var(--soft)}.lgrp.g0{color:var(--danger);background:var(--danger-soft)}.lgrp.g1{color:var(--accent-ink);background:var(--accent)}.lgrp.g2{color:var(--accent);background:var(--accent-soft)}
 .lr.lhd{cursor:default;background:var(--bg);font:600 10.5px var(--f-body);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:7px 12px}.lr.lhd:hover{background:var(--bg)}
 .lnum{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 6px;min-width:0}.lnum b{font:600 15px var(--f-display)}.lnum small{flex-basis:100%;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .limp{font:600 10px var(--f-body);text-transform:uppercase;letter-spacing:.05em;background:var(--soft);color:var(--muted);border-radius:999px;padding:1px 7px;vertical-align:middle}
 .lst{display:flex;flex-direction:column;gap:4px;min-width:0}.lst small{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lbar{display:block;height:6px;border-radius:3px;background:var(--soft);overflow:hidden}.lbar>span{display:block;height:100%;background:var(--accent);border-radius:3px}.lst small b{color:var(--ink);font-weight:600}.lhint{display:block;text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
+.lbar{display:block;height:6px;border-radius:3px;background:var(--soft);overflow:hidden}.lbar>span{display:block;height:100%;background:var(--accent);border-radius:3px}.lstn{font:600 14px var(--f-body);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lr.arch .lstn,.lr.closed .lstn{color:var(--muted);font-weight:500}.lhint{display:block;text-transform:none;letter-spacing:0;font-weight:500;font-size:10.5px}
 .lnow{display:flex;flex-direction:column;gap:2px;min-width:0;line-height:1.3}.lnow small{font-size:12px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.lnow .bad,.lpay.bad{color:var(--danger)}.lnow .warn{color:var(--warn)}.okt{color:var(--ok)}.muted{color:var(--muted)}
 .ldb{font:600 13px var(--f-mono);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:4px 7px;cursor:pointer;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.2;min-width:62px}
 .ldb:hover{border-color:var(--accent)}.ldb.bad{color:var(--danger);border-color:var(--danger)}.ldb.warn{color:var(--warn);border-color:var(--warn)}.ldb.ok{color:var(--ok)}.ldb.none{border-color:transparent;background:none;cursor:default;color:var(--muted)}
@@ -809,8 +808,8 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
   body.lp-open .lpx{display:inline-flex}
 }
 @media (max-width:760px){
-  .lr{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"n d e" "w w p"}
-  .lr .lnum{grid-area:n}.lr .lst{display:none}.lr .lnow{grid-area:w}.lr .ldc:nth-child(4){grid-area:d}.lr .ldc:nth-child(5){grid-area:e}.lr .ldc:nth-child(6){grid-area:p;justify-self:end}
+  .lr{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"n d e" "s s p" "w w w"}
+  .lr .lnum{grid-area:n}.lr .lst{grid-area:s}.lr .lnow{grid-area:w}.lr .ldc:nth-child(4){grid-area:d}.lr .ldc:nth-child(5){grid-area:e}.lr .ldc:nth-child(6){grid-area:p;justify-self:end}
   .lr.lhd{display:none}
   .lpd{grid-template-columns:1fr 1fr 1fr}
 }
@@ -1479,7 +1478,7 @@ function lRow(o){const a=an(o), P=phasesOf(o), cur=a.closed?P.length-1:Math.min(
   const pay=imp?`<span class="muted">—</span>`:`<span class="lpay ${PAY[o.pay||"none"][1]}">${PAY[o.pay||"none"][0]}</span>`;
   return `<div class="lr ${o.id===lSel?"sel":""} ${a.arch?"arch":a.closed?"closed":a.alerts.some(x=>x.c==="bad")?"bad":""}" data-lsel="${esc(o.id)}" tabindex="0" role="button" aria-pressed="${o.id===lSel}">
     <div class="lnum"><b>${esc(o.num||"без номера")}</b>${imp?`<span class="limp">импорт</span>`:""}<small>${esc([o.buyer,o.goods].filter(Boolean).join(" · ")||"—")}</small></div>
-    <div class="lst">${a.arch?"":lBar(a)}<small>${a.arch?"":a.closed?"Завершена":`<b>${esc(P[cur].t)}</b> · этап ${cur+1} из ${P.length}`}</small></div>
+    <div class="lst">${a.arch?"":lBar(a)}<span class="lstn">${a.arch?"Архив":a.closed?"Завершена":esc(P[cur].t)}</span><small>${a.arch||a.closed?"":`этап ${cur+1} из ${P.length}`}</small></div>
     <div class="lnow">${lNow(a)}</div>
     <div class="ldc">${lDateBtn(o,"loadAt",stepDone(o,"photo"))}</div>
     <div class="ldc">${lDateBtn(o,"etd",stepDone(o,"port"))}</div>
@@ -1565,23 +1564,17 @@ function lPanel(o){
     <div class="lpb">${body}</div>
     <footer class="lpf"><button type="button" class="btn" data-ledit="">Открыть весь заказ</button>${canWrite&&!o.arch?`<button type="button" class="btn ghost" data-lflow>Настроить ход</button>`:""}${o.notes?`<span class="note" title="${esc(o.notes)}">📝 ${esc(String(o.notes).slice(0,80))}${String(o.notes).length>80?"…":""}</span>`:""}</footer>`;
 }
-// urgency: the order's nearest open date (loading, departure, arrival, payment, supplier); a missed one counts as today
-function urg(o){if(o.arch)return {g:7,d:""};const a=an(o);if(a.closed)return {g:6,d:""};
-  const L=calEvents([o]).filter(e=>e.o&&!e.my&&!/ev-done|ev-x/.test(e.c)&&e.d).map(e=>e.d).sort();
-  if(!L.length)return {g:5,d:""};
-  const late=L.filter(d=>days(d)<0), up=L.filter(d=>days(d)>=0), d=late.length&&(!up.length||days(up[0])>0)?late[late.length-1]:up[0], n=Math.max(days(d),0);
-  // a missed date (and nothing today) goes to «Просрочено», the freshest first
-  if(days(d)<0)return {g:0,d:String(99999999-Number(d.replace(/-/g,""))),late:true};
-  return {g:n===0?1:n===1?2:n<=7?3:4,d,late:late.length>0}}
-const UG=["Просрочено","Сегодня","Завтра","Ближайшие 7 дней","Позже","Без дат","Завершённые","Архив"];
+// on top: the order whose loading, departure or arrival date is closest to today (either side); finished and archive last
+function urg(o){if(o.arch)return 3e6;if(an(o).closed)return 2e6;
+  const L=[o.loadAt,o.etd,o.eta].filter(Boolean).map(d=>Math.abs(days(d)));return L.length?Math.min(...L):1e6}
 function lSort(vis){const nn=o=>parseInt(String(o.num||"").replace(/\D+/g," ").trim().split(" ").pop())||0;
   vis.forEach(o=>o.__u=urg(o));
-  return vis.sort((x,y)=>x.__u.g-y.__u.g||String(x.__u.d).localeCompare(String(y.__u.d))||(y.__u.late?1:0)-(x.__u.late?1:0)||String(y.date||y.createdAt||"").localeCompare(String(x.date||x.createdAt||""))||nn(y)-nn(x))}
+  return vis.sort((x,y)=>x.__u-y.__u||String(y.date||y.createdAt||"").localeCompare(String(x.date||x.createdAt||""))||nn(y)-nn(x))}
 function renderList(){
   const vis=lSort(visible());
   renderWeek(vis);
   if(!vis.some(o=>o.id===lSel)){const f=vis.find(o=>!o.arch&&!an(o).closed)||vis[0];lSel=f?f.id:""}
-  $("lt").innerHTML=vis.length?`<div class="lr lhd"><div>Заказ</div><div>Этап</div><div>Что сейчас</div><div>Загрузка</div><div>Выход</div><div>Оплата</div></div>`+vis.map((o,i)=>(i===0||vis[i-1].__u.g!==o.__u.g?`<div class="lgrp g${o.__u.g}">${UG[o.__u.g]}</div>`:"")+lRow(o)).join(""):`<div class="status">${orders.length?"Нет заказов под этот фильтр.":"Заказов пока нет."}</div>`;
+  $("lt").innerHTML=vis.length?`<div class="lr lhd"><div>Заказ</div><div>Этап</div><div>Что сейчас</div><div>Загрузка</div><div>Выход</div><div>Оплата</div></div>`+vis.map(lRow).join(""):`<div class="status">${orders.length?"Нет заказов под этот фильтр.":"Заказов пока нет."}</div>`;
   const lp=$("lp"), st=lp.querySelector(".lpb")?lp.scrollTop:0;
   lp.innerHTML=lPanel(orders.find(o=>o.id===lSel));lp.scrollTop=st;
 }
