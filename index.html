@@ -819,6 +819,7 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
 .flph>header{display:flex;gap:6px;align-items:center}.flph>header .sp{flex:1}
 .flph ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}.flph li{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .fladd{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.fladd input{flex:1 1 200px;width:auto}.fladd select{width:auto;max-width:230px}
+.rcpay{width:auto;padding:3px 6px;font-size:12.5px}.rcpay.cash{color:var(--warn);font-weight:600}.rcpay.card{color:var(--accent)}.rcpay.none{color:var(--muted)}
 </style>
 
 </head>
@@ -1763,8 +1764,14 @@ function rcParse(text){
   out.shop=shop;
   const dates=new Set((raw.replace(/\s/g,"").match(/20\d\d[-./]\d{1,2}[-./]\d{1,2}/g)||[]).map(x=>x.slice(0,10)));
   out.many=dates.size>2;
+  out.pay=rcPayOf(raw);
   return out;
 }
+// card or cash, from the words on the receipt; "" when the receipt does not say
+function rcPayOf(raw){const z=String(raw||"").replace(/\s/g,"").toUpperCase();
+  const card=(z.match(/신용카드|체크카드|카드번호|카드종류|카드사|카드명|승인번호|승인일시|할부|일시불|매입사|신용승인|IC카드|VISA|MASTER|삼성카드|신한카드|국민카드|현대카드|롯데카드|BC카드|비씨카드|하나카드|우리카드|NH카드|농협카드|카카오페이|네이버페이|삼성페이|페이코|PAYCO|APPLEPAY|애플페이/g)||[]).length;
+  const cash=(z.match(/현금영수증|현금결제|현금매출|현금[:：]|받은금액|받은돈|거스름|거스름돈|잔돈|CASH/g)||[]).length;
+  return card>cash?"card":cash>card?"cash":card?"card":""}
 let _tess=null;
 async function rcOCR(file){
   await loadLib("tess","https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js",()=>window.Tesseract);
@@ -1794,7 +1801,7 @@ async function rcAddPhotos(list){
       $("rcNote").textContent=`Читаю чек «${file.name}»…`;
       if(!rcNames.length)await rcLoadNames();
       let p={};try{const t=await rcOCR(file);p=rcParse(t);p.shop=rcKnownName(p.shop);p.cat=rcCatGuess(p.shop,t)}catch(e){p={err:true}}
-      const patch={date:p.date||"",shop:p.shop||"",cat:p.cat||"식대",amt:p.amt||null,st:p.err?"check":p.many?"many":(p.date&&p.amt?"new":"check")};
+      const patch={date:p.date||"",shop:p.shop||"",cat:p.cat||"식대",amt:p.amt||null,pay:p.pay||"",st:p.err?"check":p.many?"many":(p.date&&p.amt?"new":"check")};
       await db.collection("receipts").doc(id).update(patch);Object.assign(rcRows[id],patch);renderRc();
     }catch(e){$("rcNote").textContent=`«${file.name}» не загружен (${e&&e.code||"ошибка"}).`}
   }
@@ -1821,11 +1828,12 @@ function renderRc(){
     const end=w!=="—"?(()=>{const d=new Date(w+"T00:00:00");d.setDate(d.getDate()+6);return isoD(d)})():"";
     const tot=rows.reduce((t,r)=>t+(Number(r.amt)||0),0);
     return `<section class="rcw"><header><b>${w==="—"?"Без даты":`Неделя ${md2(w)} – ${md2(end)}`}</b><span class="note">${rows.length} чек.</span><span class="rct">${tot.toLocaleString("ru-RU")} ₩</span></header>
-      <table class="rct-t"><thead><tr><th></th>${show==="all"?"<th>Сотрудник</th>":""}<th>Дата</th><th>상호 / Имя</th><th>내역 / Вид</th><th class="n">Сумма</th><th>Примечание</th><th>Статус</th><th></th></tr></thead><tbody>
+      <table class="rct-t"><thead><tr><th></th>${show==="all"?"<th>Сотрудник</th>":""}<th>Дата</th><th>상호 / Имя</th><th>내역 / Вид</th><th class="n">Сумма</th><th>Оплата</th><th>Примечание</th><th>Статус</th><th></th></tr></thead><tbody>
       ${rows.map(r=>{const ro=r.exported||!canWrite?"disabled":"";const st=r.dup?"dup":r.exported?"done":r.st||"new";
         return `<tr data-rc="${esc(r.id)}" class="st-${st}"><td>${r.photo?`<a href="#" data-rcph="${esc(r.photo)}" title="Открыть фото"><img src="/_blob/${esc(r.photo)}" alt="" class="rcph"></a>`:`<span class="rcph gone" title="Фото удалено через 2 недели после выгрузки в Excel">—</span>`}</td>${show==="all"?`<td class="note">${esc(r.emp)}</td>`:""}
           <td><input type="date" data-f="date" value="${esc(r.date||"")}" ${ro}></td><td><input data-f="shop" value="${esc(r.shop||"")}" ${ro}></td>
           <td><input data-f="cat" list="rcCats" value="${esc(r.cat||"")}" ${ro} style="width:110px"></td><td class="n"><input data-f="amt" inputmode="numeric" value="${r.amt?Number(r.amt).toLocaleString("ru-RU"):""}" ${ro} style="width:100px;text-align:right"></td>
+          <td><select data-f="pay" ${ro} class="rcpay ${r.pay||"none"}" title="Определено по чеку; можно поправить"><option value="" ${!r.pay?"selected":""}>—</option><option value="card" ${r.pay==="card"?"selected":""}>💳 карта</option><option value="cash" ${r.pay==="cash"?"selected":""}>💵 наличные</option></select></td>
           <td><input data-f="note" value="${esc(r.note||"")}" ${ro} placeholder="—"></td><td><span class="rcs">${stT[st]||st}</span></td>
           <td>${r.exported||!canWrite?"":`<button type="button" class="ib danger" data-rcdel="${esc(r.id)}" title="Удалить чек" aria-label="Удалить">✕</button>`}</td></tr>`}).join("")}
       </tbody></table></section>`}).join(""):`<div class="note" style="padding:20px">Чеков пока нет. Выберите сотрудника и загрузите фото чеков — по одному чеку на фото.</div>`;
@@ -1901,7 +1909,7 @@ $("rcMasterIn").addEventListener("change",e=>{const f=e.target.files[0];e.target
 $("rcMasterBtn").onclick=()=>$("rcMasterIn").click();
 $("rcMasterDl").onclick=async()=>{const m=rcMaster();if(!m)return;const res=await fetch("/_blob/"+m.aid);const b=await res.blob();if(dl)dl.save({filename:m.name,data:b}).catch(()=>{});};
 $("rcExport").onclick=rcExport;
-$("rcAll").addEventListener("change",e=>{const i=e.target.closest("input[data-f]");if(!i)return;rcSave(i.closest("tr"),i.dataset.f,i.value).then(()=>{if(i.dataset.f==="date"||i.dataset.f==="amt")renderRc()})});
+$("rcAll").addEventListener("change",e=>{const i=e.target.closest("input[data-f],select[data-f]");if(!i)return;rcSave(i.closest("tr"),i.dataset.f,i.value).then(()=>{if(i.dataset.f==="date"||i.dataset.f==="amt"||i.dataset.f==="pay")renderRc()})});
 $("rcAll").addEventListener("click",async e=>{const ph=e.target.closest("[data-rcph]");if(ph){e.preventDefault();window.open(ph.querySelector("img").src,"_blank");return}
   const d=e.target.closest("[data-rcdel]");if(d){const id=d.dataset.rcdel;const r=rcRows[id];try{await db.collection("receipts").doc(id).delete();delete rcRows[id];if(r&&r.photo&&assets)assets.delete(r.photo).catch(()=>{});renderRc()}catch(err){}}});
 // photos of receipts already in the Excel file are deleted 2 weeks after the export (the rows stay; paper receipts are kept)
