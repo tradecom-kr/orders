@@ -1572,7 +1572,8 @@ function urg(o){if(o.arch)return 3e6;if(an(o).closed)return 2e6;
   const L=[o.loadAt,o.etd,o.eta].filter(Boolean).map(d=>Math.abs(days(d)));return L.length?Math.min(...L):1e6}
 let lOrd=load("lord","");  // "", "loadAt:1", "loadAt:-1", "etd:1", "etd:-1"
 function lSort(vis){if(lOrd){const [k,dir]=lOrd.split(":"), sg=+dir||1;
-    return vis.sort((x,y)=>(!!x.arch-!!y.arch)||(!x[k]-!y[k])||sg*String(x[k]||"").localeCompare(String(y[k]||"")))}
+    const fin=o=>o.arch?2:an(o).closed?1:0;
+    return vis.sort((x,y)=>fin(x)-fin(y)||(!x[k]-!y[k])||sg*String(x[k]||"").localeCompare(String(y[k]||"")))}
   const nn=o=>parseInt(String(o.num||"").replace(/\D+/g," ").trim().split(" ").pop())||0;
   vis.forEach(o=>o.__u=urg(o));
   return vis.sort((x,y)=>x.__u-y.__u||String(y.date||y.createdAt||"").localeCompare(String(x.date||x.createdAt||""))||nn(y)-nn(x))}
