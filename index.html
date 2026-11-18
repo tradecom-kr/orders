@@ -949,7 +949,7 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
           <label class="f wide"><span>Место загрузки</span><input id="e_loadPlace" list="placeNames" placeholder="склад и адрес — не заполнено"><datalist id="placeNames"></datalist></label>
           <label class="f"><span>ETD (выход судна)</span><input id="e_etd" type="date"></label>
           <label class="f"><span>ETA (прибытие) — если известно</span><input id="e_eta" type="date"></label>
-          <label class="f"><span>Судно / рейс</span><input id="e_vessel"></label>
+          <label class="f"><span>Судно / рейс</span><input id="e_vessel" placeholder="название или ссылка MarineTraffic"></label>
           <label class="f"><span>Линия / перевозчик</span><input id="e_carrier" placeholder="например, CK Line"><span id="e_trk" class="note"></span></label>
           <label class="f"><span>Тип контейнера</span><select id="e_contType"><option value="">—</option><option>20 Dry</option><option>40 Dry</option><option>40HC Dry</option><option>20 Reefer</option><option>40 Reefer</option><option>40HC Reefer</option></select></label>
           <label class="f"><span>Номер контейнера</span><input id="e_cont" placeholder="—"></label>
@@ -1432,14 +1432,22 @@ const trackOf=o=>{const c=String(o&&o.carrier||"")+" "+String(o&&o.vessel||""), 
 const clean=v=>String(v||"").replace(/[\/,;]+\s*$/,"").trim();
 const trackNo=o=>clean(o&&(o.bl||o.cont));
 // the link, plus the B/L and container numbers as buttons that copy themselves (the line's site wants the number typed in)
+// the ship on MarineTraffic: a pasted ship page (o.shipUrl) or a search by name without the voyage number («KAI HANG 5 2636N» → «KAI HANG 5»)
+const shipName=v=>String(v||"").trim().replace(/\s+(V\.?\s*)?\d{3,}[A-Z]{0,2}$/i,"").replace(/\s+V\.?$/i,"").trim();
+const mtName=u=>{const m=String(u||"").match(/vessel:([^/?#]+)/i);return m?decodeURIComponent(m[1]).replace(/_/g," ").trim():""};
+const isMT=u=>/^https?:\/\/(www\.)?marinetraffic\.com\//i.test(String(u||"").trim());
+// a MarineTraffic ship page pasted into «Судно / рейс»: the page is kept, the field gets the ship's name (the voyage stays if it was there)
+function shipPaste(v,prev){const u=String(v).trim(), n=mtName(u)||"";const keep=prev&&n&&shipName(prev).toUpperCase()===n.toUpperCase();return {vessel:keep?prev:n,shipUrl:u.replace(/^http:/,"https:")}}
+const shipUrl=o=>{if(o&&isMT(o.shipUrl)&&(!o.vessel||!mtName(o.shipUrl)||shipName(o.vessel).toUpperCase()===mtName(o.shipUrl).toUpperCase()))return o.shipUrl;const n=shipName(o&&o.vessel);return n?"https://www.marinetraffic.com/en/ais/index/search/all/keyword:"+encodeURIComponent(n):""};
 function trackA(o,cls){o=o||{};const t=trackOf(o), n=docNos(o);
   // numbers from the order's fields; if empty there — the ones read from its papers
   const bl=clean(o&&o.bl)||n.bl[0]||"", ct=clean(o&&o.cont)||n.cont[0]||"", fromDoc=v=>v&&!(clean(o.bl)===v||clean(o.cont)===v);
-  if(!t&&!bl&&!ct)return "";
+  const su=shipUrl(o), sa=su?`<a class="trk" href="${esc(su)}" target="_blank" rel="noopener" title="Где сейчас судно ${esc(shipName(o.vessel)||"")} — MarineTraffic">🚢 Судно на карте ↗</a>`:"";
+  if(!t&&!bl&&!ct)return sa?`<span class="trkw ${cls||""}">${sa}</span>`:"";
   const cp=(lbl,v)=>`<button type="button" class="trkno" data-copy="${esc(v)}" title="Скопировать ${lbl} ${esc(v)}${fromDoc(v)?" (найден в документах)":""}">${lbl} <b>${esc(v)}</b> ⧉</button>`;
   const more=n.cont.filter(c=>c!==ct).slice(0,3).map(c=>cp("конт.",c)).join("");
   return `<span class="trkw ${cls||""}">${t?`<a class="trk" href="${t.url}" target="_blank" rel="noopener" data-trkno="${esc(bl||ct)}" title="Открыть отслеживание ${esc(t.name)}${bl||ct?" — номер "+esc(bl||ct)+" скопируется":""}">📍 Отследить на ${esc(t.name)} ↗</a>`:`<span class="trkno none" title="Впишите линию в «Линия / перевозчик», чтобы появилась ссылка на отслеживание">📍 линия не указана</span>`}`
-    +(bl?cp("B/L",bl):`<span class="trkno none" title="Впишите номер коносамента: «Открыть весь заказ» → «График и загрузка» → «Коносамент №», или загрузите коносамент — номер найдётся сам">B/L — не указан</span>`)+(ct?cp("конт.",ct):"")+more+(fromDoc(bl)||fromDoc(ct)?`<span class="note">· из документов</span>`:"")+`</span>`}
+    +(bl?cp("B/L",bl):`<span class="trkno none" title="Впишите номер коносамента: «Открыть весь заказ» → «График и загрузка» → «Коносамент №», или загрузите коносамент — номер найдётся сам">B/L — не указан</span>`)+(ct?cp("конт.",ct):"")+more+(fromDoc(bl)||fromDoc(ct)?`<span class="note">· из документов</span>`:"")+sa+`</span>`}
 // read container / B/L numbers from the papers that carry them, once per file; the result is kept with the file
 const NOS_KINDS=["bl","bldraft","freight","exp","ipl","impdecl","brokinv","cert","other","dt"], nosBusy=new Set();
 async function scanNos(o){if(!o||!db||!canWrite||nosBusy.has(o.id))return;
@@ -1455,7 +1463,8 @@ document.addEventListener("click",async e=>{const b=e.target.closest("button.trk
   try{await navigator.clipboard.writeText(b.dataset.copy)}catch(err){const t=document.createElement("textarea");t.value=b.dataset.copy;document.body.appendChild(t);t.select();document.execCommand("copy");t.remove()}
   const h=b.innerHTML;b.classList.add("done");b.textContent="Скопировано ✓";setTimeout(()=>{b.innerHTML=h;b.classList.remove("done")},1400)},true);
 // order editor: the tracking link appears under «Линия» as soon as the line is known
-function paintTrk(){const el=$("e_trk");if(!el)return;const o={carrier:$("e_carrier").value,vessel:$("e_vessel").value,cont:$("e_cont").value,bl:$("e_bl").value,files:editing&&editing.files};el.innerHTML=trackA(o,"in")}
+function paintTrk(){const el=$("e_trk");if(!el)return;const o={carrier:$("e_carrier").value,vessel:$("e_vessel").value,cont:$("e_cont").value,bl:$("e_bl").value,files:editing&&editing.files,shipUrl:editing&&editing.shipUrl};el.innerHTML=trackA(o,"in")}
+$("e_vessel").addEventListener("input",e=>{const i=e.target;if(isMT(i.value)&&editing){const r=shipPaste(i.value,editing.vessel);editing.shipUrl=r.shipUrl;i.value=r.vessel}});
 ["e_carrier","e_vessel","e_cont","e_bl"].forEach(id=>$(id)&&$(id).addEventListener("input",paintTrk));
 {const _oe2=openEditor;openEditor=function(){const r=_oe2.apply(this,arguments);paintTrk();return r};}
 
@@ -1468,7 +1477,7 @@ function qdOpen(btn){
     <label>Загрузка<input type="date" data-k="loadAt" value="${esc(o.loadAt||"")}"></label>
     <label>Выход судна (ETD)<input type="date" data-k="etd" value="${esc(o.etd||"")}"></label>
     <label>Прибытие (ETA)<input type="date" data-k="eta" value="${esc(o.eta||"")}"></label>
-    <label>Судно / рейс<input data-k="vessel" value="${esc(o.vessel||"")}" placeholder="—"></label>
+    <label>Судно / рейс<input data-k="vessel" value="${esc(o.vessel||"")}" placeholder="название или ссылка MarineTraffic"></label>
     <div class="qdb"><button type="button" class="btn primary" data-qsave>Сохранить</button><button type="button" class="btn ghost" data-qx>Отмена</button></div>
     <small class="note" id="qdNote">Прежняя дата будет видна на плитке как «было …» ещё 2 недели.</small>`;
   document.body.appendChild(pop);
@@ -1478,6 +1487,7 @@ function qdOpen(btn){
   pop.querySelector("[data-qx]").onclick=qdClose;
   pop.querySelector("[data-qsave]").onclick=async()=>{
     const patch={},now=new Date().toISOString();
+    {const vi=pop.querySelector('[data-k="vessel"]');if(vi&&isMT(vi.value)){const r=shipPaste(vi.value,o.vessel);vi.value=r.vessel;patch.shipUrl=r.shipUrl}}
     pop.querySelectorAll("[data-k]").forEach(i=>{const k=i.dataset.k,v=i.value.trim();if((o[k]||"")!==v){patch[k]=v;if(k!=="vessel"&&o[k]){patch[k+"Was"]=o[k];patch[k+"MovedAt"]=now}}});
     if(!Object.keys(patch).length){qdClose();return}
     patch.updatedAt=now;
