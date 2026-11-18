@@ -1438,7 +1438,13 @@ const mtName=u=>{const m=String(u||"").match(/vessel:([^/?#]+)/i);return m?decod
 const isMT=u=>/^https?:\/\/(www\.)?marinetraffic\.com\//i.test(String(u||"").trim());
 // a MarineTraffic ship page pasted into «Судно / рейс»: the page is kept, the field gets the ship's name (the voyage stays if it was there)
 function shipPaste(v,prev){const u=String(v).trim(), n=mtName(u)||"";const keep=prev&&n&&shipName(prev).toUpperCase()===n.toUpperCase();return {vessel:keep?prev:n,shipUrl:u.replace(/^http:/,"https:")}}
-const shipUrl=o=>{if(o&&isMT(o.shipUrl)&&(!o.vessel||!mtName(o.shipUrl)||shipName(o.vessel).toUpperCase()===mtName(o.shipUrl).toUpperCase()))return o.shipUrl;const n=shipName(o&&o.vessel);return n?"https://www.vesselfinder.com/vessels?name="+encodeURIComponent(n).replace(/%20/g,"+"):""};
+// ship pages already known: from this list and from any order where a MarineTraffic page was pasted for a ship of the same name
+const SHIPS={"XIANG YUAN HE RUN":"https://www.marinetraffic.com/en/ais/details/ships/shipid:9021763/mmsi:352004459/imo:1077488/vessel:XIANG_YUAN_HE_RUN",
+  "KAI HANG 5":"https://www.marinetraffic.com/en/ais/details/ships/shipid:7892278/mmsi:352002882/imo:1016628/vessel:KAI_HANG_5"};
+const knownShip=n=>{const k=String(n||"").toUpperCase();if(!k)return "";if(SHIPS[k])return SHIPS[k];
+  const f=(typeof orders!=="undefined"?orders:[]).find(x=>isMT(x.shipUrl)&&mtName(x.shipUrl).toUpperCase()===k);return f?f.shipUrl:""};
+const shipUrl=o=>{if(o&&isMT(o.shipUrl)&&(!o.vessel||!mtName(o.shipUrl)||shipName(o.vessel).toUpperCase()===mtName(o.shipUrl).toUpperCase()))return o.shipUrl;
+  {const k=knownShip(shipName(o&&o.vessel));if(k)return k}const n=shipName(o&&o.vessel);return n?"https://www.vesselfinder.com/vessels?name="+encodeURIComponent(n).replace(/%20/g,"+"):""};
 function trackA(o,cls){o=o||{};const t=trackOf(o), n=docNos(o);
   // numbers from the order's fields; if empty there — the ones read from its papers
   const bl=clean(o&&o.bl)||n.bl[0]||"", ct=clean(o&&o.cont)||n.cont[0]||"", fromDoc=v=>v&&!(clean(o.bl)===v||clean(o.cont)===v);
