@@ -455,8 +455,14 @@ textarea{min-height:70px;resize:vertical}
 .kcol{display:flex;flex-direction:column;gap:3px;min-width:0}
 .kwho{font:600 12px var(--f-body);color:var(--ink);max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kwho.none{color:var(--muted);font-weight:400}
-.kds .kar{align-self:flex-end;margin-bottom:14px}
+/* date tiles: one fixed size whatever is under or inside them («было», tracking links) */
+.kds{align-items:flex-start!important;align-self:flex-start!important}
+.kds .kdb{width:168px;min-width:0;height:76px;box-sizing:border-box;justify-content:flex-start;overflow:hidden}
+.kds .kdb .kwas{line-height:1.2}.kds .kdb .kl{white-space:nowrap}
+.kds .kwho{height:16px;line-height:16px}
+.kds .kar{align-self:flex-start;margin-top:44px}
 @media (max-width:640px){.kcol{flex:1}.kwho{max-width:none}}
+@media (max-width:640px){.kds .kdb{width:auto}}
 
 /* what we owe suppliers */
 .supdue{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin-bottom:12px;overflow:hidden}
