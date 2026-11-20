@@ -836,6 +836,11 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
 .tdl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .tdl li{display:flex;align-items:center;gap:10px;padding:5px 2px;border-bottom:1px solid var(--soft);font-size:14px}
 .tdl li:last-child{border-bottom:0}
+.tdgrip{flex:0 0 14px;color:color-mix(in srgb,var(--muted) 55%,transparent);cursor:grab;user-select:none;touch-action:none;font-size:13px;letter-spacing:-3px;line-height:1}.tdgrip.off{cursor:default}
+.tdl li:hover .tdgrip:not(.off){color:var(--muted)}
+.tdl li.drag{background:var(--accent-soft);box-shadow:0 2px 8px rgba(0,0,0,.12);position:relative;z-index:1}.tdl li.drag .tdgrip{cursor:grabbing}
+.tdl li.pin{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
+.tdpin{border:0;background:none;cursor:pointer;font-size:13px;padding:2px 3px;filter:grayscale(1);opacity:.35}.tdpin:hover{opacity:.8}.tdpin.on{filter:none;opacity:1}
 .tdc{display:flex;align-items:flex-start;gap:8px;flex:1;min-width:0;cursor:pointer}.tdc input{margin-top:3px;flex:0 0 auto}.tdt{color:var(--ink);overflow-wrap:anywhere}
 .tdl li.done .tdt{text-decoration:line-through;color:var(--muted)}
 .tdm{display:flex;align-items:center;gap:6px;flex:0 0 auto}
@@ -1825,12 +1830,13 @@ function renderTodo(){const box=$("todo");if(!box)return;
   // «только мои»: addressed to me, or written by me for nobody in particular
   const mine=r=>!tdMine||r.who===me||(!r.who&&r.by===me);
   const ord=(a,b)=>String(a.day||"").localeCompare(String(b.day||""))||String(a.at||"").localeCompare(String(b.at||""));
-  const sh=[...open.filter(mine).sort(ord),...done.filter(mine).sort((a,b)=>String(a.doneAt).localeCompare(String(b.doneAt)))], lt=later.filter(mine).sort(ord);
+  const pord=(a,b)=>(b.pin?1:0)-(a.pin?1:0)||(a.ord??1e15)-(b.ord??1e15)||ord(a,b);
+  const sh=[...open.filter(mine).sort(pord),...done.filter(mine).sort((a,b)=>String(a.doneAt).localeCompare(String(b.doneAt)))], lt=later.filter(mine).sort(ord);
   const nOpen=open.filter(mine).length, nDone=done.filter(mine).length;
   const d=new Date();const wd=["вс","пн","вт","ср","чт","пт","сб"][d.getDay()];
   const item=r=>{const o=r.oid&&orders.find(x=>x.id===r.oid), carried=!r.done&&r.day&&r.day<t;
-    return `<li class="${r.done?"done":""} ${carried?"carried":""}"><label class="tdc"><input type="checkbox" data-tddone="${esc(r.id)}" ${r.done?"checked":""} ${canWrite?"":"disabled"}><span class="tdt">${esc(r.text)}</span></label>
-      <span class="tdm">${o?`<button type="button" class="tdo" data-tdord="${esc(o.id)}" title="Открыть заказ">${esc(o.num||"заказ")}</button>`:""}${canWrite?`<select class="tdwho ${r.who?"on":""}" data-tdwho="${esc(r.id)}" title="Ответственный" aria-label="Ответственный"><option value="">всем</option>${[...new Set(tdPeople().concat(r.who?[r.who]:[]))].map(e=>`<option value="${esc(e)}" ${r.who===e?"selected":""}>${esc(tdShort(e))}</option>`).join("")}</select>`:r.who?`<span class="tdw" title="${esc(r.who)}">${esc(tdShort(r.who))}</span>`:""}${carried?`<span class="tdcar" title="Не сделано в тот день — перенесено">с ${mdd(r.day)}</span>`:""}${r.done&&r.doneBy?`<span class="tdby">✓ ${esc(tdShort(r.doneBy))}</span>`:""}${canWrite?`<button type="button" class="lun" data-tddel="${esc(r.id)}" title="Удалить задание">✕</button>`:""}</span></li>`};
+    return `<li data-id="${esc(r.id)}" class="${r.done?"done":""} ${carried?"carried":""} ${r.pin&&!r.done?"pin":""}">${!r.done&&canWrite?`<span class="tdgrip" data-tdgrip title="Перетащите вверх или вниз, чтобы поменять очередь" aria-hidden="true">⋮⋮</span>`:`<span class="tdgrip off" aria-hidden="true"></span>`}<label class="tdc"><input type="checkbox" data-tddone="${esc(r.id)}" ${r.done?"checked":""} ${canWrite?"":"disabled"}><span class="tdt">${esc(r.text)}</span></label>
+      <span class="tdm">${o?`<button type="button" class="tdo" data-tdord="${esc(o.id)}" title="Открыть заказ">${esc(o.num||"заказ")}</button>`:""}${canWrite?`<select class="tdwho ${r.who?"on":""}" data-tdwho="${esc(r.id)}" title="Ответственный" aria-label="Ответственный"><option value="">всем</option>${[...new Set(tdPeople().concat(r.who?[r.who]:[]))].map(e=>`<option value="${esc(e)}" ${r.who===e?"selected":""}>${esc(tdShort(e))}</option>`).join("")}</select>`:r.who?`<span class="tdw" title="${esc(r.who)}">${esc(tdShort(r.who))}</span>`:""}${carried?`<span class="tdcar" title="Не сделано в тот день — перенесено">с ${mdd(r.day)}</span>`:""}${r.done&&r.doneBy?`<span class="tdby">✓ ${esc(tdShort(r.doneBy))}</span>`:""}${canWrite&&!r.done?`<button type="button" class="tdpin ${r.pin?"on":""}" data-tdpin="${esc(r.id)}" title="${r.pin?"Открепить":"Закрепить сверху"}" aria-pressed="${!!r.pin}">📌</button>`:""}${canWrite?`<button type="button" class="lun" data-tddel="${esc(r.id)}" title="Удалить задание">✕</button>`:""}</span></li>`};
   const ppl=tdPeople(), oo=orders.filter(o=>!o.arch&&!an(o).closed).sort((a,b)=>String(a.num||"").localeCompare(String(b.num||""),"ru"));
   box.innerHTML=`<header class="tdh"><button type="button" class="tdfold" data-tdfold aria-expanded="${!tdFold}" title="${tdFold?"Развернуть":"Свернуть"}">${tdFold?"▸":"▾"}</button><h2>Задачи и планы <span>${wd} ${mdd(t)}</span></h2><span class="tdcnt">${nOpen?`осталось ${nOpen}`:"всё сделано"}${nDone?` · сделано ${nDone}`:""}</span><span class="sp"></span><label class="tdmine" title="Задачи, назначенные вам, и ваши задачи без адресата"><input type="checkbox" data-tdmine ${tdMine?"checked":""}> только мои</label></header>
   ${tdFold?"":`
@@ -1853,11 +1859,26 @@ $("todo").addEventListener("change",async e=>{const t=e.target;
 $("todo").addEventListener("click",async e=>{const t=e.target;
   if(t.closest("[data-tdfold]")){tdFold=!tdFold;save("tdfold",tdFold?"1":"0");renderTodo();return}
   const o=t.closest("[data-tdord]");if(o){view="list";save("view",view);lSel=o.dataset.tdord;save("lsel",lSel);render();document.body.classList.add("lp-open");return}
+  const pn=t.closest("[data-tdpin]");if(pn&&db&&canWrite){const id=pn.dataset.tdpin, patch={pin:!tdRows[id].pin};Object.assign(tdRows[id],patch);renderTodo();
+    try{await db.collection("tasks").doc(id).update(patch)}catch(err){showStatus("Не сохранилось ("+(err&&err.code||"ошибка")+").",true)}return}
   const dl=t.closest("[data-tddel]");if(dl&&db&&canWrite){const id=dl.dataset.tddel;const keep=tdRows[id];delete tdRows[id];renderTodo();
     try{await db.collection("tasks").doc(id).delete()}catch(err){tdRows[id]=keep;renderTodo();showStatus("Не удалилось ("+(err&&err.code||"ошибка")+").",true)}}});
+let tdDrag=null;
+$("todo").addEventListener("pointerdown",e=>{const g=e.target.closest("[data-tdgrip]");if(!g||!canWrite)return;const li=g.closest("li");if(!li)return;
+  e.preventDefault();try{g.setPointerCapture(e.pointerId)}catch(_){}tdDrag={li,ul:li.parentNode,moved:false};li.classList.add("drag")});
+$("todo").addEventListener("pointermove",e=>{if(!tdDrag)return;const {li,ul}=tdDrag, y=e.clientY;
+  const L=[...ul.querySelectorAll("li[data-id]:not(.done)")].filter(x=>x!==li);
+  const before=L.find(x=>{const r=x.getBoundingClientRect();return y<r.top+r.height/2});
+  if(before){if(li.nextSibling!==before){ul.insertBefore(li,before);tdDrag.moved=true}}
+  else if(L.length){const last=L[L.length-1];if(last.nextSibling!==li){ul.insertBefore(li,last.nextSibling);tdDrag.moved=true}}});
+const tdDrop=async()=>{if(!tdDrag)return;const {li,ul,moved}=tdDrag;tdDrag=null;li.classList.remove("drag");if(!moved)return;
+  const ids=[...ul.querySelectorAll("li[data-id]:not(.done)")].map(x=>x.dataset.id), ch=[];
+  ids.forEach((id,i)=>{if(tdRows[id]&&tdRows[id].ord!==i){tdRows[id].ord=i;ch.push([id,i])}});renderTodo();
+  for(const [id,i] of ch){try{await db.collection("tasks").doc(id).update({ord:i})}catch(err){showStatus("Порядок не сохранился ("+(err&&err.code||"ошибка")+").",true);break}}};
+$("todo").addEventListener("pointerup",tdDrop);$("todo").addEventListener("pointercancel",tdDrop);
 (function waitTd(){if(!db){setTimeout(waitTd,500);return}if(typeof users==="undefined"){setTimeout(waitTd,200);return}
   db.collection("tasks").onSnapshot(s=>{tdRows={};s.docs.filter(x=>x.exists).forEach(x=>tdRows[x.id]=x.data());
-    if(!document.activeElement||!document.activeElement.closest||!document.activeElement.closest("#tdForm"))renderTodo()},()=>{});
+    if(!tdDrag&&(!document.activeElement||!document.activeElement.closest||!document.activeElement.closest("#tdForm")))renderTodo()},()=>{});
   // done tasks older than 30 days are removed, so the list does not grow forever
   setTimeout(()=>{const lim=new Date(Date.now()-30*86400000).toISOString();Object.entries(tdRows).forEach(([id,r])=>{if(r.done&&r.doneAt&&r.doneAt<lim&&canWrite)Promise.resolve(db.collection("tasks").doc(id).delete()).catch(()=>{})})},8000);
 })();
