@@ -826,11 +826,31 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
 .flph ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}.flph li{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .fladd{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.fladd input{flex:1 1 200px;width:auto}.fladd select{width:auto;max-width:230px}
 .rcpay{width:auto;padding:3px 6px;font-size:12.5px}.rcpay.cash{color:var(--warn);font-weight:600}.rcpay.card{color:var(--accent)}.rcpay.none{color:var(--muted)}
+/* «Задания на сегодня» */
+.todo{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--r);padding:10px 14px;display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.tdh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.tdh h2{margin:0;font:600 16px var(--f-display);color:var(--ink)}.tdh h2 span{color:var(--muted);font-weight:500;margin-left:4px}.tdh .sp{flex:1}
+.tdfold{border:0;background:none;cursor:pointer;color:var(--muted);font-size:14px;padding:2px 4px}
+.tdcnt{font-size:12.5px;color:var(--muted)}.tdmine{font-size:12.5px;color:var(--muted);display:inline-flex;gap:5px;align-items:center;cursor:pointer}
+.tdf{display:flex;gap:6px;flex-wrap:wrap}.tdf #tdText{flex:1 1 280px;width:auto}.tdf select,.tdf input[type=date]{width:auto;max-width:170px}
+.todo input[type=checkbox]{width:16px;height:16px;min-height:0;padding:0;margin:0;flex:0 0 16px}.tdmine{white-space:nowrap}
+.tdl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.tdl li{display:flex;align-items:center;gap:10px;padding:5px 2px;border-bottom:1px solid var(--soft);font-size:14px}
+.tdl li:last-child{border-bottom:0}
+.tdc{display:flex;align-items:flex-start;gap:8px;flex:1;min-width:0;cursor:pointer}.tdc input{margin-top:3px;flex:0 0 auto}.tdt{color:var(--ink);overflow-wrap:anywhere}
+.tdl li.done .tdt{text-decoration:line-through;color:var(--muted)}
+.tdm{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.tdo{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:1px 8px;font:600 12px var(--f-body);color:var(--accent);cursor:pointer}.tdo:hover{border-color:var(--accent)}
+.tdw{font:600 11.5px var(--f-body);background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:1px 8px}
+.tdcar{font:600 11.5px var(--f-mono);color:var(--warn)}.tdby{font-size:11.5px;color:var(--ok)}
+.tdempty{color:var(--muted);font-size:13px}
+.tdlater summary{cursor:pointer;font-size:12.5px;color:var(--muted);padding:2px 0}.tdlater .tdl li{opacity:.8}
+@media (max-width:640px){.tdl li{flex-wrap:wrap}.tdm{margin-left:24px}}
 </style>
 
 </head>
 <body>
 <div class="page">
+  <section id="todo" class="todo" aria-label="Задания на сегодня"></section>
   <header class="top">
     <div>
       <h1>Заказы и отгрузки</h1>
@@ -1748,6 +1768,52 @@ async function flowClick(e){const b=e.target.closest("button");if(!b)return;cons
 }
 const flowStepsAll=o=>[...new Set([...libOf(o).flatMap(p=>p.steps),...phasesOf(o).flatMap(p=>p.steps)])].filter(id=>STEP[id]);
 $("flowBtn").onclick=()=>{if(!editing)return;const o=formOrder();o.flow=editing.flow;o.skip=editing.skip;flowOpen(o,true)};
+/* ---------- «Задания на сегодня»: a shared to-do list at the very top; unfinished tasks carry over to the next day ---------- */
+let tdRows={}, tdMine=load("tdmine","0")==="1", tdFold=load("tdfold","0")==="1";
+const tdShort=e=>String(e||"").split("@")[0];
+function tdPeople(){return [...new Set(Object.values(users).map(u=>String(u&&u.email||"").toLowerCase()).filter(e=>e.includes("@")).concat(meEmail().includes("@")?[meEmail()]:[]))].sort()}
+function renderTodo(){const box=$("todo");if(!box)return;
+  const t=isoToday(), me=meEmail();
+  const L=Object.entries(tdRows).map(([id,r])=>({id,...r})).filter(r=>r&&r.text&&!r.gone);
+  const open=L.filter(r=>!r.done&&(r.day||t)<=t), done=L.filter(r=>r.done&&String(r.doneAt||"").slice(0,10)===t), later=L.filter(r=>!r.done&&(r.day||t)>t);
+  const mine=r=>!tdMine||!r.who||r.who===me||r.by===me;
+  const ord=(a,b)=>String(a.day||"").localeCompare(String(b.day||""))||String(a.at||"").localeCompare(String(b.at||""));
+  const sh=[...open.filter(mine).sort(ord),...done.filter(mine).sort((a,b)=>String(a.doneAt).localeCompare(String(b.doneAt)))], lt=later.filter(mine).sort(ord);
+  const nOpen=open.filter(mine).length, nDone=done.filter(mine).length;
+  const d=new Date();const wd=["вс","пн","вт","ср","чт","пт","сб"][d.getDay()];
+  const item=r=>{const o=r.oid&&orders.find(x=>x.id===r.oid), carried=!r.done&&r.day&&r.day<t;
+    return `<li class="${r.done?"done":""} ${carried?"carried":""}"><label class="tdc"><input type="checkbox" data-tddone="${esc(r.id)}" ${r.done?"checked":""} ${canWrite?"":"disabled"}><span class="tdt">${esc(r.text)}</span></label>
+      <span class="tdm">${o?`<button type="button" class="tdo" data-tdord="${esc(o.id)}" title="Открыть заказ">${esc(o.num||"заказ")}</button>`:""}${r.who?`<span class="tdw" title="${esc(r.who)}">${esc(tdShort(r.who))}</span>`:""}${carried?`<span class="tdcar" title="Не сделано в тот день — перенесено">с ${mdd(r.day)}</span>`:""}${r.done&&r.doneBy?`<span class="tdby">✓ ${esc(tdShort(r.doneBy))}</span>`:""}${canWrite?`<button type="button" class="lun" data-tddel="${esc(r.id)}" title="Удалить задание">✕</button>`:""}</span></li>`};
+  const ppl=tdPeople(), oo=orders.filter(o=>!o.arch&&!an(o).closed).sort((a,b)=>String(a.num||"").localeCompare(String(b.num||""),"ru"));
+  box.innerHTML=`<header class="tdh"><button type="button" class="tdfold" data-tdfold aria-expanded="${!tdFold}" title="${tdFold?"Развернуть":"Свернуть"}">${tdFold?"▸":"▾"}</button><h2>Задания на сегодня <span>${wd} ${mdd(t)}</span></h2><span class="tdcnt">${nOpen?`осталось ${nOpen}`:"всё сделано"}${nDone?` · сделано ${nDone}`:""}</span><span class="sp"></span><label class="tdmine"><input type="checkbox" data-tdmine ${tdMine?"checked":""}> только мои</label></header>
+  ${tdFold?"":`${canWrite?`<form class="tdf" id="tdForm" autocomplete="off"><input id="tdText" placeholder="Новое задание, например «Отправить инвойс М-36 покупателю»" aria-label="Новое задание" maxlength="300"><select id="tdWho" aria-label="Кому"><option value="">кому: всем</option>${ppl.map(e=>`<option value="${esc(e)}">${esc(tdShort(e))}${e===me?" (я)":""}</option>`).join("")}</select><select id="tdOrd" aria-label="Заказ"><option value="">без заказа</option>${oo.map(o=>`<option value="${esc(o.id)}">${esc(o.num||"без номера")}</option>`).join("")}</select><input type="date" id="tdDay" value="${t}" aria-label="На какой день" title="На какой день"><button class="btn primary sm" type="submit">Добавить</button></form>`:""}
+  <ul class="tdl">${sh.map(item).join("")||`<li class="tdempty">На сегодня заданий нет.</li>`}</ul>
+  ${lt.length?`<details class="tdlater"><summary>Запланировано на следующие дни: ${lt.length}</summary><ul class="tdl">${lt.map(r=>item(r).replace('<span class="tdm">',`<span class="tdm"><span class="tdcar">${mdd(r.day)}</span>`)).join("")}</ul></details>`:""}`}`;
+}
+$("todo").addEventListener("submit",async e=>{if(e.target.id!=="tdForm")return;e.preventDefault();if(!db||!canWrite)return;
+  const i=$("tdText"), text=i.value.trim();if(!text){i.focus();return}
+  const id="t"+Date.now().toString(36)+Math.random().toString(36).slice(2,6), rec={text,day:$("tdDay").value||isoToday(),who:$("tdWho").value,oid:$("tdOrd").value,by:meEmail(),at:new Date().toISOString(),done:false};
+  tdRows[id]=rec;renderTodo();$("tdText")&&$("tdText").focus();
+  try{await db.collection("tasks").doc(id).set(rec)}catch(err){delete tdRows[id];renderTodo();showStatus("Задание не сохранилось ("+(err&&err.code||"ошибка")+").",true)}});
+$("todo").addEventListener("change",async e=>{const t=e.target;
+  if("tdmine" in t.dataset){tdMine=t.checked;save("tdmine",tdMine?"1":"0");renderTodo();return}
+  const id=t.dataset.tddone;if(!id||!db||!canWrite)return;
+  const patch=t.checked?{done:true,doneAt:new Date().toISOString(),doneBy:meEmail()}:{done:false,doneAt:"",doneBy:""};
+  Object.assign(tdRows[id],patch);renderTodo();
+  try{await db.collection("tasks").doc(id).update(patch)}catch(err){showStatus("Не сохранилось ("+(err&&err.code||"ошибка")+").",true)}});
+$("todo").addEventListener("click",async e=>{const t=e.target;
+  if(t.closest("[data-tdfold]")){tdFold=!tdFold;save("tdfold",tdFold?"1":"0");renderTodo();return}
+  const o=t.closest("[data-tdord]");if(o){view="list";save("view",view);lSel=o.dataset.tdord;save("lsel",lSel);render();document.body.classList.add("lp-open");return}
+  const dl=t.closest("[data-tddel]");if(dl&&db&&canWrite){const id=dl.dataset.tddel;const keep=tdRows[id];delete tdRows[id];renderTodo();
+    try{await db.collection("tasks").doc(id).delete()}catch(err){tdRows[id]=keep;renderTodo();showStatus("Не удалилось ("+(err&&err.code||"ошибка")+").",true)}}});
+(function waitTd(){if(!db){setTimeout(waitTd,500);return}if(typeof users==="undefined"){setTimeout(waitTd,200);return}
+  db.collection("tasks").onSnapshot(s=>{tdRows={};s.docs.filter(x=>x.exists).forEach(x=>tdRows[x.id]=x.data());
+    if(!document.activeElement||!document.activeElement.closest||!document.activeElement.closest("#tdForm"))renderTodo()},()=>{});
+  // done tasks older than 30 days are removed, so the list does not grow forever
+  setTimeout(()=>{const lim=new Date(Date.now()-30*86400000).toISOString();Object.entries(tdRows).forEach(([id,r])=>{if(r.done&&r.doneAt&&r.doneAt<lim&&canWrite)Promise.resolve(db.collection("tasks").doc(id).delete()).catch(()=>{})})},8000);
+})();
+setInterval(()=>{if(!document.activeElement||!document.activeElement.closest||!document.activeElement.closest("#tdForm"))renderTodo()},60000);
+setTimeout(renderTodo,0);
 
 /* ---------- «Квитанции»: weekly expense receipts by photo → rows added to the shared Excel file ---------- */
 let rcRows={}, rcMeta={}, rcEmp="", rcWho="", rcBusy=false, rcHist={};
