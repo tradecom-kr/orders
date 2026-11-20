@@ -865,7 +865,7 @@ header.top>div:last-child{align-items:center;gap:6px}
 .tdf #tdText,.tdf select,.tdf input[type=date],.tdf .btn{height:32px;font-size:13px}
 /* toolbar: views first, filters after; Excel / fold only on the cards view */
 .bar .seg{order:-1}.bar #q{flex:1 1 260px}
-body:not([data-view="over"]) #foldAll,body:not([data-view="over"]) #xlsBtn{display:none}
+body:not([data-tab="over"]) #foldAll,body:not([data-tab="over"]) #xlsBtn{display:none}
 .bar .chk{font-size:12.5px;color:var(--muted)}
 /* week strip: lighter */
 .wk{background:none;border:0;padding:0 2px}.wk h2{font-size:14px}
@@ -2144,7 +2144,7 @@ function renderUpcoming(vis){
     ||`<span class="note">На ближайшие две недели сроков нет. Даты берутся из заказов: оплата, поставщики, загрузка, ETD и ETA.</span>`)
     +(items.length>shown.length?`<span class="note">и ещё ${items.length-shown.length}</span>`:"");
 }
-function render(){document.body.dataset.view=view;
+function render(){document.body.dataset.tab=view;
   fillBuyerFilter();
   renderKpis();
   [["vList","list"],["vOver","over"],["vTime","time"],["vDocs","docs"],["vRc","rc"]].forEach(([b,v])=>$(b).setAttribute("aria-pressed",view===v));
