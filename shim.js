@@ -14,7 +14,7 @@
   /* ---------- sign-in gate ---------- */
   const gate = document.createElement("div");
   gate.id = "tcGate";
-  gate.innerHTML = `<div class="gbox"><h1>Заказы и отгрузки TRADECOM</h1><p id="gMsg">Проверяю вход…</p>
+  gate.innerHTML = `<div class="gbox"><h1>Рабочая панель TRADECOM</h1><p id="gMsg">Проверяю вход…</p>
     <form id="gPw" hidden>
       <input type="email" id="gEmail" name="username" autocomplete="username" required placeholder="Почта" aria-label="Почта">
       <input type="password" id="gPass" name="password" autocomplete="current-password" required minlength="6" placeholder="Пароль" aria-label="Пароль">
