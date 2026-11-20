@@ -841,6 +841,7 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
 .tdm{display:flex;align-items:center;gap:6px;flex:0 0 auto}
 .tdo{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:1px 8px;font:600 12px var(--f-body);color:var(--accent);cursor:pointer}.tdo:hover{border-color:var(--accent)}
 .tdw{font:600 11.5px var(--f-body);background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:1px 8px}
+.tdwho{width:auto;height:26px;padding:0 22px 0 8px;font:600 12px var(--f-body);border-radius:999px;border:1px solid var(--line);background-color:var(--panel);color:var(--muted);cursor:pointer}.tdwho.on{background-color:var(--accent-soft);color:var(--accent);border-color:transparent}
 .tdcar{font:600 11.5px var(--f-mono);color:var(--warn)}.tdby{font-size:11.5px;color:var(--ok)}
 .tdempty{color:var(--muted);font-size:13px}
 .tdlater summary{cursor:pointer;font-size:12.5px;color:var(--muted);padding:2px 0}.tdlater .tdl li{opacity:.8}
@@ -1830,7 +1831,7 @@ function renderTodo(){const box=$("todo");if(!box)return;
   const d=new Date();const wd=["вс","пн","вт","ср","чт","пт","сб"][d.getDay()];
   const item=r=>{const o=r.oid&&orders.find(x=>x.id===r.oid), carried=!r.done&&r.day&&r.day<t;
     return `<li class="${r.done?"done":""} ${carried?"carried":""}"><label class="tdc"><input type="checkbox" data-tddone="${esc(r.id)}" ${r.done?"checked":""} ${canWrite?"":"disabled"}><span class="tdt">${esc(r.text)}</span></label>
-      <span class="tdm">${o?`<button type="button" class="tdo" data-tdord="${esc(o.id)}" title="Открыть заказ">${esc(o.num||"заказ")}</button>`:""}${r.who?`<span class="tdw" title="${esc(r.who)}">${esc(tdShort(r.who))}</span>`:""}${carried?`<span class="tdcar" title="Не сделано в тот день — перенесено">с ${mdd(r.day)}</span>`:""}${r.done&&r.doneBy?`<span class="tdby">✓ ${esc(tdShort(r.doneBy))}</span>`:""}${canWrite?`<button type="button" class="lun" data-tddel="${esc(r.id)}" title="Удалить задание">✕</button>`:""}</span></li>`};
+      <span class="tdm">${o?`<button type="button" class="tdo" data-tdord="${esc(o.id)}" title="Открыть заказ">${esc(o.num||"заказ")}</button>`:""}${canWrite?`<select class="tdwho ${r.who?"on":""}" data-tdwho="${esc(r.id)}" title="Ответственный" aria-label="Ответственный"><option value="">всем</option>${[...new Set(tdPeople().concat(r.who?[r.who]:[]))].map(e=>`<option value="${esc(e)}" ${r.who===e?"selected":""}>${esc(tdShort(e))}</option>`).join("")}</select>`:r.who?`<span class="tdw" title="${esc(r.who)}">${esc(tdShort(r.who))}</span>`:""}${carried?`<span class="tdcar" title="Не сделано в тот день — перенесено">с ${mdd(r.day)}</span>`:""}${r.done&&r.doneBy?`<span class="tdby">✓ ${esc(tdShort(r.doneBy))}</span>`:""}${canWrite?`<button type="button" class="lun" data-tddel="${esc(r.id)}" title="Удалить задание">✕</button>`:""}</span></li>`};
   const ppl=tdPeople(), oo=orders.filter(o=>!o.arch&&!an(o).closed).sort((a,b)=>String(a.num||"").localeCompare(String(b.num||""),"ru"));
   box.innerHTML=`<header class="tdh"><button type="button" class="tdfold" data-tdfold aria-expanded="${!tdFold}" title="${tdFold?"Развернуть":"Свернуть"}">${tdFold?"▸":"▾"}</button><h2>Задачи и планы <span>${wd} ${mdd(t)}</span></h2><span class="tdcnt">${nOpen?`осталось ${nOpen}`:"всё сделано"}${nDone?` · сделано ${nDone}`:""}</span><span class="sp"></span><label class="tdmine" title="Задачи, назначенные вам, и ваши задачи без адресата"><input type="checkbox" data-tdmine ${tdMine?"checked":""}> только мои</label></header>
   ${tdFold?"":`
@@ -1844,6 +1845,8 @@ $("todo").addEventListener("submit",async e=>{if(e.target.id!=="tdForm")return;e
   try{await db.collection("tasks").doc(id).set(rec)}catch(err){delete tdRows[id];renderTodo();showStatus("Задание не сохранилось ("+(err&&err.code||"ошибка")+").",true)}});
 $("todo").addEventListener("change",async e=>{const t=e.target;
   if("tdmine" in t.dataset){tdMine=t.checked;save("tdmine",tdMine?"1":"0");renderTodo();return}
+  if(t.dataset.tdwho&&db&&canWrite){const id=t.dataset.tdwho, patch={who:t.value};Object.assign(tdRows[id],patch);renderTodo();
+    try{await db.collection("tasks").doc(id).update(patch)}catch(err){showStatus("Не сохранилось ("+(err&&err.code||"ошибка")+").",true)}return}
   const id=t.dataset.tddone;if(!id||!db||!canWrite)return;
   const patch=t.checked?{done:true,doneAt:new Date().toISOString(),doneBy:meEmail()}:{done:false,doneAt:"",doneBy:""};
   Object.assign(tdRows[id],patch);renderTodo();
