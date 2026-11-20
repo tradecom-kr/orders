@@ -853,10 +853,9 @@ header.top h1{font-size:19px}
 header.top .sub{display:none}
 header.top>div:last-child{align-items:center;gap:6px}
 #tcUser{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;color:var(--muted);margin-right:6px}
-#tcUser .btn,#viewBtn{padding:4px 8px;font-size:12px;border-color:transparent;background:none;color:var(--muted)}
-#tcUser .btn:hover,#viewBtn:hover{color:var(--ink);border-color:var(--line)}
-.vwbar label{display:none}.vwbar select{height:30px;font-size:12.5px;color:var(--muted);border-color:transparent;background:none}
-.vwbar select:hover{border-color:var(--line)}
+#tcUser .btn{padding:4px 8px;font-size:12px;border-color:transparent;background:none;color:var(--muted)}
+#tcUser .btn:hover{color:var(--ink);border-color:var(--line)}
+.bar .vwbar{order:-1}.bar .vwbar label{white-space:nowrap}.bar .vwbar select{max-width:190px}body:not([data-tab="over"]) .bar .vwbar{display:none}
 #buyersBtn,#archBtn{border-color:transparent;background:none;color:var(--muted)}
 #buyersBtn:hover,#archBtn:hover{color:var(--ink);border-color:var(--line)}
 /* tasks: a quiet note block */
@@ -3647,8 +3646,9 @@ function viewDialog(){
 }
 // toolbar: «Вид» — detailed board or the short card, for whoever is signed in; ⚙ sets it up in detail, also for others
 {const w=document.createElement("span");w.className="vwbar";
- w.innerHTML=`<label for="viewSel">Вид</label><select id="viewSel"><option value="full">Подробный</option><option value="short">Короткая карточка</option></select><button class="btn" type="button" id="viewBtn" title="Настроить, что показывать" aria-label="Настроить вид">⚙</button>`;
- const anchor=$("buyersBtn");anchor.parentNode.insertBefore(w,anchor);
+ w.innerHTML=`<label for="viewSel">Вид карточек</label><select id="viewSel"><option value="full">Подробный</option><option value="short">Короткая карточка</option></select><button class="btn" type="button" id="viewBtn" title="Настроить, что показывать" aria-label="Настроить вид">⚙</button>`;
+ // it changes how cards look, so it sits next to the views and shows on «Карточки»
+ const seg=document.querySelector(".bar .seg");seg.parentNode.insertBefore(w,seg.nextSibling);
  $("viewSel").addEventListener("change",async e=>{
    const me=meEmail(), v=myView(), rec={email:me,hide:v.hide||[],cshow:ccShow(v),compact:e.target.value==="short"};
    views[viewId(me)]=rec;applyView();render();
