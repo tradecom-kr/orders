@@ -845,12 +845,56 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
 .tdempty{color:var(--muted);font-size:13px}
 .tdlater summary{cursor:pointer;font-size:12.5px;color:var(--muted);padding:2px 0}.tdlater .tdl li{opacity:.8}
 @media (max-width:640px){.tdl li{flex-wrap:wrap}.tdm{margin-left:24px}}
+
+/* ===== calmer look: what matters is bold and coloured, the rest is quiet ===== */
+header.top{align-items:center;gap:8px 16px;padding:2px 0 10px;border-bottom:1px solid var(--line)}
+header.top h1{font-size:19px}
+header.top .sub{display:none}
+header.top>div:last-child{align-items:center;gap:6px}
+#tcUser{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;color:var(--muted);margin-right:6px}
+#tcUser .btn,#viewBtn{padding:4px 8px;font-size:12px;border-color:transparent;background:none;color:var(--muted)}
+#tcUser .btn:hover,#viewBtn:hover{color:var(--ink);border-color:var(--line)}
+.vwbar label{display:none}.vwbar select{height:30px;font-size:12.5px;color:var(--muted);border-color:transparent;background:none}
+.vwbar select:hover{border-color:var(--line)}
+#buyersBtn,#archBtn{border-color:transparent;background:none;color:var(--muted)}
+#buyersBtn:hover,#archBtn:hover{color:var(--ink);border-color:var(--line)}
+/* tasks: a quiet note block */
+.todo{border-left-width:1px;padding:10px 14px;gap:6px}
+.tdh h2{font-size:14px}.tdl li{font-size:13.5px;padding:4px 2px}
+.tdf{opacity:.85}.tdf:focus-within{opacity:1}
+.tdf #tdText,.tdf select,.tdf input[type=date],.tdf .btn{height:32px;font-size:13px}
+/* toolbar: views first, filters after; Excel / fold only on the cards view */
+.bar .seg{order:-1}.bar #q{flex:1 1 260px}
+body:not([data-view="over"]) #foldAll,body:not([data-view="over"]) #xlsBtn{display:none}
+.bar .chk{font-size:12.5px;color:var(--muted)}
+/* week strip: lighter */
+.wk{background:none;border:0;padding:0 2px}.wk h2{font-size:14px}
+.wki{background:var(--panel)}
+/* list rows */
+.lst small{display:none}
+.lnow{gap:1px}.lnow small{-webkit-line-clamp:1;font-size:12px}
+.ldb{border-color:transparent;background:none}.ldb:hover{border-color:var(--line);background:var(--panel)}
+.ldb.bad,.ldb.warn{border-color:transparent}.ldb.ok{color:var(--muted);font-weight:500}
+.lpay.ok{color:var(--muted);font-weight:500}
+.lnum small{font-size:11.5px}
+/* order panel */
+.lp{gap:10px}
+.lph h2{font-size:20px}.lpamt{font-size:14px;color:var(--muted)}
+.lpd{gap:6px}.lpd .kdb{padding:6px 10px;gap:0;border-color:var(--soft)}.lpd .kdb b{font-size:17px}.lpd .kdb .kl{font-size:10.5px}
+.lpd .kdb .kwas{display:none}.lpd .kdb.ok b{color:var(--muted)}.lpd .kdb.bad{border-color:var(--danger)}.lpd .kdb.warn{border-color:var(--warn)}
+.lp .trkw{flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:0}
+.lp .trkno{background:none;border-color:transparent;padding:0;color:var(--muted)}.lp .trkno b{color:var(--ink);font-weight:500}.lp .trkno:hover{color:var(--accent)}
+.lp .trkno.none{display:none}.lp .trkw .note{display:none}
+.lpal .al{font-size:12.5px}
+.lptabs{gap:2px;border-bottom-color:var(--soft)}
+.lpt{border-color:transparent;background:none;padding:3px 8px}.lpt small{display:none}.lpt.cur small,.lpt.on small{display:inline}
+.lpt.done{color:var(--muted)}.lpt.cur{border-color:var(--accent)}
+.lpf{border-top-color:var(--soft)}.lpf .btn{padding:6px 10px;font-size:12.5px}
 </style>
 
 </head>
 <body>
 <div class="page">
-  <section id="todo" class="todo" aria-label="Задачи и планы"></section>
   <header class="top">
     <div>
       <h1>Заказы и отгрузки</h1>
@@ -862,6 +906,8 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
       <button class="btn primary" type="button" id="addBtn">+ Новый заказ</button>
     </div>
   </header>
+
+  <section id="todo" class="todo" aria-label="Задачи и планы"></section>
 
   <div class="kpis" id="kpis" role="group" aria-label="Быстрые фильтры" hidden></div>
 
@@ -1549,7 +1595,7 @@ function lRow(o){const a=an(o), P=phasesOf(o), cur=a.closed?P.length-1:Math.min(
   const pay=imp?`<span class="muted">—</span>`:`<span class="lpay ${PAY[o.pay||"none"][1]}">${PAY[o.pay||"none"][0]}</span>`;
   return `<div class="lr ${o.id===lSel?"sel":""} ${a.arch?"arch":a.closed?"closed":a.alerts.some(x=>x.c==="bad")?"bad":""}" data-lsel="${esc(o.id)}" tabindex="0" role="button" aria-pressed="${o.id===lSel}">
     <div class="lnum"><b>${esc(o.num||"без номера")}</b>${imp?`<span class="limp">импорт</span>`:""}<small>${esc([o.buyer,o.goods].filter(Boolean).join(" · ")||"—")}</small></div>
-    <div class="lst">${a.arch?"":lBar(a)}<span class="lstn">${a.arch?"Архив":a.closed?"Завершена":esc(P[cur].t)}</span><small>${a.arch||a.closed?"":`этап ${cur+1} из ${P.length}`}</small></div>
+    <div class="lst" title="${a.arch||a.closed?"":`этап ${cur+1} из ${P.length}`}">${a.arch?"":lBar(a)}<span class="lstn">${a.arch?"Архив":a.closed?"Завершена":esc(P[cur].t)}</span><small>${a.arch||a.closed?"":`этап ${cur+1} из ${P.length}`}</small></div>
     <div class="lnow">${lNow(a)}</div>
     <div class="ldc">${lDateBtn(o,"loadAt",stepDone(o,"photo"))}</div>
     <div class="ldc">${lDateBtn(o,"etd",stepDone(o,"port"))}</div>
@@ -1609,7 +1655,7 @@ function lPanel(o){
   let tab=lTab[o.id]||(o.arch?"all":cur);
   const tile=(l,k,done)=>{const d=o[k], w=wasOf(o,k), cls=!d||done?"":days(d)<0?"bad":days(d)<=3?"warn":"";
     return `<button type="button" class="kdb ${cls} ${done?"ok":""}" ${o.arch?"disabled":`data-qd="${esc(o.id)}" data-qk="${k}"`} title="Изменить дату"><span class="kl">${l}</span><b>${d?mdd(d):"—"}${done?" ✓":""}</b>${w?`<small class="kwas">было ${mdd(w)}</small>`:""}</button>`};
-  const al=a.alerts.filter(x=>x.c!=="info"||1).map(x=>`<div class="al ${x.c}"><i>!</i><span>${esc(x.t)}</span></div>`).join("");
+  const al=a.alerts.filter(x=>!/^Скоро/.test(x.t)).map(x=>`<div class="al ${x.c}"><i>!</i><span>${esc(x.t)}</span></div>`).join("");
   const tabs=(o.arch?[]:P.map((p,i)=>{const y=a.ph[i];return `<button type="button" class="lpt ${tab===p.id?"on":""} ${y.complete?"done":""} ${p.id===cur&&!a.closed?"cur":""}" data-ltab="${p.id}">${esc(p.t)}<small>${y.complete?"✓":`${y.done}/${y.total}`}</small></button>`})).join("")
     +`<button type="button" class="lpt ${tab==="all"?"on":""}" data-ltab="all">Все файлы<small>${(o.files||[]).length}</small></button>`;
   let body="";
@@ -2098,7 +2144,7 @@ function renderUpcoming(vis){
     ||`<span class="note">На ближайшие две недели сроков нет. Даты берутся из заказов: оплата, поставщики, загрузка, ETD и ETA.</span>`)
     +(items.length>shown.length?`<span class="note">и ещё ${items.length-shown.length}</span>`:"");
 }
-function render(){
+function render(){document.body.dataset.view=view;
   fillBuyerFilter();
   renderKpis();
   [["vList","list"],["vOver","over"],["vTime","time"],["vDocs","docs"],["vRc","rc"]].forEach(([b,v])=>$(b).setAttribute("aria-pressed",view===v));
