@@ -850,7 +850,7 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
 </head>
 <body>
 <div class="page">
-  <section id="todo" class="todo" aria-label="Задания на сегодня"></section>
+  <section id="todo" class="todo" aria-label="Задачи и планы"></section>
   <header class="top">
     <div>
       <h1>Заказы и отгрузки</h1>
@@ -1785,10 +1785,10 @@ function renderTodo(){const box=$("todo");if(!box)return;
     return `<li class="${r.done?"done":""} ${carried?"carried":""}"><label class="tdc"><input type="checkbox" data-tddone="${esc(r.id)}" ${r.done?"checked":""} ${canWrite?"":"disabled"}><span class="tdt">${esc(r.text)}</span></label>
       <span class="tdm">${o?`<button type="button" class="tdo" data-tdord="${esc(o.id)}" title="Открыть заказ">${esc(o.num||"заказ")}</button>`:""}${r.who?`<span class="tdw" title="${esc(r.who)}">${esc(tdShort(r.who))}</span>`:""}${carried?`<span class="tdcar" title="Не сделано в тот день — перенесено">с ${mdd(r.day)}</span>`:""}${r.done&&r.doneBy?`<span class="tdby">✓ ${esc(tdShort(r.doneBy))}</span>`:""}${canWrite?`<button type="button" class="lun" data-tddel="${esc(r.id)}" title="Удалить задание">✕</button>`:""}</span></li>`};
   const ppl=tdPeople(), oo=orders.filter(o=>!o.arch&&!an(o).closed).sort((a,b)=>String(a.num||"").localeCompare(String(b.num||""),"ru"));
-  box.innerHTML=`<header class="tdh"><button type="button" class="tdfold" data-tdfold aria-expanded="${!tdFold}" title="${tdFold?"Развернуть":"Свернуть"}">${tdFold?"▸":"▾"}</button><h2>Задания на сегодня <span>${wd} ${mdd(t)}</span></h2><span class="tdcnt">${nOpen?`осталось ${nOpen}`:"всё сделано"}${nDone?` · сделано ${nDone}`:""}</span><span class="sp"></span><label class="tdmine"><input type="checkbox" data-tdmine ${tdMine?"checked":""}> только мои</label></header>
-  ${tdFold?"":`${canWrite?`<form class="tdf" id="tdForm" autocomplete="off"><input id="tdText" placeholder="Новое задание, например «Отправить инвойс М-36 покупателю»" aria-label="Новое задание" maxlength="300"><select id="tdWho" aria-label="Кому"><option value="">кому: всем</option>${ppl.map(e=>`<option value="${esc(e)}">${esc(tdShort(e))}${e===me?" (я)":""}</option>`).join("")}</select><select id="tdOrd" aria-label="Заказ"><option value="">без заказа</option>${oo.map(o=>`<option value="${esc(o.id)}">${esc(o.num||"без номера")}</option>`).join("")}</select><input type="date" id="tdDay" value="${t}" aria-label="На какой день" title="На какой день"><button class="btn primary sm" type="submit">Добавить</button></form>`:""}
-  <ul class="tdl">${sh.map(item).join("")||`<li class="tdempty">На сегодня заданий нет.</li>`}</ul>
-  ${lt.length?`<details class="tdlater"><summary>Запланировано на следующие дни: ${lt.length}</summary><ul class="tdl">${lt.map(r=>item(r).replace('<span class="tdm">',`<span class="tdm"><span class="tdcar">${mdd(r.day)}</span>`)).join("")}</ul></details>`:""}`}`;
+  box.innerHTML=`<header class="tdh"><button type="button" class="tdfold" data-tdfold aria-expanded="${!tdFold}" title="${tdFold?"Развернуть":"Свернуть"}">${tdFold?"▸":"▾"}</button><h2>Задачи и планы <span>${wd} ${mdd(t)}</span></h2><span class="tdcnt">${nOpen?`осталось ${nOpen}`:"всё сделано"}${nDone?` · сделано ${nDone}`:""}</span><span class="sp"></span><label class="tdmine"><input type="checkbox" data-tdmine ${tdMine?"checked":""}> только мои</label></header>
+  ${tdFold?"":`
+  <ul class="tdl">${sh.map(item).join("")||`<li class="tdempty">На сегодня задач нет.</li>`}</ul>
+  ${lt.length?`<details class="tdlater"><summary>Запланировано на следующие дни: ${lt.length}</summary><ul class="tdl">${lt.map(r=>item(r).replace('<span class="tdm">',`<span class="tdm"><span class="tdcar">${mdd(r.day)}</span>`)).join("")}</ul></details>`:""}${canWrite?`<form class="tdf" id="tdForm" autocomplete="off"><input id="tdText" placeholder="Новое задание, например «Отправить инвойс М-36 покупателю»" aria-label="Новое задание" maxlength="300"><select id="tdWho" aria-label="Кому"><option value="">кому: всем</option>${ppl.map(e=>`<option value="${esc(e)}">${esc(tdShort(e))}${e===me?" (я)":""}</option>`).join("")}</select><select id="tdOrd" aria-label="Заказ"><option value="">без заказа</option>${oo.map(o=>`<option value="${esc(o.id)}">${esc(o.num||"без номера")}</option>`).join("")}</select><input type="date" id="tdDay" value="${t}" aria-label="На какой день" title="На какой день"><button class="btn primary sm" type="submit">Добавить</button></form>`:""}`}`;
 }
 $("todo").addEventListener("submit",async e=>{if(e.target.id!=="tdForm")return;e.preventDefault();if(!db||!canWrite)return;
   const i=$("tdText"), text=i.value.trim();if(!text){i.focus();return}
