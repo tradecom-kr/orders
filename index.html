@@ -917,7 +917,7 @@ body:not([data-tab="over"]) #foldAll,body:not([data-tab="over"]) #xlsBtn{display
     <label class="chk"><input type="checkbox" id="showArch"> Показывать архив</label>
     <div class="seg" role="group" aria-label="Вид">
       <button type="button" id="vList" aria-pressed="true">Текущие</button>
-      <button type="button" id="vOver" aria-pressed="false">Карточки</button>
+      <button type="button" id="vOver" aria-pressed="false">Все заказы</button>
       <button type="button" id="vTime" aria-pressed="false">Календарь</button>
       <button type="button" id="vDocs" aria-pressed="false">Документы</button>
       <button type="button" id="vRc" aria-pressed="false">Квитанции</button>
@@ -3647,7 +3647,7 @@ function viewDialog(){
 // toolbar: «Вид» — detailed board or the short card, for whoever is signed in; ⚙ sets it up in detail, also for others
 {const w=document.createElement("span");w.className="vwbar";
  w.innerHTML=`<label for="viewSel">Вид карточек</label><select id="viewSel"><option value="full">Подробный</option><option value="short">Короткая карточка</option></select><button class="btn" type="button" id="viewBtn" title="Настроить, что показывать" aria-label="Настроить вид">⚙</button>`;
- // it changes how cards look, so it sits next to the views and shows on «Карточки»
+ // it changes how cards look, so it sits next to the views and shows on «Все заказы»
  const seg=document.querySelector(".bar .seg");seg.parentNode.insertBefore(w,seg.nextSibling);
  $("viewSel").addEventListener("change",async e=>{
    const me=meEmail(), v=myView(), rec={email:me,hide:v.hide||[],cshow:ccShow(v),compact:e.target.value==="short"};
