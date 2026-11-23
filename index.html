@@ -909,6 +909,8 @@ body:not([data-tab="over"]) #foldAll,body:not([data-tab="over"]) #xlsBtn{display
 .tdo{font-size:11px;padding:0 6px}
 @media (max-width:760px){.tdm{gap:2px 6px;margin-top:-2px}}
 .dtxt{border-collapse:collapse;margin-top:2px;width:auto}.dtxt th,.dtxt td{padding:3px 14px 3px 0;border:0;text-align:left;vertical-align:middle;font-size:12.5px;background:none}.dtxt th{font-weight:600;color:var(--ink);min-width:120px;white-space:nowrap}.dtxt tr.no th{color:var(--danger)}
+.dtxt{table-layout:fixed;width:min(100%,820px)!important}.dtxt col.c1{width:200px}.dtxt col.c2{width:130px}.dtxt col.c3{width:auto}.dtxt col.c4{width:100px}
+.dtxt th{overflow:hidden;text-overflow:ellipsis}.dtxt td{overflow:hidden}.dtxf a{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.dtxf{max-width:100%}
 .dtxa{font-family:var(--f-mono);text-align:right!important;white-space:nowrap;color:var(--ink)}
 .dtxf{display:inline-flex;align-items:center;gap:6px}.dtxf a{color:var(--accent)}.dtxr{margin-top:4px}
 .dtx{margin-top:4px;font-size:12.5px}.dtxh{font-weight:600;margin-bottom:2px}.dtxh.bad{color:var(--danger)}.dtxh.ok{color:var(--ok)}
@@ -1290,7 +1292,7 @@ function taxBlock(o,rowFn){if(isImp(o))return "";const SL=sups(o).filter(x=>x.na
     return `<tr class="${T.length||ok?"ok":"no"}"><th scope="row">${esc(x.name)}</th><td class="dtxa">${x.amt?fm(x.amt,"₩"):""}</td><td>${file}</td><td>${!T.length&&canWrite?`<label class="dtxc" title="Бухгалтер подтвердил, что 세금계산서 получен — файл загружать не нужно"><input type="checkbox" data-taxok="${esc(x.name)}" data-oid="${esc(o.id)}" ${ok?"checked":""}> получен</label>`:""}</td></tr>`}).join("");
   // files that could not be matched to a supplier
   const rest=(o.files||[]).filter(f=>kindOf(f.kind)==="taxinv"&&!f.fix&&!used.has(f.aid));
-  return `<div class="dtx"><table class="dtxt"><tbody>${lines}</tbody></table>${rest.length?`<div class="dtxr"><small class="note">Не привязаны к поставщику:</small>${rowFn?rest.map(f=>rowFn(o,f)).join(""):rest.map(f=>`<div><a href="#" data-view="${esc(f.aid)}" data-oid="${esc(o.id)}">${esc(f.name)}</a></div>`).join("")}</div>`:""}</div>`}
+  return `<div class="dtx"><table class="dtxt"><colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"></colgroup><tbody>${lines}</tbody></table>${rest.length?`<div class="dtxr"><small class="note">Не привязаны к поставщику:</small>${rowFn?rest.map(f=>rowFn(o,f)).join(""):rest.map(f=>`<div><a href="#" data-view="${esc(f.aid)}" data-oid="${esc(o.id)}">${esc(f.name)}</a></div>`).join("")}</div>`:""}</div>`}
 async function taxSupplier(file,list){
   let t="";try{t=String(await fileText(new Uint8Array(await file.arrayBuffer()),file.name)||"")}catch(e){}
   const hay=poKey(file.name+" "+t);const hit=(list||[]).filter(x=>x.name).find(x=>{const k=poKey(x.name);return k&&hay.includes(k)});
