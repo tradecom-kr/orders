@@ -911,6 +911,8 @@ body:not([data-tab="over"]) #foldAll,body:not([data-tab="over"]) #xlsBtn{display
 .dtxt{border-collapse:collapse;margin-top:2px;width:auto}.dtxt th,.dtxt td{padding:3px 14px 3px 0;border:0;text-align:left;vertical-align:middle;font-size:12.5px;background:none}.dtxt th{font-weight:600;color:var(--ink);min-width:120px;white-space:nowrap}.dtxt tr.no th{color:var(--danger)}
 .dtxt{table-layout:fixed;width:min(100%,820px)!important}.dtxt col.c1{width:200px}.dtxt col.c2{width:130px}.dtxt col.c3{width:auto}.dtxt col.c4{width:100px}
 .dtxt th{overflow:hidden;text-overflow:ellipsis}.dtxt td{overflow:hidden}.dtxf a{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.dtxf{max-width:100%}
+.dtxu{font:500 10.5px var(--f-body);color:var(--muted);margin-left:4px}.dtxt tr.svc th{font-weight:500}
+.dtxadd{display:flex;gap:6px;margin-top:6px;max-width:520px;opacity:.8}.dtxadd:focus-within{opacity:1}.dtxadd input{flex:1;height:28px;font-size:12.5px;width:auto}
 .dtxa{font-family:var(--f-mono);text-align:right!important;white-space:nowrap;color:var(--ink)}
 .dtxf{display:inline-flex;align-items:center;gap:6px}.dtxf a{color:var(--accent)}.dtxr{margin-top:4px}
 .dtx{margin-top:4px;font-size:12.5px}.dtxh{font-weight:600;margin-bottom:2px}.dtxh.bad{color:var(--danger)}.dtxh.ok{color:var(--ok)}
@@ -1273,9 +1275,13 @@ const fixesOf=(o,f)=>(o&&o.files||[]).filter(x=>x.fix&&x.fixOf===f.aid).sort((a,
 const fixedTag=(o,f)=>{if(f.fix){const src=(o.files||[]).find(x=>x.aid===f.fixOf);return `исправленная версия${src?" «"+src.name+"»":""}`}const n=fixesOf(o,f);return n.length?"есть исправленная версия":""};
 const supLeft=x=>x.paid?0:Math.max(0,(Number(x.amt)||0)-(Number(x.paidAmt)||0));
 // 세금계산서 from each supplier: a file of that type tied to the supplier by its name (in the file name or inside it)
+const OURS=/트레이드\s*콤|tradecom/i;
+function taxParse(t){t=String(t||"");const out={issuer:"",amt:null};let m;const re=/상\s*호\s*(?:\(\s*법\s*인\s*명\s*\))?\s*[:：]?\s*([^\n]{2,60})/g;
+  while((m=re.exec(t))){let v=m[1].split(/\s*(?:성\s*명|대\s*표|사\s*업\s*장|등\s*록|주\s*소|종\s*사)/)[0].replace(/^\(?\s*법\s*인\s*명\s*\)?\s*/,"").trim();if(v&&!OURS.test(v)&&!/^\(\s*$/.test(v)){out.issuer=v.slice(0,40);break}re.lastIndex=m.index+2}
+  const a=t.match(/합\s*계\s*금\s*액\s*[:：]?\s*₩?\s*([\d,]{4,})/);if(a)out.amt=Number(a[1].replace(/,/g,""));return out}
 const taxFiles=(o,x,L)=>{const T=(o.files||[]).filter(f=>kindOf(f.kind)==="taxinv");if(!T.length)return [];
   const k=poKey(x.name);const mine=T.filter(f=>{const s=poKey(f.sup||""),n=poKey(f.orig||f.name);return k&&((s&&(s.includes(k)||k.includes(s)))||n.includes(k))});
-  if(mine.length)return mine;const named=(L||[]).filter(y=>y.name);return named.length===1?T:[]};
+  if(mine.length)return mine;const named=(L||[]).filter(y=>y.name);return named.length===1?T.filter(f=>!f.issuer||!!(k&&poKey(f.issuer).includes(k))):[]};
 // 세금계산서 marked as received (the accountant says so) without a file: o.taxOk = {supplier name (lower case): date}
 const taxKey=x=>String(x&&x.name||"").trim().toLowerCase();
 const taxOkOf=(o,x)=>!!(o&&o.taxOk&&o.taxOk[taxKey(x)]);
@@ -1284,19 +1290,32 @@ async function taxOkSet(o,name,on){if(!db||!canWrite||!o)return;const k=String(n
   const m={...(o.taxOk||{})};if(on)m[k]=isoToday();else delete m[k];
   try{await db.collection("orders").doc(o.id).update({taxOk:m,updatedAt:new Date().toISOString()})}catch(err){showStatus("Не сохранилось ("+(err&&err.code||"ошибка")+").",true)}}
 // 세금계산서 by supplier: «не хватает N из M», each supplier's status, a «получен» tick where there is no file
-// 세금계산서 by supplier: one line per supplier — supplier | its file (empty if none) | «получен» tick when there is no file
-function taxBlock(o,rowFn){if(isImp(o))return "";const SL=sups(o).filter(x=>x.name);if(!SL.length)return "";
-  const miss=SL.filter(x=>!taxHave(o,x,SL)).length, used=new Set();
-  const lines=SL.map(x=>{const T=taxFiles(o,x,SL), ok=taxOkOf(o,x);T.forEach(f=>used.add(f.aid));
-    const file=T.map(f=>`<span class="dtxf"><span class="ext ${extOf(f.name)}">${extOf(f.name)||"файл"}</span><a href="#" data-view="${esc(f.aid)}" data-oid="${esc(o.id)}" title="${esc(f.name)} — открыть">${esc(f.name)}</a><button type="button" class="ib" data-dl="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Скачать" aria-label="Скачать ${esc(f.name)}">⬇</button></span>`).join("");
-    return `<tr class="${T.length||ok?"ok":"no"}"><th scope="row">${esc(x.name)}</th><td class="dtxa">${x.amt?fm(x.amt,"₩"):""}</td><td>${file}</td><td>${!T.length&&canWrite?`<label class="dtxc" title="Бухгалтер подтвердил, что 세금계산서 получен — файл загружать не нужно"><input type="checkbox" data-taxok="${esc(x.name)}" data-oid="${esc(o.id)}" ${ok?"checked":""}> получен</label>`:""}</td></tr>`}).join("");
-  // files that could not be matched to a supplier
-  const rest=(o.files||[]).filter(f=>kindOf(f.kind)==="taxinv"&&!f.fix&&!used.has(f.aid));
-  return `<div class="dtx"><table class="dtxt"><colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"></colgroup><tbody>${lines}</tbody></table>${rest.length?`<div class="dtxr"><small class="note">Не привязаны к поставщику:</small>${rowFn?rest.map(f=>rowFn(o,f)).join(""):rest.map(f=>`<div><a href="#" data-view="${esc(f.aid)}" data-oid="${esc(o.id)}">${esc(f.name)}</a></div>`).join("")}</div>`:""}</div>`}
+// 세금계산서: one line per supplier, then per service company (서진쉬핑, broker, trucking…) — name | amount | file (empty if none) | «получен»
+function taxLines(o){
+  // company name keys: the name itself and what is in brackets («EGNIS ((주)이그니스)» → egnis, 이그니스), without 주식회사 / (주) / Co., Ltd.
+  const ck=n=>{const t=String(n||"").replace(/주식회사|\(\s*주\s*\)|㈜|\(\s*유\s*\)|co\.?,?\s*ltd\.?|inc\.?|corp\.?|llc/gi," ");
+    return [t.replace(/\(.*$/,""),...(t.match(/\(([^()]+)\)/g)||[]).map(x=>x.slice(1,-1)),t].map(x=>x.toLowerCase().replace(/[\s.,()\-]/g,"")).filter(x=>x.length>=2)};
+  const same=(a,b)=>{const A=ck(a),B=ck(b);return A.some(x=>B.some(y=>x===y||x.includes(y)||y.includes(x)))};
+const SL=isImp(o)?[]:sups(o).filter(x=>x.name), T=(o.files||[]).filter(f=>kindOf(f.kind)==="taxinv"&&!f.fix), used=new Set();
+  const lines=SL.map(x=>{const F=taxFiles(o,x,SL);F.forEach(f=>used.add(f.aid));return {name:x.name,amt:x.amt,files:F,sup:true}});
+  const svc=[];const add=(name,man)=>{let l=svc.find(y=>same(y.name,name));if(!l){l={name,amt:null,files:[],man:false};svc.push(l)}if(man)l.man=true;return l};
+  (o.taxExtra||[]).forEach(e=>e&&e.name&&add(e.name,true));
+  // an issuer that is one of the suppliers (e.g. «주식회사 이그니스» for «EGNIS ((주)이그니스)») goes to that supplier
+  T.filter(f=>!used.has(f.aid)&&f.issuer).forEach(f=>{const l=lines.find(y=>same(y.name,f.issuer));if(l){l.files.push(f);used.add(f.aid)}});
+  T.filter(f=>!used.has(f.aid)).forEach(f=>{const nm=f.issuer||"";const hit=nm?null:svc.find(l=>{const k=poKey(l.name),n=poKey(f.orig||f.name);return k&&n.includes(k)});const l=nm?add(nm,false):hit;if(!l)return;l.files.push(f);used.add(f.aid)});
+  svc.forEach(l=>{const s=l.files.reduce((t,f)=>t+(Number(f.taxAmt)||0),0);l.amt=s||null});
+  return {lines:lines.concat(svc),rest:T.filter(f=>!used.has(f.aid))}}
+function taxBlock(o,rowFn){const {lines,rest}=taxLines(o);if(!lines.length&&!rest.length&&!canWrite)return "";
+  const row=l=>{const ok=taxOkOf(o,l), has=l.files.length;
+    const file=l.files.map(f=>`<span class="dtxf"><span class="ext ${extOf(f.name)}">${extOf(f.name)||"файл"}</span><a href="#" data-view="${esc(f.aid)}" data-oid="${esc(o.id)}" title="${esc(f.name)} — открыть">${esc(f.name)}</a><button type="button" class="ib" data-dl="${esc(f.aid)}" data-oid="${esc(o.id)}" title="Скачать" aria-label="Скачать ${esc(f.name)}">⬇</button></span>`).join("");
+    return `<tr class="${has||ok?"ok":"no"} ${l.sup?"":"svc"}"><th scope="row" title="${l.sup?"Поставщик":"Услуги"}">${esc(l.name)}${l.sup?"":` <small class="dtxu">услуги</small>`}</th><td class="dtxa">${l.amt?fm(l.amt,"₩"):""}</td><td>${file}</td><td>${!has&&canWrite?`<label class="dtxc" title="Бухгалтер подтвердил, что 세금계산서 получен — файл загружать не нужно"><input type="checkbox" data-taxok="${esc(l.name)}" data-oid="${esc(o.id)}" ${ok?"checked":""}> получен</label>`:""}${l.man&&!has&&canWrite?`<button type="button" class="lun" data-taxdel="${esc(l.name)}" data-oid="${esc(o.id)}" title="Убрать компанию">✕</button>`:""}</td></tr>`};
+  return `<div class="dtx"><table class="dtxt"><colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"></colgroup><tbody>${lines.map(row).join("")}</tbody></table>`
+    +(rest.length?`<div class="dtxr"><small class="note">Не привязаны к компании:</small>${rowFn?rest.map(f=>rowFn(o,f)).join(""):rest.map(f=>`<div><a href="#" data-view="${esc(f.aid)}" data-oid="${esc(o.id)}">${esc(f.name)}</a></div>`).join("")}</div>`:"")
+    +(canWrite?`<div class="dtxadd"><input placeholder="+ компания, от которой ждём 세금계산서 (например 서진쉬핑)" data-taxnew="${esc(o.id)}" aria-label="Компания"><button type="button" class="ib" data-taxadd="${esc(o.id)}">Добавить</button></div>`:"")+`</div>`}
 async function taxSupplier(file,list){
   let t="";try{t=String(await fileText(new Uint8Array(await file.arrayBuffer()),file.name)||"")}catch(e){}
   const hay=poKey(file.name+" "+t);const hit=(list||[]).filter(x=>x.name).find(x=>{const k=poKey(x.name);return k&&hay.includes(k)});
-  return {isTax:/세\s*금\s*계\s*산\s*서|TAX\s+INVOICE/i.test(t),sup:hit?hit.name:""};
+  return {isTax:/세\s*금\s*계\s*산\s*서|TAX\s+INVOICE/i.test(t),sup:hit?hit.name:"",text:t};
 }
 const supPart=x=>!x.paid&&Number(x.paidAmt)>0;
 function supPaidPart(r){
@@ -1573,13 +1592,14 @@ function trackA(o,cls){o=o||{};const t=trackOf(o), n=docNos(o);
   return `<span class="trkw ${cls||""}">${t?`<a class="trk" href="${t.url}" target="_blank" rel="noopener" data-trkno="${esc(bl||ct)}" title="Открыть отслеживание ${esc(t.name)}${bl||ct?" — номер "+esc(bl||ct)+" скопируется":""}">📍 Отследить на ${esc(t.name)} ↗</a>`:`<span class="trkno none" title="Впишите линию в «Линия / перевозчик», чтобы появилась ссылка на отслеживание">📍 линия не указана</span>`}`
     +(bl?cp("B/L",bl):`<span class="trkno none" title="Впишите номер коносамента: «Открыть весь заказ» → «График и загрузка» → «Коносамент №», или загрузите коносамент — номер найдётся сам">B/L — не указан</span>`)+(ct?cp("конт.",ct):"")+more+(fromDoc(bl)||fromDoc(ct)?`<span class="note">· из документов</span>`:"")+sa+`</span>`}
 // read container / B/L numbers from the papers that carry them, once per file; the result is kept with the file
-const NOS_KINDS=["advreq","bl","bldraft","freight","exp","ipl","impdecl","brokinv","cert","other","dt"], nosBusy=new Set();
+const NOS_KINDS=["taxinv","advreq","bl","bldraft","freight","exp","ipl","impdecl","brokinv","cert","other","dt"], nosBusy=new Set();
 async function scanNos(o){if(!o||!db||!canWrite||nosBusy.has(o.id))return;
   const todo=(o.files||[]).filter(f=>!f.nos&&f.aid&&NOS_KINDS.includes(kindOf(f.kind))&&/\.(pdf|docx|txt)$/i.test(f.name||"")).slice(0,6);if(!todo.length)return;
   nosBusy.add(o.id);const got={};
-  for(const f of todo){try{const t=await fileText(await blobBytes(f),f.name);const r=t==null?{cont:[],bl:[]}:findNos(t);got[f.aid]={cont:r.cont.slice(0,10),bl:r.bl.slice(0,5)}}catch(e){got[f.aid]={cont:[],bl:[],err:1}}}
+  for(const f of todo){try{const t=await fileText(await blobBytes(f),f.name);const r=t==null?{cont:[],bl:[]}:findNos(t);got[f.aid]={cont:r.cont.slice(0,10),bl:r.bl.slice(0,5)};
+    if(kindOf(f.kind)==="taxinv"&&t){const tp=taxParse(t);got[f.aid].__tax=tp}}catch(e){got[f.aid]={cont:[],bl:[],err:1}}}
   const cur=orders.find(x=>x.id===o.id);if(!cur){nosBusy.delete(o.id);return}
-  const files=(cur.files||[]).map(f=>got[f.aid]&&!f.nos?{...f,nos:got[f.aid]}:f);
+  const files=(cur.files||[]).map(f=>{const g=got[f.aid];if(!g||f.nos)return f;const tp=g.__tax;delete g.__tax;return {...f,nos:g,...(tp?{issuer:f.issuer||tp.issuer||"",taxAmt:f.taxAmt||tp.amt||null}:{})}});
   try{await db.collection("orders").doc(o.id).update({files})}catch(e){}
   nosBusy.delete(o.id)}
 document.addEventListener("click",e=>{const a=e.target.closest("a.trk");if(!a)return;e.stopPropagation();const n=a.dataset.trkno;if(n&&navigator.clipboard)navigator.clipboard.writeText(n).catch(()=>{})},true);
@@ -3064,7 +3084,7 @@ async function uploadFiles(list){
       if(rec.kind==="other"&&!kindSel&&/\.pdf$/i.test(file.name)&&await isImpDecl(file))rec.kind="impdecl";
       if(rec.kind==="other"&&!kindSel&&/\.pdf$/i.test(file.name)&&await isExpDecl(file))rec.kind="exp";
       if((rec.kind==="other"||rec.kind==="")&&!kindSel&&/\.(xlsx|xls|pdf)$/i.test(file.name)&&await isPayReq(file))rec.kind="payreq";
-      if(rec.kind==="taxinv"||((rec.kind==="other"||rec.kind==="")&&!kindSel&&/\.(pdf|xlsx|xls|html?|xml)$/i.test(file.name))){const tx=await taxSupplier(file,sups(editing));if(tx.isTax&&rec.kind!=="taxinv"&&!kindSel)rec.kind="taxinv";if(rec.kind==="taxinv"&&tx.sup)rec.sup=tx.sup}
+      if(rec.kind==="taxinv"||((rec.kind==="other"||rec.kind==="")&&!kindSel&&/\.(pdf|xlsx|xls|html?|xml)$/i.test(file.name))){const tx=await taxSupplier(file,sups(editing));if(tx.isTax&&rec.kind!=="taxinv"&&!kindSel)rec.kind="taxinv";if(rec.kind==="taxinv"&&tx.sup)rec.sup=tx.sup;if(rec.kind==="taxinv"){const tp=taxParse(tx.text);if(tp.issuer)rec.issuer=tp.issuer;if(tp.amt)rec.taxAmt=tp.amt}}
       if(kindOf(rec.kind)==="exp")expList.push(file);
       if(kindOf(rec.kind)==="ipl"&&/\.xlsx?$/i.test(file.name))Object.assign(rec,invEquiv(new Uint8Array(await file.arrayBuffer())));
       if(/\.xlsx$/i.test(file.name)&&!repl&&!fixOf){const bytes=new Uint8Array(await file.arrayBuffer());if(await isCalcBook(bytes)){rec.kind="calc";calcList.push({rec,bytes})}}
@@ -3842,13 +3862,13 @@ renderDocsAll=function(){
     (isImp(o)?["cs","ipl","lbl","lblph","test","photo","advreq","impdecl","brokinv"]:["kp","cs","ipl","taxinv","exp","photo","expd","bl","freight"]).forEach(k=>kinds.add(k));
     let list=[...kinds].sort((a,b)=>kIdx(a)-kIdx(b));
     if(cur)list=list.filter(k=>k===cur);
-    if(!isImp(o)&&sups(o).some(x=>x.name))kinds.add("taxinv");
+    kinds.add("taxinv");
     if(cur&&!list.length&&cur==="taxinv"&&kinds.has("taxinv"))list=["taxinv"];
-    if(cur&&!docs.some(f=>kindOf(f.kind)===cur)&&!(cur==="photo"&&(pics.length||linkOK(o.photoLink)))&&!(cur==="taxinv"&&kinds.has("taxinv")))return "";
+    if(cur&&!docs.some(f=>kindOf(f.kind)===cur)&&!(cur==="photo"&&(pics.length||linkOK(o.photoLink)))&&cur!=="taxinv")return "";
     const rows=list.map(k=>{
       let h="";
       const L=docs.filter(f=>kindOf(f.kind)===k).sort((a,b)=>k==="cs"?CS_PARTS.indexOf(csPart(a.orig||a.name))-CS_PARTS.indexOf(csPart(b.orig||b.name))||sigOrder(a.signer)-sigOrder(b.signer):k==="ipl"?IPL_PARTS.indexOf(iplPart(a.orig||a.name))-IPL_PARTS.indexOf(iplPart(b.orig||b.name))||String(b.at||"").localeCompare(String(a.at||"")):String(b.at||"").localeCompare(String(a.at||"")));
-      nFiles+=L.length;if(!(k==="taxinv"&&!isImp(o)&&sups(o).some(x=>x.name)))h+=L.map(f=>fileRow(o,f)).join("");
+      nFiles+=L.length;if(k!=="taxinv")h+=L.map(f=>fileRow(o,f)).join("");
       if(k==="photo"){
         if(linkOK(o.photoLink))h+=`<div class="dfl"><a href="${esc(o.photoLink.trim())}" target="_blank" rel="noopener" data-ext>📁 Google Диск ↗</a></div>`;
         if(pics.length){nFiles+=pics.length;h+=`<div class="dfl"><span class="dfn">Фото: ${pics.length}</span><span class="da"><button type="button" class="ib" data-dlpics="${esc(o.id)}" title="Скачать все фото (.zip)">⬇</button></span></div>`}
@@ -3860,9 +3880,16 @@ renderDocsAll=function(){
     return `<article class="dcard"><header><span class="num" data-open="${esc(o.id)}" title="Открыть заказ">${esc(o.num||"без номера")}</span><span class="who">${esc(o.buyer||"")}</span>${o.arch?`<small class="note">архив</small>`:""}<span class="cnt">${docsAll.length+pics.length} файл.</span></header><table class="dct"><tbody>${rows}</tbody></table></article>`;
   }).join("");
   $("docsCount").textContent=nFiles?`Файлов: ${nFiles}`:"";
+  // read issuer / total of tax invoices not read yet (one order at a time)
+  (async()=>{for(const o of rowsO){if((o.files||[]).some(f=>kindOf(f.kind)==="taxinv"&&!f.nos))await scanNos(o)}})();
   $("docsAll").innerHTML=blocks||`<div class="frow"><span class="note" style="grid-column:1/-1">${rowsO.length?"Нет документов под этот фильтр.":"Заказов пока нет."}</span></div>`;
 };
 // change a file's type right here
+async function taxExtraSet(o,fn){if(!o||!db||!canWrite)return;const L=fn((o.taxExtra||[]).slice());try{await db.collection("orders").doc(o.id).update({taxExtra:L,updatedAt:new Date().toISOString()})}catch(err){showStatus("Не сохранилось ("+(err&&err.code||"ошибка")+").",true)}}
+$("docsAll").addEventListener("click",e=>{const a=e.target.closest("[data-taxadd]");if(a){const i=$("docsAll").querySelector(`[data-taxnew="${CSS.escape(a.dataset.taxadd)}"]`), n=i&&i.value.trim();if(!n){i&&i.focus();return}
+    taxExtraSet(orders.find(x=>x.id===a.dataset.taxadd),L=>L.some(x=>poKey(x.name)===poKey(n))?L:L.concat([{name:n}]));return}
+  const d=e.target.closest("[data-taxdel]");if(d){taxExtraSet(orders.find(x=>x.id===d.dataset.oid),L=>L.filter(x=>poKey(x.name)!==poKey(d.dataset.taxdel)));return}});
+$("docsAll").addEventListener("keydown",e=>{const i=e.target.closest("[data-taxnew]");if(i&&e.key==="Enter"){e.preventDefault();const b=$("docsAll").querySelector(`[data-taxadd="${CSS.escape(i.dataset.taxnew)}"]`);b&&b.click()}});
 $("docsAll").addEventListener("change",async e=>{
   const tk=e.target.closest("input[data-taxok]");if(tk){taxOkSet(orders.find(x=>x.id===tk.dataset.oid),tk.dataset.taxok,tk.checked);return}
   const s=e.target.closest("select[data-dkind]");if(!s)return;
