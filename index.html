@@ -1628,7 +1628,6 @@ function weekRange(){const t=today(), k=(t.getDay()+6)%7, s=new Date(t);s.setDat
 const wasOf=(o,k)=>{const w=o[k+"Was"], at=o[k+"MovedAt"];return w&&at&&Date.now()-new Date(at).getTime()<14*86400000&&w!==o[k]?w:""};
 function lDateBtn(o,k,done){
   const d=o[k], cls=!d||done?"":days(d)<0?"bad":days(d)<=3?"warn":"", w=wasOf(o,k);
-  if(o.arch)return `<span class="ldb none">${d?mdd(d):"—"}</span>`;
   return `<button type="button" class="ldb ${cls} ${done?"ok":""}" data-qd="${esc(o.id)}" data-qk="${k}" title="${w?`Перенесено с ${mdd(w)}. `:""}Изменить дату">${d?mdd(d):"—"}${done?" ✓":""}</button>`}
 function lBar(a){const n=phasesOf(a.o).length, cur=a.closed?n:Math.min(a.cur,n), w=Math.round(Math.min(cur+1,n)/n*100);
   return `<span class="lbar"><span style="width:${w}%"></span></span>`}
@@ -1641,7 +1640,7 @@ function lRow(o){const a=an(o), P=phasesOf(o), cur=a.closed?P.length-1:Math.min(
   const pay=imp?`<span class="muted">—</span>`:`<span class="lpay ${PAY[o.pay||"none"][1]}">${PAY[o.pay||"none"][0]}</span>`;
   return `<div class="lr ${o.id===lSel?"sel":""} ${a.arch?"arch":a.closed?"closed":a.alerts.some(x=>x.c==="bad")?"bad":""}" data-lsel="${esc(o.id)}" tabindex="0" role="button" aria-pressed="${o.id===lSel}">
     <div class="lnum"><b>${esc(o.num||"без номера")}</b>${imp?`<span class="limp">импорт</span>`:""}<small>${esc([o.buyer,o.goods].filter(Boolean).join(" · ")||"—")}</small></div>
-    <div class="lst" title="${a.arch||a.closed?"":`этап ${cur+1} из ${P.length}`}">${a.arch?"":lBar(a)}<span class="lstn">${a.arch?"Архив":a.closed?"Завершена":esc(P[cur].t)}</span><small>${a.arch||a.closed?"":`этап ${cur+1} из ${P.length}`}</small></div>
+    <div class="lst" title="${a.closed?"":`этап ${cur+1} из ${P.length}`}">${lBar(a)}<span class="lstn">${a.closed?"Завершена":esc(P[cur].t)}</span><small>${a.arch||a.closed?"":`этап ${cur+1} из ${P.length}`}</small></div>
     <div class="lnow">${lNow(a)}</div>
     <div class="ldc">${lDateBtn(o,"loadAt",stepDone(o,"photo"))}</div>
     <div class="ldc">${lDateBtn(o,"etd",stepDone(o,"port"))}</div>
@@ -1698,11 +1697,11 @@ function lPanel(o){
   if(!o)return `<div class="lpe">Выберите заказ в списке слева.</div>`;
   const a=an(o), P=phasesOf(o), imp=isImp(o);
   const cur=a.closed?P[P.length-1].id:(P[Math.min(a.cur,P.length-1)]||P[0]).id;
-  let tab=lTab[o.id]||(o.arch?"all":cur);
+  let tab=lTab[o.id]||cur;
   const tile=(l,k,done)=>{const d=o[k], w=wasOf(o,k), cls=!d||done?"":days(d)<0?"bad":days(d)<=3?"warn":"";
-    return `<button type="button" class="kdb ${cls} ${done?"ok":""}" ${o.arch?"disabled":`data-qd="${esc(o.id)}" data-qk="${k}"`} title="Изменить дату"><span class="kl">${l}</span><b>${d?mdd(d):"—"}${done?" ✓":""}</b>${w?`<small class="kwas">было ${mdd(w)}</small>`:""}</button>`};
+    return `<button type="button" class="kdb ${cls} ${done?"ok":""}" data-qd="${esc(o.id)}" data-qk="${k}" title="Изменить дату"><span class="kl">${l}</span><b>${d?mdd(d):"—"}${done?" ✓":""}</b>${w?`<small class="kwas">было ${mdd(w)}</small>`:""}</button>`};
   const al=a.alerts.filter(x=>!/^Скоро/.test(x.t)).map(x=>`<div class="al ${x.c}"><i>!</i><span>${esc(x.t)}</span></div>`).join("");
-  const tabs=(o.arch?[]:P.map((p,i)=>{const y=a.ph[i];return `<button type="button" class="lpt ${tab===p.id?"on":""} ${y.complete?"done":""} ${p.id===cur&&!a.closed?"cur":""}" data-ltab="${p.id}">${esc(p.t)}<small>${y.complete?"✓":`${y.done}/${y.total}`}</small></button>`})).join("")
+  const tabs=(P.map((p,i)=>{const y=a.ph[i];return `<button type="button" class="lpt ${tab===p.id?"on":""} ${y.complete?"done":""} ${p.id===cur&&!a.closed?"cur":""}" data-ltab="${p.id}">${esc(p.t)}<small>${y.complete?"✓":`${y.done}/${y.total}`}</small></button>`})).join("")
     +`<button type="button" class="lpt ${tab==="all"?"on":""}" data-ltab="all">Все файлы<small>${(o.files||[]).length}</small></button>`;
   let body="";
   if(tab==="all"){const fs=byNew(o.files||[]);
@@ -1721,11 +1720,11 @@ function lPanel(o){
   }
   return `<header class="lph"><div><h2>${esc(o.num||"без номера")}${imp?` <span class="limp">импорт</span>`:""}${o.arch?` <span class="limp">архив</span>`:""}</h2><span class="muted">${esc([o.buyer,o.goods].filter(Boolean).join(" · ")||"—")}</span></div><button type="button" class="btn ghost lpx" data-lclose aria-label="Закрыть">✕</button></header>
     <div class="lpamt">${fm(o.amount,o.cur)}${eqText(o)}</div>
-    ${o.arch?"":`<div class="lpd">${tile(imp?"Загрузка":"Загрузка","loadAt",stepDone(o,"photo"))}${tile("Выход судна","etd",stepDone(o,"port"))}${tile("Прибытие","eta",etaDone(o))}</div>${trackA(o)}`}
+    ${`<div class="lpd">${tile(imp?"Загрузка":"Загрузка","loadAt",stepDone(o,"photo"))}${tile("Выход судна","etd",stepDone(o,"port"))}${tile("Прибытие","eta",etaDone(o))}</div>${trackA(o)}`}
     ${al?`<div class="alerts lpal">${al}</div>`:""}
     <div class="lptabs" role="tablist">${tabs}</div>
     <div class="lpb">${body}</div>
-    <footer class="lpf"><button type="button" class="btn" data-ledit="">Открыть весь заказ</button>${canWrite&&!o.arch?`<button type="button" class="btn ghost" data-lflow>Настроить ход</button>`:""}${o.notes?`<span class="note" title="${esc(o.notes)}">📝 ${esc(String(o.notes).slice(0,80))}${String(o.notes).length>80?"…":""}</span>`:""}</footer>`;
+    <footer class="lpf"><button type="button" class="btn" data-ledit="">Открыть весь заказ</button>${canWrite?`<button type="button" class="btn ghost" data-lflow>Настроить ход</button>`:""}${o.notes?`<span class="note" title="${esc(o.notes)}">📝 ${esc(String(o.notes).slice(0,80))}${String(o.notes).length>80?"…":""}</span>`:""}</footer>`;
 }
 // on top: the order whose loading, departure or arrival date is closest to today (either side); finished and archive last
 function urg(o){if(o.arch)return 3e6;if(an(o).closed)return 2e6;
@@ -1743,7 +1742,7 @@ function renderList(){
   if(!vis.some(o=>o.id===lSel)){const f=vis.find(o=>!o.arch&&!an(o).closed)||vis[0];lSel=f?f.id:""}
   $("lt").innerHTML=vis.length?`<div class="lr lhd"><div>Заказ</div><div>Этап</div><div>Что сейчас</div>${["loadAt","etd"].map(k=>{const [ck,cd]=lOrd.split(":"), on=ck===k;return `<div><button type="button" class="lsrt ${on?"on":""}" data-lord="${k}" title="Сортировать по дате; ещё раз — в обратном порядке, третий раз — как было">${k==="loadAt"?"Загрузка":"Выход"} <span>${on?(cd==="-1"?"↓":"↑"):"↕"}</span></button></div>`}).join("")}<div>Оплата</div></div>`+vis.map(lRow).join(""):`<div class="status">${orders.length?"Нет заказов под этот фильтр.":"Заказов пока нет."}</div>`;
   const lp=$("lp"), st=lp.querySelector(".lpb")?lp.scrollTop:0;
-  const so=orders.find(o=>o.id===lSel);lp.innerHTML=lPanel(so);lp.scrollTop=st;if(so&&!so.arch)scanNos(so);
+  const so=orders.find(o=>o.id===lSel);lp.innerHTML=lPanel(so);lp.scrollTop=st;if(so)scanNos(so);
 }
 function lPick(id){lSel=id;save("lsel",id);document.body.classList.add("lp-open");renderList();
   const r=$("lt").querySelector(`[data-lsel="${CSS.escape(id)}"]`);if(r&&r.scrollIntoView)r.scrollIntoView({block:"nearest"})}
@@ -2158,7 +2157,6 @@ function archCard(o){
   </article>`;
 }
 function cardHTML(o){
-  if(o.arch)return archCard(o);
   const a=an(o), bad=a.alerts.some(x=>x.c==="bad"), warn=a.alerts.length>0, L=sups(o).filter(x=>x.name||x.date);
   const loaded=stepDone(o,"photo");
   const dt=[["Оплата до",o.payDue,o.pay==="paid"],["Товар к",supMax(L),loaded],["Загрузка",o.loadAt,loaded],["ETD",o.etd,stepDone(o,"port")],["ETA",o.eta,etaDone(o)]];
@@ -3219,7 +3217,7 @@ function renderDocsAll(){
     const pics=fs.filter(isPic); if(pics.length)put(o,"photo",{pics});
     if(linkOK(o.photoLink))put(o,"photo",{link:o.photoLink.trim()});
   });
-  if(!cur&&rowsO.some(o=>!o.arch))["kp","cs","ipl","exp","photo","expd","bl","freight"].forEach(k=>used.add(k));
+  if(!cur&&rowsO.length)["kp","cs","ipl","exp","photo","expd","bl","freight"].forEach(k=>used.add(k));
   const cols=[...used].sort((a,b)=>{const ia=KINDS.findIndex(x=>x[0]===a),ib=KINDS.findIndex(x=>x[0]===b);return (ia<0?99:ia)-(ib<0?99:ib)});
   const sigOrder=k=>["ti","both","den","den_both","nosig",""].indexOf(k||"");
   const chip=(o,it)=>{
@@ -3780,7 +3778,7 @@ function compactCard(o){
     ${body?`<table class="cct"><tbody>${body}</tbody></table>`:""}
   </article>`;
 }
-{const _card=cardHTML;cardHTML=function(o){return !o.arch&&myView().compact?compactCard(o):_card(o)};}
+{const _card=cardHTML;cardHTML=function(o){return myView().compact?compactCard(o):_card(o)};}
 document.addEventListener("click",e=>{const b=e.target.closest("[data-ccdl]");if(b){e.preventDefault();e.stopPropagation();downloadFile(b.dataset.ccdl,b.dataset.oid)}},true);
 
 // who has the board open right now (seen in the last 2.5 minutes), next to the view switch
@@ -3841,7 +3839,7 @@ renderDocsAll=function(){
     const fs=o.files||[], pics=fs.filter(isPic), docsAll=fs.filter(f=>!isPic(f)), fixed=docsAll.filter(f=>f.fix), docs=docsAll.filter(f=>!f.fix);
     const kinds=new Set(docs.map(f=>kindOf(f.kind)));
     if(pics.length||linkOK(o.photoLink))kinds.add("photo");
-    if(!o.arch)(isImp(o)?["cs","ipl","lbl","lblph","test","photo","advreq","impdecl","brokinv"]:["kp","cs","ipl","taxinv","exp","photo","expd","bl","freight"]).forEach(k=>kinds.add(k));
+    (isImp(o)?["cs","ipl","lbl","lblph","test","photo","advreq","impdecl","brokinv"]:["kp","cs","ipl","taxinv","exp","photo","expd","bl","freight"]).forEach(k=>kinds.add(k));
     let list=[...kinds].sort((a,b)=>kIdx(a)-kIdx(b));
     if(cur)list=list.filter(k=>k===cur);
     if(!isImp(o)&&sups(o).some(x=>x.name))kinds.add("taxinv");
