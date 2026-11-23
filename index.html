@@ -907,6 +907,10 @@ body:not([data-tab="over"]) #foldAll,body:not([data-tab="over"]) #xlsBtn{display
 .tdpin{font-size:11px}.tdm .lun{font-size:11px;opacity:.6}
 .tdo{font-size:11px;padding:0 6px}
 @media (max-width:760px){.tdm{gap:2px 6px;margin-top:-2px}}
+.dtx{margin-top:4px;font-size:12.5px}.dtxh{font-weight:600;margin-bottom:2px}.dtxh.bad{color:var(--danger)}.dtxh.ok{color:var(--ok)}
+.dtx ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.dtx li{display:flex;align-items:center;gap:10px}.dtxn{min-width:120px;font-weight:500;color:var(--ink)}.dtx li.ok .dtxs{color:var(--ok)}.dtx li.no .dtxs{color:var(--danger)}
+.dtxc,.stxok{display:inline-flex;align-items:center;gap:4px;color:var(--muted);cursor:pointer;font-size:12px}.dtxc input,.stxok input{width:14px;height:14px;margin:0}
 </style>
 
 </head>
@@ -1264,6 +1268,13 @@ const supLeft=x=>x.paid?0:Math.max(0,(Number(x.amt)||0)-(Number(x.paidAmt)||0));
 const taxFiles=(o,x,L)=>{const T=(o.files||[]).filter(f=>kindOf(f.kind)==="taxinv");if(!T.length)return [];
   const k=poKey(x.name);const mine=T.filter(f=>{const s=poKey(f.sup||""),n=poKey(f.orig||f.name);return k&&((s&&(s.includes(k)||k.includes(s)))||n.includes(k))});
   if(mine.length)return mine;const named=(L||[]).filter(y=>y.name);return named.length===1?T:[]};
+// 세금계산서 marked as received (the accountant says so) without a file: o.taxOk = {supplier name (lower case): date}
+const taxKey=x=>String(x&&x.name||"").trim().toLowerCase();
+const taxOkOf=(o,x)=>!!(o&&o.taxOk&&o.taxOk[taxKey(x)]);
+const taxHave=(o,x,L)=>taxFiles(o,x,L).length>0||taxOkOf(o,x);
+async function taxOkSet(o,name,on){if(!db||!canWrite||!o)return;const k=String(name||"").trim().toLowerCase();if(!k)return;
+  const m={...(o.taxOk||{})};if(on)m[k]=isoToday();else delete m[k];
+  try{await db.collection("orders").doc(o.id).update({taxOk:m,updatedAt:new Date().toISOString()})}catch(err){showStatus("Не сохранилось ("+(err&&err.code||"ошибка")+").",true)}}
 async function taxSupplier(file,list){
   let t="";try{t=String(await fileText(new Uint8Array(await file.arrayBuffer()),file.name)||"")}catch(e){}
   const hay=poKey(file.name+" "+t);const hit=(list||[]).filter(x=>x.name).find(x=>{const k=poKey(x.name);return k&&hay.includes(k)});
@@ -1369,7 +1380,7 @@ function analyze0(o){
     if(!imp&&o.payDue&&!paid&&!sent){const d=days(o.payDue);if(d<0){overdue=true;iss("pay");alerts.push({c:"bad",t:`Оплата от покупателя просрочена (срок ${fds(o.payDue)})`})}else if(d<=3)soon.push(`оплата до ${fds(o.payDue)}`)}
     if(sent)alerts.push({c:"info",t:`Покупатель отправил платёж ${sent} — ждём поступления денег`});
     if(!imp&&paid&&!stepDone(o,"bank")){iss("pay");alerts.push({c:"bad",t:"Стоит статус «Оплачен» — подготовьте контракт с подписью Ден Е."})}
-    if(!imp){const noTax=L.filter(x=>x.name&&(x.paid||Number(x.paidAmt)>0)&&!taxFiles(o,x,L).length).map(x=>x.name);if(noTax.length)alerts.push({c:"warn",t:`Нет 세금계산서: ${noTax.join(", ")}`})}
+    if(!imp){const noTax=L.filter(x=>x.name&&(x.paid||Number(x.paidAmt)>0)&&!taxHave(o,x,L)).map(x=>x.name);if(noTax.length)alerts.push({c:"warn",t:`Нет 세금계산서: ${noTax.join(", ")}`})}
     if(!loaded&&!imp)L.forEach(x=>{if(!x.date)return;const d=days(x.date);
       if(d<0&&x.st!=="confirmed"){overdue=true;iss("sched");alerts.push({c:"bad",t:`Срок поставщика ${x.name||""} прошёл (${fds(x.date)}) и не подтверждён`})}
       else if(d>=0&&d<=3)soon.push(`товар ${x.name||"от поставщика"} ${fds(x.date)}`)});
@@ -1445,7 +1456,7 @@ function stLi(z,a){
     if(L.length)h+=(all?`<li class="sub money r1 ${due?"due":"ok"}"${cf} title="${due?"К оплате поставщикам":"Поставщикам оплачено"}">${full(due||all)}</li>`:`<li class="sub money">—</li>`)
       +L.map(x=>{const pt=supPart(x), md=d=>d?" "+String(d).slice(5,7)+"."+String(d).slice(8,10):"";
         const tip=x.name+(x.amt?" — "+full(x.amt):"")+(x.paid?" · оплачен":pt?` · оплачено${md(x.paidAt)} ${full(x.paidAmt)}${x.amt?" ("+Math.round(x.paidAmt/x.amt*100)+"%)":""}, осталось ${full(supLeft(x))}`:" · не оплачен");
-        return `<li class="sub supl sp ${x.paid?"ok":pt?"part":"no"}"${cf} title="${esc(tip)}"><span class="sn">${esc(x.name)}</span>${(()=>{const T=taxFiles(a.o,x,L), tb=`<span class="stx ${T.length?"on":""}"${T.length?fOpen(a.o,T):""} title="세금계산서 ${esc(x.name)}: ${T.length?"загружен — открыть":"не загружен"}">세</span>`;
+        return `<li class="sub supl sp ${x.paid?"ok":pt?"part":"no"}"${cf} title="${esc(tip)}"><span class="sn">${esc(x.name)}</span>${(()=>{const T=taxFiles(a.o,x,L), ok=taxOkOf(a.o,x), tb=`<span class="stx ${T.length||ok?"on":""}"${T.length?fOpen(a.o,T):""} title="세금계산서 ${esc(x.name)}: ${T.length?"загружен — открыть":ok?"получен (со слов бухгалтера)":"не загружен"}">세</span>`;
           return x.amt?`<span class="samt ${x.paid?"paid":""}">${tb}${pt&&x.amt?`<small>${Math.round(x.paidAmt/x.amt*100)}%</small> `:""}${full(pt?supLeft(x):x.amt).replace(" KRW","")}</span>`:tb})()}</li>`}).join("")
     // the payment request is used on some orders only: a line when it is there, nothing (and no to-do) when it is not
     {const pr=kindFiles(a.o,"payreq");if(pr.length)h+=`<li class="ok"${fOpen(a.o,pr)}>Запрос на оплату</li>`}}
@@ -1664,7 +1675,7 @@ function lStepRow(o,id,ph){const s=STEP[id];
   }
   return `<li class="${done?"ok":""}"><i>${done?"✓":""}</i><span class="lsn">${esc(stepName(id))}${d?`<small>${fd(d)}</small>`:""}</span><span class="lsa">${act}</span></li>`}
 function lSups(o){const L=sups(o).filter(x=>x.name||x.date);if(!L.length)return `<p class="note">Поставщики не указаны.</p>`;
-  return `<ul class="lsup">${L.map(x=>{const tx=taxFiles(o,x,L);return `<li><span class="lsn">${esc(x.name||"Поставщик")}<small>${x.date?"товар "+fd(x.date)+" · ":""}${esc((SUPST[x.st]||SUPST.none).toLowerCase())}</small></span><span class="lsm">${x.amt?fm(x.amt,"₩"):""}<small class="${x.paid?"okt":""}">${x.paid?"оплачен":Number(x.paidAmt)>0?"частично":"не оплачен"}</small></span><span class="stx ${tx.length?"on":""}" ${tx.length?fOpen(o,tx):""} title="세금계산서 ${tx.length?"загружен":"нет"}">세</span></li>`}).join("")}</ul>`}
+  return `<ul class="lsup">${L.map(x=>{const tx=taxFiles(o,x,L);return `<li><span class="lsn">${esc(x.name||"Поставщик")}<small>${x.date?"товар "+fd(x.date)+" · ":""}${esc((SUPST[x.st]||SUPST.none).toLowerCase())}</small></span><span class="lsm">${x.amt?fm(x.amt,"₩"):""}<small class="${x.paid?"okt":""}">${x.paid?"оплачен":Number(x.paidAmt)>0?"частично":"не оплачен"}</small></span>${tx.length?`<span class="stx on" ${fOpen(o,tx)} title="세금계산서 загружен — открыть">세</span>`:x.name&&canWrite?`<label class="stxok" title="Отметьте, если бухгалтер сказал, что 세금계산서 уже получен — файл загружать не нужно"><input type="checkbox" data-taxok="${esc(x.name)}" ${taxOkOf(o,x)?"checked":""}> <span class="stx ${taxOkOf(o,x)?"on":""}">세</span></label>`:`<span class="stx ${taxOkOf(o,x)?"on":""}">세</span>`}</li>`}).join("")}</ul>`}
 function lPanel(o){
   if(!o)return `<div class="lpe">Выберите заказ в списке слева.</div>`;
   const a=an(o), P=phasesOf(o), imp=isImp(o);
@@ -1729,6 +1740,7 @@ $("listView").addEventListener("click",async e=>{
   const up=t.closest("[data-lup]");if(up&&o){openEditor(o,up.dataset.lph||null);const k=up.dataset.lup;if($("upKind")){$("upKind").value=k;$("upSigner").hidden=k!=="cs"}$("upFile").click();return}
   const sk=t.closest("[data-lskip]");if(sk&&o&&db&&canWrite){const id=sk.dataset.lskip, skip={...(o.skip||{})};if(sk.dataset.on==="1")skip[id]=true;else delete skip[id];
     sk.disabled=true;try{await db.collection("orders").doc(o.id).update({skip,updatedAt:new Date().toISOString()})}catch(err){sk.disabled=false;showStatus("Не получилось сохранить ("+(err&&err.code||"ошибка")+").",true)}return}
+  const tk=t.closest("input[data-taxok]");if(tk&&o){taxOkSet(o,tk.dataset.taxok,tk.checked);return}
   const sb=t.closest("[data-lstep]");if(sb&&o&&db&&canWrite){const id=sb.dataset.lstep, on=sb.dataset.on==="1";
     const steps={...(o.steps||{}),[id]:on?isoToday():""}, toArch=id==="closed"&&on&&!o.arch;
     sb.disabled=true;
@@ -3726,7 +3738,7 @@ function compactCard(o){
       t.eq.forEach(([k,v])=>r.push(["Эквивалент",amt(v,k),"n eqv"]));sec.push([isImp(o)?"Сумма":"Покупатель",r])}}
   const money=[];
   if(sh.has("sup")){const L=sups(o).filter(x=>x.name);
-    L.forEach(x=>money.push([esc(x.name)+(taxFiles(o,x,L).length?` <small class="ok-t" title="세금계산서 загружен">세 ✓</small>`:` <small class="ccno" title="세금계산서 не загружен">세 —</small>`)+(x.paid?` <small class="ok-t">оплачен</small>`:supPart(x)?` <small class="ccp">оплачено ${x.amt?Math.round(x.paidAmt/x.amt*100)+"%":amt(x.paidAmt,"KRW")}, осталось ${amt(supLeft(x),"KRW")}</small>`:""),x.amt?amt(x.amt,"KRW"):`<span class="ccno">сумма не указана</span>`,"n"]));
+    L.forEach(x=>money.push([esc(x.name)+(taxHave(o,x,L)?` <small class="ok-t" title="세금계산서 загружен">세 ✓</small>`:` <small class="ccno" title="세금계산서 не загружен">세 —</small>`)+(x.paid?` <small class="ok-t">оплачен</small>`:supPart(x)?` <small class="ccp">оплачено ${x.amt?Math.round(x.paidAmt/x.amt*100)+"%":amt(x.paidAmt,"KRW")}, осталось ${amt(supLeft(x),"KRW")}</small>`:""),x.amt?amt(x.amt,"KRW"):`<span class="ccno">сумма не указана</span>`,"n"]));
     const tot=L.reduce((t,x)=>t+(Number(x.amt)||0),0);
     if(L.length>1&&tot)money.push(["Итого поставщикам",amt(tot,"KRW"),"n tot"]);
     if(money.length)sec.push(["Поставщикам",money.splice(0)])}
@@ -3818,9 +3830,10 @@ renderDocsAll=function(){
         if(pics.length){nFiles+=pics.length;h+=`<div class="dfl"><span class="dfn">Фото: ${pics.length}</span><span class="da"><button type="button" class="ib" data-dlpics="${esc(o.id)}" title="Скачать все фото (.zip)">⬇</button></span></div>`}
       }
       // 세금계산서: which suppliers have not sent theirs yet
-      if(k==="taxinv"){const SL=sups(o).filter(x=>x.name), miss=SL.filter(x=>!taxFiles(o,x,SL).length).map(x=>x.name);
-        if(miss.length&&h)h+=`<div class="dfl"><span></span><span class="dnone">нет от: ${esc(miss.join(", "))}</span></div>`;
-        else if(miss.length)h=`<span class="dnone">нет от: ${esc(miss.join(", "))}</span>`}
+      if(k==="taxinv"){const SL=sups(o).filter(x=>x.name);
+        if(SL.length){const miss=SL.filter(x=>!taxHave(o,x,SL)).length;
+          h+=`<div class="dtx"><div class="dtxh ${miss?"bad":"ok"}">${miss?`Не хватает ${miss} из ${SL.length}`:(SL.length===1?"Получен":`Все ${SL.length} получены`)}</div><ul>${SL.map(x=>{const T=taxFiles(o,x,SL), ok=taxOkOf(o,x);
+            return `<li class="${T.length||ok?"ok":"no"}"><span class="dtxn">${esc(x.name)}</span><span class="dtxs">${T.length?`✓ файл`:ok?`✓ получен, со слов бухгалтера`:`нет`}</span>${!T.length&&canWrite?`<label class="dtxc" title="Бухгалтер подтвердил, что 세금계산서 получен — файл загружать не нужно"><input type="checkbox" data-taxok="${esc(x.name)}" data-oid="${esc(o.id)}" ${ok?"checked":""}> получен</label>`:""}</li>`}).join("")}</ul></div>`}}
       return `<tr class="${h&&!/^<span class="dnone">/.test(h)?"":"none"}"><th scope="row">${esc(k==="photo"?"Фотоотчёт":k==="taxinv"?"세금계산서":(KIND[k]||"Прочее").replace(/ \(.*\)$/,""))}</th><td>${h||`<span class="dnone">нет</span>`}</td></tr>`;
     }).join("")+(fixed.length&&!cur?`<tr class="fixrow"><th scope="row">Документы после исправлений</th><td>${(nFiles+=fixed.length,fixed.slice().sort((a,b)=>String(b.at||"").localeCompare(String(a.at||""))).map(f=>fileRow(o,f)).join(""))}</td></tr>`:"");
     return `<article class="dcard"><header><span class="num" data-open="${esc(o.id)}" title="Открыть заказ">${esc(o.num||"без номера")}</span><span class="who">${esc(o.buyer||"")}</span>${o.arch?`<small class="note">архив</small>`:""}<span class="cnt">${docsAll.length+pics.length} файл.</span></header><table class="dct"><tbody>${rows}</tbody></table></article>`;
@@ -3830,6 +3843,7 @@ renderDocsAll=function(){
 };
 // change a file's type right here
 $("docsAll").addEventListener("change",async e=>{
+  const tk=e.target.closest("input[data-taxok]");if(tk){taxOkSet(orders.find(x=>x.id===tk.dataset.oid),tk.dataset.taxok,tk.checked);return}
   const s=e.target.closest("select[data-dkind]");if(!s)return;
   const o=orders.find(x=>x.id===s.dataset.oid);if(!o)return;
   const files=(o.files||[]).map(f=>{if(f.aid!==s.dataset.dkind)return f;const n={...f,kind:s.value};if(s.value==="cs"&&!n.signer)n.signer=guessSigner(f.name)||"ti";if(s.value!=="cs")delete n.signer;return n});
