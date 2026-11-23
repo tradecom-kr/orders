@@ -1275,6 +1275,12 @@ const taxHave=(o,x,L)=>taxFiles(o,x,L).length>0||taxOkOf(o,x);
 async function taxOkSet(o,name,on){if(!db||!canWrite||!o)return;const k=String(name||"").trim().toLowerCase();if(!k)return;
   const m={...(o.taxOk||{})};if(on)m[k]=isoToday();else delete m[k];
   try{await db.collection("orders").doc(o.id).update({taxOk:m,updatedAt:new Date().toISOString()})}catch(err){showStatus("Не сохранилось ("+(err&&err.code||"ошибка")+").",true)}}
+// 세금계산서 by supplier: «не хватает N из M», each supplier's status, a «получен» tick where there is no file
+function taxBlock(o){if(isImp(o))return "";const SL=sups(o).filter(x=>x.name);if(!SL.length)return "";let h="";
+  const miss=SL.filter(x=>!taxHave(o,x,SL)).length;
+          h+=`<div class="dtx"><div class="dtxh ${miss?"bad":"ok"}">${miss?`Не хватает ${miss} из ${SL.length}`:(SL.length===1?"Получен":`Все ${SL.length} получены`)}</div><ul>${SL.map(x=>{const T=taxFiles(o,x,SL), ok=taxOkOf(o,x);
+            return `<li class="${T.length||ok?"ok":"no"}"><span class="dtxn">${esc(x.name)}</span><span class="dtxs">${T.length?`✓ файл`:ok?`✓ получен, со слов бухгалтера`:`нет`}</span>${!T.length&&canWrite?`<label class="dtxc" title="Бухгалтер подтвердил, что 세금계산서 получен — файл загружать не нужно"><input type="checkbox" data-taxok="${esc(x.name)}" data-oid="${esc(o.id)}" ${ok?"checked":""}> получен</label>`:""}</li>`}).join("")}</ul></div>`
+  return h}
 async function taxSupplier(file,list){
   let t="";try{t=String(await fileText(new Uint8Array(await file.arrayBuffer()),file.name)||"")}catch(e){}
   const hay=poKey(file.name+" "+t);const hit=(list||[]).filter(x=>x.name).find(x=>{const k=poKey(x.name);return k&&hay.includes(k)});
@@ -3214,7 +3220,8 @@ function renderDocsAll(){
   const body=rowsO.map(o=>`<tr>${one?"":`<th class="dord" scope="row"><span class="on" data-open="${esc(o.id)}">${esc(o.num||"")}</span>${o.arch?`<small>архив</small>`:""}</th>`}${cols.map(k=>{
     const items=(cell.get(o.id+"|"+k)||[]).slice().sort((a,b)=>k==="cs"?sigOrder(a.f&&a.f.signer)-sigOrder(b.f&&b.f.signer):String(b.f&&b.f.at||"").localeCompare(String(a.f&&a.f.at||"")));
     nFiles+=items.reduce((n,it)=>n+(it.pics?it.pics.length:1),0);
-    return `<td>${items.length?items.map(it=>chip(o,it)).join(""):`<span class="dnone">—</span>`}</td>`}).join("")}</tr>`).join("");
+    const tb=k==="taxinv"?taxBlock(o):"";
+    return `<td>${items.length?items.map(it=>chip(o,it)).join(""):tb?"":`<span class="dnone">—</span>`}${tb}</td>`}).join("")}</tr>`).join("");
   $("docsCount").textContent=nFiles?`Файлов: ${nFiles}`:"";
   // keep the table where it was scrolled: a delete confirmation must not jump back to the first column
   const oldBox=$("docsAll").querySelector(".dmx"), keepX=oldBox?oldBox.scrollLeft:0;
@@ -3226,7 +3233,7 @@ try{const v=localStorage.getItem("docSort");if(v)$("dSort").value=v}catch(e){}
 $("dSort").addEventListener("change",()=>{try{localStorage.setItem("docSort",$("dSort").value)}catch(e){}renderDocsAll()});
 try{const v=localStorage.getItem("docOrder");if(v!==null&&$("fOrder"))$("fOrder").dataset.want=v}catch(e){}
 if($("fOrder"))$("fOrder").addEventListener("change",()=>{try{localStorage.setItem("docOrder",$("fOrder").value)}catch(e){}renderDocsAll()});
-$("fKind").addEventListener("change",renderDocsAll);
+$("fKind").addEventListener("change",()=>renderDocsAll());
 $("docsAll").addEventListener("click",e=>{const b=e.target.closest("[data-dl]");if(b){downloadFile(b.dataset.dl,b.dataset.oid);return}
   const x=e.target.closest("button");
   if(x&&x.dataset.dlpics){dlPics(x.dataset.dlpics);return}
@@ -3820,7 +3827,9 @@ renderDocsAll=function(){
     if(!o.arch)(isImp(o)?["cs","ipl","lbl","lblph","test","photo","impdecl","brokinv"]:["kp","cs","ipl","taxinv","exp","photo","expd","bl","freight"]).forEach(k=>kinds.add(k));
     let list=[...kinds].sort((a,b)=>kIdx(a)-kIdx(b));
     if(cur)list=list.filter(k=>k===cur);
-    if(cur&&!docs.some(f=>kindOf(f.kind)===cur)&&!(cur==="photo"&&(pics.length||linkOK(o.photoLink))))return "";
+    if(!isImp(o)&&sups(o).some(x=>x.name))kinds.add("taxinv");
+    if(cur&&!list.length&&cur==="taxinv"&&kinds.has("taxinv"))list=["taxinv"];
+    if(cur&&!docs.some(f=>kindOf(f.kind)===cur)&&!(cur==="photo"&&(pics.length||linkOK(o.photoLink)))&&!(cur==="taxinv"&&kinds.has("taxinv")))return "";
     const rows=list.map(k=>{
       let h="";
       const L=docs.filter(f=>kindOf(f.kind)===k).sort((a,b)=>k==="cs"?CS_PARTS.indexOf(csPart(a.orig||a.name))-CS_PARTS.indexOf(csPart(b.orig||b.name))||sigOrder(a.signer)-sigOrder(b.signer):k==="ipl"?IPL_PARTS.indexOf(iplPart(a.orig||a.name))-IPL_PARTS.indexOf(iplPart(b.orig||b.name))||String(b.at||"").localeCompare(String(a.at||"")):String(b.at||"").localeCompare(String(a.at||"")));
@@ -3830,10 +3839,7 @@ renderDocsAll=function(){
         if(pics.length){nFiles+=pics.length;h+=`<div class="dfl"><span class="dfn">Фото: ${pics.length}</span><span class="da"><button type="button" class="ib" data-dlpics="${esc(o.id)}" title="Скачать все фото (.zip)">⬇</button></span></div>`}
       }
       // 세금계산서: which suppliers have not sent theirs yet
-      if(k==="taxinv"){const SL=sups(o).filter(x=>x.name);
-        if(SL.length){const miss=SL.filter(x=>!taxHave(o,x,SL)).length;
-          h+=`<div class="dtx"><div class="dtxh ${miss?"bad":"ok"}">${miss?`Не хватает ${miss} из ${SL.length}`:(SL.length===1?"Получен":`Все ${SL.length} получены`)}</div><ul>${SL.map(x=>{const T=taxFiles(o,x,SL), ok=taxOkOf(o,x);
-            return `<li class="${T.length||ok?"ok":"no"}"><span class="dtxn">${esc(x.name)}</span><span class="dtxs">${T.length?`✓ файл`:ok?`✓ получен, со слов бухгалтера`:`нет`}</span>${!T.length&&canWrite?`<label class="dtxc" title="Бухгалтер подтвердил, что 세금계산서 получен — файл загружать не нужно"><input type="checkbox" data-taxok="${esc(x.name)}" data-oid="${esc(o.id)}" ${ok?"checked":""}> получен</label>`:""}</li>`}).join("")}</ul></div>`}}
+      if(k==="taxinv")h+=taxBlock(o);
       return `<tr class="${h&&!/^<span class="dnone">/.test(h)?"":"none"}"><th scope="row">${esc(k==="photo"?"Фотоотчёт":k==="taxinv"?"세금계산서":(KIND[k]||"Прочее").replace(/ \(.*\)$/,""))}</th><td>${h||`<span class="dnone">нет</span>`}</td></tr>`;
     }).join("")+(fixed.length&&!cur?`<tr class="fixrow"><th scope="row">Документы после исправлений</th><td>${(nFiles+=fixed.length,fixed.slice().sort((a,b)=>String(b.at||"").localeCompare(String(a.at||""))).map(f=>fileRow(o,f)).join(""))}</td></tr>`:"");
     return `<article class="dcard"><header><span class="num" data-open="${esc(o.id)}" title="Открыть заказ">${esc(o.num||"без номера")}</span><span class="who">${esc(o.buyer||"")}</span>${o.arch?`<small class="note">архив</small>`:""}<span class="cnt">${docsAll.length+pics.length} файл.</span></header><table class="dct"><tbody>${rows}</tbody></table></article>`;
