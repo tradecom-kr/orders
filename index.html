@@ -2338,6 +2338,8 @@ function clRow(d,id){
       if(canWrite&&assets&&editing.id)act=`<button class="btn" type="button" data-upk="cs_den_both">${sb.length?"+ Ещё файл":"Загрузить подписанный"}</button>`}
   }else{
     ctrl=`<span class="ico" aria-hidden="true">${done?"✓":""}</span>`;
+    // «Поставщикам оплачено» follows the suppliers' «оплачен» ticks: one button ticks them all
+    if(id==="suppay"&&!done&&canWrite&&sups(d).some(x=>x.name))act=`<button class="btn" type="button" data-allpaid>Отметить: всем оплачено</button>`;
     if(s.mode==="doc"){
       if(s.doc==="photo"){const all=reqFiles(d,"photo"),ps=all.filter(isPic),other=all.length-ps.length,lk=linkOK(d.photoLink);
         hint=lk?`<small><a class="lnk" href="${esc(d.photoLink.trim())}" target="_blank" rel="noopener" data-ext>📁 Открыть фото в Google Диске ↗</a></small>`
@@ -2394,6 +2396,9 @@ async function writeOrder(o){
 function showStatus(t,err){const s=$("status");s.hidden=!t;s.textContent=t||"";s.classList.toggle("err",!!err)}
 
 /* checklist interactions */
+$("cl").addEventListener("click",e=>{if(!e.target.closest("[data-allpaid]")||!editing)return;
+  $("supList").querySelectorAll(".s_paid").forEach(c=>{if(c.closest(".sups").querySelector(".s_name").value.trim())c.checked=true});
+  editing.suppliers=readSups();supSum();refreshDerived();$("saveNote").textContent="Поставщики отмечены оплаченными — нажмите «Сохранить».";});
 $("cl").addEventListener("change",async e=>{
   const c=e.target.closest("[data-step]");if(!c||!editing)return;
   const id=c.dataset.step;
