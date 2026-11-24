@@ -798,7 +798,7 @@ button.kdb:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-so
 .lsteps li>i{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font:700 11px var(--f-body);font-style:normal;color:var(--accent-ink)}.lsteps li.ok>i{background:var(--ok);border-color:var(--ok)}
 .lsn{display:flex;flex-direction:column;min-width:0}.lsn small{color:var(--muted);font-size:11.5px}
 .lsa{display:flex;gap:4px;align-items:center;justify-content:flex-end;min-width:0}
-.lsup li{grid-template-columns:minmax(0,1fr) auto auto}.lsm{display:flex;flex-direction:column;align-items:flex-end;font:600 12.5px var(--f-mono)}.lsm small{font:500 11px var(--f-body);color:var(--danger)}.lsm small.okt{color:var(--ok)}
+.lsup li{grid-template-columns:minmax(0,1fr) auto auto}.lsp{display:inline-flex;align-items:center;gap:4px;font:500 12px var(--f-body);color:var(--danger);cursor:pointer}.lsp.on{color:var(--ok)}.lsp input,.stxok input{width:14px;height:14px;margin:0}.lsm.paid{color:var(--ok)}.stxok{white-space:nowrap}.lsm{display:flex;flex-direction:column;align-items:flex-end;font:600 12.5px var(--f-mono)}.lsm small{font:500 11px var(--f-body);color:var(--danger)}.lsm small.okt{color:var(--ok)}
 .lfiles li{display:flex;flex-direction:column;padding:6px 0;border-bottom:1px solid var(--soft)}.lfiles small{color:var(--muted);font-size:11.5px}
 .lfl{border:0;background:none;padding:0;color:var(--accent);font:500 13px var(--f-body);cursor:pointer;text-align:left;text-decoration:none;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lfl:hover{text-decoration:underline}
 .lfiles .lfl{max-width:100%}
@@ -1712,8 +1712,12 @@ function lStepRow(o,id,ph){const s=STEP[id];
     if(!["got","closed"].includes(id))act+=`<button type="button" class="lun" data-lskip="${id}" data-on="1" title="В этом заказе этот шаг не нужен">не нужно</button>`;
   }
   return `<li class="${done?"ok":""}"><i>${done?"✓":""}</i><span class="lsn">${esc(stepName(id))}${d?`<small>${fd(d)}</small>`:""}</span><span class="lsa">${act}</span></li>`}
-function lSups(o){const L=sups(o).filter(x=>x.name||x.date);if(!L.length)return `<p class="note">Поставщики не указаны.</p>`;
-  return `<ul class="lsup">${L.map(x=>{const tx=taxFiles(o,x,L);return `<li><span class="lsn">${esc(x.name||"Поставщик")}<small>${x.date?"товар "+fd(x.date)+" · ":""}${esc((SUPST[x.st]||SUPST.none).toLowerCase())}</small></span><span class="lsm">${x.amt?fm(x.amt,"₩"):""}<small class="${x.paid?"okt":""}">${x.paid?"оплачен":Number(x.paidAmt)>0?"частично":"не оплачен"}</small></span>${tx.length?`<span class="stx on" ${fOpen(o,tx)} title="세금계산서 загружен — открыть">세</span>`:x.name&&canWrite?`<label class="stxok" title="Отметьте, если бухгалтер сказал, что 세금계산서 уже получен — файл загружать не нужно"><input type="checkbox" data-taxok="${esc(x.name)}" ${taxOkOf(o,x)?"checked":""}> <span class="stx ${taxOkOf(o,x)?"on":""}">세</span></label>`:`<span class="stx ${taxOkOf(o,x)?"on":""}">세</span>`}</li>`}).join("")}</ul>`}
+// suppliers in the panel: «оплачен» tick (the supplier is paid) and, separately, «세 получен» (tax invoice received without a file)
+function lSups(o){const R=sups0(o), S=sups(o), L=S.map((x,i)=>({...x,__i:i})).filter(x=>x.name||x.date);if(!L.length)return `<p class="note">Поставщики не указаны.</p>`;
+  return `<ul class="lsup">${L.map(x=>{const tx=taxFiles(o,x,L), pt=!x.paid&&Number(x.paidAmt)>0, tok=taxOkOf(o,x);
+    const pay=canWrite?`<label class="lsp ${x.paid?"on":""}" title="Отметьте, когда поставщику оплачено полностью"><input type="checkbox" data-suppaid="${x.__i}" ${x.paid?"checked":""}> оплачен</label>`:`<small class="${x.paid?"okt":""}">${x.paid?"оплачен":"не оплачен"}</small>`;
+    const tax=tx.length?`<span class="stx on" ${fOpen(o,tx)} title="세금계산서 загружен — открыть">세</span>`:x.name&&canWrite?`<label class="stxok" title="Отметьте, если бухгалтер сказал, что 세금계산서 уже получен — файл загружать не нужно"><input type="checkbox" data-taxok="${esc(x.name)}" ${tok?"checked":""}> <span class="stx ${tok?"on":""}">세</span> получен</label>`:`<span class="stx ${tok?"on":""}">세</span>`;
+    return `<li><span class="lsn">${esc(x.name||"Поставщик")}<small>${x.date?"товар "+fd(x.date)+" · ":""}${esc((SUPST[x.st]||SUPST.none).toLowerCase())}${pt?` · оплачено частично ${fm(x.paidAmt,"₩")}`:""}</small></span><span class="lsm ${x.paid?"paid":""}">${x.amt?fm(x.amt,"₩"):""}${pay}</span>${tax}</li>`}).join("")}</ul>`}
 function lPanel(o){
   if(!o)return `<div class="lpe">Выберите заказ в списке слева.</div>`;
   const a=an(o), P=phasesOf(o), imp=isImp(o);
@@ -1779,6 +1783,9 @@ $("listView").addEventListener("click",async e=>{
   const sk=t.closest("[data-lskip]");if(sk&&o&&db&&canWrite){const id=sk.dataset.lskip, skip={...(o.skip||{})};if(sk.dataset.on==="1")skip[id]=true;else delete skip[id];
     sk.disabled=true;try{await db.collection("orders").doc(o.id).update({skip,updatedAt:new Date().toISOString()})}catch(err){sk.disabled=false;showStatus("Не получилось сохранить ("+(err&&err.code||"ошибка")+").",true)}return}
   const tk=t.closest("input[data-taxok]");if(tk&&o){taxOkSet(o,tk.dataset.taxok,tk.checked);return}
+  const sp=t.closest("input[data-suppaid]");if(sp&&o&&db&&canWrite){const i=+sp.dataset.suppaid, L=sups0(o).map(x=>({...x}));if(!L[i])return;
+    L[i].paid=sp.checked;if(sp.checked){L[i].paidAt=L[i].paidAt||isoToday();L[i].paidAmt=null}
+    sp.disabled=true;try{await db.collection("orders").doc(o.id).update({suppliers:L,updatedAt:new Date().toISOString()})}catch(err){sp.disabled=false;showStatus("Не сохранилось ("+(err&&err.code||"ошибка")+").",true)}return}
   const sb=t.closest("[data-lstep]");if(sb&&o&&db&&canWrite){const id=sb.dataset.lstep, on=sb.dataset.on==="1";
     const steps={...(o.steps||{}),[id]:on?isoToday():""}, toArch=id==="closed"&&on&&!o.arch;
     sb.disabled=true;
